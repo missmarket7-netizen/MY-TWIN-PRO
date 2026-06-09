@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, StyleSheet, Animated, ActivityIndicator,
-  Dimensions, SafeAreaView
+  View, StyleSheet, Animated, ActivityIndicator, Text, Dimensions, SafeAreaView
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -18,12 +17,14 @@ export default function SplashScreen() {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
   const subTextOpacity = useRef(new Animated.Value(0)).current;
-  const [authReady, setAuthReady] = useState(false);
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [loadingText, setLoadingText] = useState('');
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [routeReady, setRouteReady] = useState(false);
+  const targetRoute = useRef('/login');
 
   useEffect(() => {
-    // بدء الأنيميشن وتخزين المرجع لإيقافه لاحقاً
-    animationRef.current = Animated.sequence([
+    // بدء الأنيميشن
+    animRef.current = Animated.sequence([
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
@@ -50,55 +51,75 @@ export default function SplashScreen() {
         }),
       ]),
     ]);
-    animationRef.current.start();
+    animRef.current.start();
 
-    // بدء التحقق من الجلسة فوراً دون انتظار الأنيميشن
-    const authPromise = (async () => {
+    // بدء التحقق من الجلسة فوراً بالتوازي
+    const isAr = useTwinStore.getState().lang === 'ar';
+    const texts = {
+      checking: isAr ? 'جارٍ الاتصال بتوأمك...' : 'Connecting to your Twin...',
+      loading: isAr ? 'تحميل البيانات...' : 'Loading data...',
+    };
+
+    const bootPromise = (async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        setLoadingText(texts.checking);
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
-          return { route: '/login' as const };
+          targetRoute.current = '/login';
+          return;
         }
 
         setAuth(session.user.id);
         setToken(session.access_token);
+        setLoadingText(texts.loading);
 
-        // استخدام maybeSingle لتجنب الخطأ عند عدم وجود صف
-        const { data: profile } = await supabase
+        // جلب ملف المستخدم
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('onboarded')
           .eq('id', session.user.id)
           .maybeSingle();
 
-        // إذا لم يكن هناك profile أو لم يكمل الـ onboarding
-        if (!profile || !profile.onboarded) {
-          return { route: '/onboarding' as const };
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+          targetRoute.current = '/login';
+          return;
         }
 
-        return { route: '/chat' as const };
+        // إذا لم يكن هناك صف أو لم يكمل الـ onboarding
+        if (!profile || !profile.onboarded) {
+          targetRoute.current = '/onboarding';
+          return;
+        }
+
+        targetRoute.current = '/chat';
       } catch (e) {
-        console.error('Splash auth error:', e);
-        return { route: '/login' as const };
+        console.error('Boot error:', e);
+        targetRoute.current = '/login';
+      } finally {
+        setRouteReady(true);
       }
     })();
 
-    // انتظر انتهاء الأنيميشن والتحقق معاً
-    Promise.all([
-      authPromise,
-      new Promise(resolve => setTimeout(resolve, 2800)), // الحد الأدنى للـ splash
-    ]).then(([authResult]) => {
-      setAuthReady(true);
-      router.replace(authResult.route);
+    // انتظر على الأقل مدة الأنيميشن (2.8 ثانية) مع التحقق
+    const minTime = new Promise(resolve => setTimeout(resolve, 2800));
+
+    Promise.all([bootPromise, minTime]).then(() => {
+      if (!routeReady) setRouteReady(true);
     });
 
     return () => {
-      // إيقاف الأنيميشن عند مغادرة الشاشة
-      animationRef.current?.stop();
+      animRef.current?.stop();
     };
-  }, [setAuth]);
+  }, []);
+
+  // الانتقال عند الجاهزية
+  useEffect(() => {
+    if (routeReady) {
+      router.replace(targetRoute.current as any);
+    }
+  }, [routeReady]);
 
   return (
     <SafeAreaView style={[styles.safe, isDark && { backgroundColor: '#1A1A1A' }]}>
@@ -115,31 +136,25 @@ export default function SplashScreen() {
             ]}
             resizeMode="contain"
           />
-          <Animated.Text
-            style={[
-              styles.company,
-              { opacity: textOpacity },
-              isDark && { color: '#D8B4FE' },
-            ]}
-          >
+          <Animated.Text style={[styles.appName, { opacity: textOpacity }, isDark && { color: '#D8B4FE' }]}>
+            MyTwin
+          </Animated.Text>
+          <Animated.Text style={[styles.tagline, { opacity: subTextOpacity }, isDark && { color: '#A78BFA' }]}>
+            {useTwinStore.getState().lang === 'ar' ? 'رفيقك الذكي دائماً 💜' : 'Your AI Companion Always 💜'}
+          </Animated.Text>
+          <Animated.Text style={[styles.company, { opacity: textOpacity }, isDark && { color: '#9B7FC7' }]}>
             BY SOULSYNC
           </Animated.Text>
-          <Animated.Text
-            style={[
-              styles.copyright,
-              { opacity: subTextOpacity },
-              isDark && { color: '#A78BFA' },
-            ]}
-          >
+          <Animated.Text style={[styles.copyright, { opacity: subTextOpacity }, isDark && { color: '#9B7FC7' }]}>
             2026©
           </Animated.Text>
-          {!authReady && (
-            <ActivityIndicator
-              size="small"
-              color={isDark ? '#D8B4FE' : '#6B21A8'}
-              style={{ marginTop: 20 }}
-            />
-          )}
+        </View>
+
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={isDark ? '#D8B4FE' : '#6B21A8'} />
+          <Text style={[styles.loadingText, isDark && { color: '#D8B4FE' }]}>
+            {loadingText}
+          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -158,15 +173,38 @@ const styles = StyleSheet.create({
   logo: {
     width: Math.min(SCREEN_WIDTH * 0.5, 240),
     height: Math.min(SCREEN_WIDTH * 0.5, 240),
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  company: {
-    fontSize: 20,
-    fontWeight: '700',
+  appName: {
+    fontSize: 32,
+    fontWeight: '800',
     color: '#6B21A8',
     letterSpacing: 2,
     marginBottom: 6,
-    textTransform: 'uppercase',
   },
-  copyright: { fontSize: 13, color: '#9B7FC7', letterSpacing: 1 },
+  tagline: {
+    fontSize: 15,
+    color: '#9B7FC7',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  company: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B21A8',
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  copyright: { fontSize: 12, color: '#9B7FC7', letterSpacing: 1 },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 24,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#6B21A8',
+    fontWeight: '500',
+  },
 });

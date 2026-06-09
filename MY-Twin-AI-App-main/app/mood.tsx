@@ -1,7 +1,7 @@
 import { SafeAreaView, View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
 import { HeartPulse } from 'lucide-react-native';
-import Emoji from '../components/Emoji';
+import EmotionalAvatar from '../components/EmotionalAvatar';
 
 export default function Mood() {
   const { lang, theme } = useTwinStore();
@@ -24,7 +24,7 @@ export default function Mood() {
         <HeartPulse size={40} stroke={isDark ? '#D8B4FE' : '#6B21A8'} style={{ alignSelf: 'center', marginBottom: 24 }} />
         {moods.map((m, i) => (
           <View key={i} style={[s.row, isDark && { backgroundColor: '#2A2A2A', borderColor: '#444' }]}>
-            <Emoji emoji={m.emoji} size={24} />
+            <EmotionalAvatar emoji={m.emoji} size={28} animated={false} />
             <Text style={[s.label, isDark && { color: '#FFF' }]}>{m.label}</Text>
             <View style={[s.dot, { backgroundColor: m.color }]} />
           </View>

@@ -1,64 +1,67 @@
-import { SafeAreaView, ScrollView, Text, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, Text, StyleSheet, View } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
-import { Shield } from 'lucide-react-native';
+import {
+  Shield, Lock, Brain, UserCheck, Trash2, AlertTriangle,
+  Download, Mail, FileText, Cloud, Smartphone, Eye
+} from 'lucide-react-native';
 
 export default function Privacy() {
   const { lang, theme } = useTwinStore();
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  const policy = isAr ? `
-  سياسة الخصوصية والشروط – MyTwin
-  
-  آخر تحديث: يونيو 2026
-  
-  1. جمع البيانات: نجمع فقط البيانات الضرورية لتشغيل التطبيق (البريد الإلكتروني، الاسم، تفضيلات التوأم). لا نبيع بياناتك لأي طرف ثالث.
-  
-  2. المحادثات: جميع محادثاتك مشفرة ومخزنة بشكل آمن على خوادم Supabase. لا يطلع عليها أي شخص آخر.
-  
-  3. الذكاء الاصطناعي: يستخدم MyTwin نماذج ذكاء اصطناعي متعددة (Gemini، Groq، OpenRouter). قد تتم معالجة بعض الرسائل على خوادم هذه النماذج وفقًا لسياسات الخصوصية الخاصة بها.
-  
-  4. الصوت: عند استخدام ميزة الصوت، يتم تحويل النص إلى كلام باستخدام Edge TTS أو ElevenLabs. لا يتم تخزين التسجيلات الصوتية.
-  
-  5. ملفات تعريف الارتباط: لا نستخدم ملفات تعريف ارتباط.
-  
-  6. حقوق المستخدم: يمكنك طلب حذف حسابك وجميع بياناتك في أي وقت من خلال الإعدادات.
-  
-  7. الامتثال القانوني: تلتزم Soul Sync Ltd. بكافة القوانين واللوائح الدولية المتعلقة بحماية البيانات والخصوصية، بما في ذلك اللائحة العامة لحماية البيانات (GDPR) وقانون خصوصية المستهلك في كاليفورنيا (CCPA).
-  
-  8. تحديد المسؤولية: يتم توفير التطبيق "كما هو". لا تتحمل Soul Sync Ltd. أي مسؤولية عن أي أضرار ناتجة عن استخدام التطبيق. المستخدم هو المسؤول الوحيد عن تفاعلاته مع التوأم الرقمي.
-  
-  9. الاتصال: للأسئلة حول الخصوصية، راسلنا على support@mytwin.app.
-  ` : `
-  Privacy Policy & Terms – MyTwin
-  
-  Last updated: June 2026
-  
-  1. Data Collection: We collect only data necessary to operate the app (email, name, twin preferences). We do not sell your data to third parties.
-  
-  2. Chats: All your chats are encrypted and stored securely on Supabase servers. No one else has access.
-  
-  3. AI: MyTwin uses multiple AI models (Gemini, Groq, OpenRouter). Some messages may be processed on these models' servers according to their privacy policies.
-  
-  4. Voice: When using voice features, text-to-speech is processed via Edge TTS or ElevenLabs. Voice recordings are not stored.
-  
-  5. Cookies: We do not use cookies.
-  
-  6. User Rights: You can request deletion of your account and all data at any time via Settings.
-  
-  7. Legal Compliance: Soul Sync Ltd. complies with all international data protection and privacy laws, including GDPR and CCPA.
-  
-  8. Limitation of Liability: The app is provided "as is". Soul Sync Ltd. is not liable for any damages arising from the use of the app. The user is solely responsible for their interactions with the digital twin.
-  
-  9. Contact: For privacy questions, email support@mytwin.app.
-  `;
+  const txt = isDark ? '#FFF' : '#1A1A1A';
+  const sub = isDark ? '#CCC' : '#444';
+  const bg = isDark ? '#1A1A1A' : '#F8F6F2';
+  const card = isDark ? '#2A2A2A' : '#FFF';
+  const border = isDark ? '#444' : '#F0F0F0';
+  const primary = isDark ? '#D8B4FE' : '#6B21A8';
+
+  const sections = isAr ? [
+    { icon: UserCheck, title: 'بياناتك ملكك 🔒', body: 'نجمع فقط البيانات الضرورية لتشغيل التطبيق: البريد الإلكتروني، الاسم (اختياري)، تفضيلات التوأم، وسجل المحادثات. لا نبيع بياناتك لأي طرف ثالث ولا نستخدمها لأغراض إعلانية بدون موافقتك الصريحة.' },
+    { icon: Lock, title: 'أين تُخزّن بياناتك؟ ☁️', body: 'تُخزَّن بياناتك على خوادم Supabase الآمنة في السحابة. نستخدم إجراءات أمان معيارية (TLS, AES-256) لحماية بياناتك، لكننا لا نطبّق تشفيرًا من طرف إلى طرف (E2EE). الوصول إلى البيانات مقيد للأنظمة والخدمات المصرح لها والضرورية لتشغيل المنصة فقط.' },
+    { icon: Brain, title: 'كيف تعمل معالجة الذكاء الاصطناعي؟ 🧠', body: 'يستخدم MyTwin نماذج ذكاء اصطناعي متعددة (Gemini، Groq، OpenRouter). قد تُعالج بعض الرسائل على خوادم هذه النماذج وفقًا لسياسات الخصوصية الخاصة بها. لا نتحكم في كيفية معالجة هذه النماذج للبيانات، ونوصي بمراجعة سياساتها.' },
+    { icon: Trash2, title: 'الاحتفاظ بالبيانات والحذف 🗑️', body: 'نحتفظ بالبيانات طوال مدة استخدامك للتطبيق. يمكنك طلب حذف حسابك وجميع بياناتك في أي وقت من خلال الإعدادات > حذف الحساب. قد تُحذف البيانات تلقائيًا بعد فترة من عدم النشاط (حسب الباقة).' },
+    { icon: Download, title: 'تصدير بياناتك 📤', body: 'لك الحق في تصدير جميع بياناتك بصيغة JSON. يمكنك فعل ذلك من الإعدادات > تصدير بياناتي. سنرسل لك الملف خلال 48 ساعة.' },
+    { icon: AlertTriangle, title: 'إخلاء مسؤولية طبي ونفسي 🏥', body: 'MyTwin هو تطبيق رفيق ذكي للأغراض الترفيهية والداعمة فقط. هو ليس طبيباً، ولا معالجاً نفسياً، ولا مستشاراً مالياً، ولا مستشاراً قانونياً. لا يقدم التطبيق تشخيصات أو نصائح طبية أو نفسية أو مالية أو قانونية. إذا كنت تعاني من أزمة، استخدم ميزة "دعم طوارئ نفسي" في الإعدادات أو اتصل بالخدمات المهنية.' },
+    { icon: AlertTriangle, title: 'إخلاء مسؤولية الذكاء الاصطناعي 🤖', body: 'الردود التي يولدها الذكاء الاصطناعي قد تكون غير دقيقة أو غير مناسبة أو تحتوي على أخطاء (هلوسة). استخدم التطبيق بوعي ولا تعتمد على ردود التوأم كمصدر وحيد للمعلومات أو الدعم أو القرارات. تحقق دائمًا من المعلومات المهمة من مصادر مستقلة.' },
+    { icon: Shield, title: 'خصوصية القاصرين 👶', body: 'التطبيق غير مخصص للأطفال دون سن 16 عامًا. لا نجمع بيانات عن قاصرين عن قصد. إذا كنت ولي أمر وتعتقد أن طفلك استخدم التطبيق، يرجى التواصل معنا لحذف بياناته فورًا.' },
+    { icon: Eye, title: 'المحتوى الذي ينشئه المستخدم 📁', body: 'أنت مسؤول عن جميع المحتويات التي ترفعها أو تنشئها داخل التطبيق، بما في ذلك الصور والملفات والنصوص. لا نتحمل مسؤولية أي محتوى ينشئه المستخدمون.' },
+    { icon: Smartphone, title: 'خدمات الطرف الثالث 🔗', body: 'يستخدم MyTwin خدمات خارجية تشمل: Supabase (قاعدة بيانات)، Railway (استضافة)، OpenRouter / Groq / Gemini (نماذج ذكاء اصطناعي)، OneSignal (إشعارات)، Edge TTS / ElevenLabs (تحويل نص إلى كلام)، PostHog (تحليلات). لهذه الخدمات سياسات خصوصية خاصة بها نوصي بمراجعتها.' },
+    { icon: Mail, title: 'تواصل معنا ✉️', body: 'لأي أسئلة حول الخصوصية أو طلبات البيانات، راسلنا على: support@mytwin.app. سنرد خلال 48 ساعة.' },
+  ] : [
+    { icon: UserCheck, title: 'Your Data is Yours 🔒', body: 'We collect only data necessary to operate the app: email, name (optional), twin preferences, and chat history. We do not sell your data to third parties or use it for advertising without your explicit consent.' },
+    { icon: Lock, title: 'Where is Your Data Stored? ☁️', body: 'Your data is stored on secure Supabase cloud servers. We use standard security measures (TLS, AES-256) to protect your data, but we do not implement end-to-end encryption (E2EE). Access is restricted to authorized systems and services required to operate the platform only.' },
+    { icon: Brain, title: 'How AI Processing Works 🧠', body: 'MyTwin uses multiple AI models (Gemini, Groq, OpenRouter). Some messages may be processed on these models servers according to their privacy policies. We do not control how these models handle data; we recommend reviewing their policies.' },
+    { icon: Trash2, title: 'Data Retention & Deletion 🗑️', body: 'We retain data as long as you use the app. You can request deletion of your account and all data at any time via Settings > Delete Account. Data may be deleted automatically after a period of inactivity (depending on your plan).' },
+    { icon: Download, title: 'Export Your Data 📤', body: 'You have the right to export all your data in JSON format. You can do this from Settings > Export My Data. We will send you the file within 48 hours.' },
+    { icon: AlertTriangle, title: 'Medical & Professional Disclaimer 🏥', body: 'MyTwin is an AI companion app for entertainment and supportive purposes only. It is NOT a doctor, therapist, financial advisor, or legal advisor. The app does not provide medical, psychological, financial, or legal diagnoses or advice. If you are in crisis, use the "Emergency Support" feature in Settings or contact professional services.' },
+    { icon: AlertTriangle, title: 'AI Disclaimer 🤖', body: 'AI-generated responses may be inaccurate, inappropriate, or contain errors (hallucinations). Use the app mindfully and do not rely solely on twin responses as a source of information, support, or decisions. Always verify important information from independent sources.' },
+    { icon: Shield, title: 'Children Privacy 👶', body: 'The app is not intended for children under 16. We do not knowingly collect data from minors. If you are a guardian and believe your child used the app, please contact us immediately to delete their data.' },
+    { icon: Eye, title: 'User Generated Content 📁', body: 'You are responsible for all content you upload or create within the app, including images, files, and text. We are not liable for any user-generated content.' },
+    { icon: Smartphone, title: 'Third Party Services 🔗', body: 'MyTwin uses external services including: Supabase (database), Railway (hosting), OpenRouter/Groq/Gemini (AI models), OneSignal (notifications), Edge TTS/ElevenLabs (text-to-speech), PostHog (analytics). These services have their own privacy policies which we recommend reviewing.' },
+    { icon: Mail, title: 'Contact Us ✉️', body: 'For privacy questions or data requests, email us at: support@mytwin.app. We will respond within 48 hours.' },
+  ];
 
   return (
-    <SafeAreaView style={[s.safe, isDark && { backgroundColor: '#1A1A1A' }]}>
-      <ScrollView style={s.container} contentContainerStyle={{ padding: 20 }}>
-        <Shield size={40} stroke={isDark ? '#D8B4FE' : '#6B21A8'} style={{ alignSelf: 'center', marginBottom: 16 }} />
-        <Text style={[s.title, isDark && { color: '#FFF' }]}>{isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}</Text>
-        <Text style={[s.body, isDark && { color: '#CCC' }]}>{policy}</Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <Shield size={48} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />
+        <Text style={[s.title, { color: txt }]}>{isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}</Text>
+        <Text style={[s.updated, { color: sub }]}>{isAr ? 'آخر تحديث: يونيو 2026' : 'Last updated: June 2026'}</Text>
+
+        {sections.map((section, i) => {
+          const Icon = section.icon;
+          return (
+            <View key={i} style={[s.card, { backgroundColor: card, borderColor: border }]}>
+              <View style={s.cardHeader}>
+                <Icon size={22} stroke={primary} />
+                <Text style={[s.cardTitle, { color: txt }]}>{section.title}</Text>
+              </View>
+              <Text style={[s.cardBody, { color: sub }]}>{section.body}</Text>
+            </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -66,7 +69,10 @@ export default function Privacy() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#F8F6F2' },
-  title: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', marginBottom: 16, textAlign: 'center' },
-  body: { fontSize: 14, lineHeight: 22, color: '#444' },
+  title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  updated: { fontSize: 13, textAlign: 'center', marginBottom: 24 },
+  card: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  cardTitle: { fontSize: 16, fontWeight: '700', flex: 1 },
+  cardBody: { fontSize: 14, lineHeight: 22 },
 });

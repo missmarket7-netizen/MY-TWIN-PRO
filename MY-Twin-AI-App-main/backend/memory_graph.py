@@ -1,97 +1,23 @@
 """
-MyTwin – Memory Graph v1.0 (Graph-Based Memory System)
-- ذاكرة متقدمة تعتمد على Graph حقيقي.
-- تقوم بإنشاء وتحديث العلاقات بين الكيانات (أشخاص، أماكن، تفضيلات، أهداف).
-- تستخدم للاسترجاع السياقي الذكي (Smart Context Retrieval).
-- متوافقة مع `twin_brain.py` و `prompt_builder.py`.
+MyTwin – Unified Memory System v4.0
+يدمج: Memory Engine + Personal Knowledge Graph + Memory Graph
+- تصنيف ذكي للذكريات (core, emotional, preference, relationship)
+- تخزين في Supabase مع استرجاع سياقي
+- دمج المعرفة الشخصية من الكيانات
+- متكامل مع multi_ai بدلاً من groq_helper
 """
-import os, logging, json, asyncio, hashlib
-from typing import Optional, List, Dict, Any, Set, Tuple
+import os, logging, json, asyncio
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from supabase import create_client, Client
-from groq_helper import call_groq
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("memory_graph")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 db: Optional[Client] = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
-# ========== جداول الكيانات والعلاقات ==========
-async def init_tables():
-    """إنشاء جداول الكيانات والعلاقات إذا لم تكن موجودة."""
-    if not db:
-        return
-    # سيتم إنشاء الجداول في Supabase يدويًا.
-
-# ========== دالة مساعدة لتوليد ID للكيانات ==========
-def _entity_id(content: str, entity_type: str) -> str:
-    """توليد ID فريد للكيان بناءً على المحتوى والنوع."""
-    return hashlib.sha256(f"{content}_{entity_type}".encode()).hexdigest()[:16]
-
-# ========== استخراج الكيانات ==========
-async def extract_entities(user_id: str, message: str, lang: str = "ar") -> List[Dict[str, Any]]:
-    """
-    استخراج الكيانات من رسالة المستخدم وتخزينها في Graph.
-    - تحليل النص باستخدام Groq.
-    - تخزين الكيانات في `knowledge_entities`.
-    - إنشاء علاقات بين الكيانات والمستخدم.
-    """
-    if not db or not message.strip():
-        return []
-    prompt = f"""استخرج الكيانات التالية من هذه الرسالة وأعد ONLY JSON:
-{{
-  "people": ["اسم شخص", "علاقته (مثل زوجة، أخ، صديق)"],
-  "places": ["اسم مكان"],
-  "preferences": ["شيء يحبه أو يكرهه"],
-  "goals": ["هدف أو طموح"],
-  "habits": ["عادة أو روتين"],
-  "facts": ["معلومة عامة عن المستخدم"]
-}}
-الرسالة: "{message}"
-JSON:"""
-    try:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, call_groq, prompt)
-        if result:
-            raw = result.strip()
-            if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
-            elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
-            entities = json.loads(raw)
-            stored_entities = []
-            
-            # تخزين الكيانات وربطها بالمستخدم
-            for key, values in entities.items():
-                entity_type = key.rstrip('s')  # people -> person
-                for value in values:
-                    # التحقق من وجود الكيان مسبقًا
-                    eid = _entity_id(value, entity_type)
-                    # تخزين الكيان
-                    res = db.table("knowledge_entities").upsert({
-                        "id": eid,
-                        "user_id": user_id,
-                        "entity_type": entity_type,
-                        "content": value,
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }, on_conflict="id").execute()
-                    if res.data:
-                        stored_entities.append(res.data[0])
-                    # إنشاء علاقة "has_entity" بين المستخدم والكيان
-                    db.table("entity_relations").upsert({
-                        "user_id": user_id,
-                        "from_entity": user_id,
-                        "to_entity": eid,
-                        "relation_type": "has_entity",
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }, on_conflict=["user_id", "to_entity", "relation_type"]).execute()
-            
-            logger.info(f"✅ Extracted and stored {len(stored_entities)} entities for {user_id}")
-            return stored_entities
-    except Exception as e:
-        logger.warning(f"Entity extraction failed: {e}")
-    return []
-
-# ========== تصنيف الذكريات ==========
+# ========== أنواع الذكريات ==========
 MEMORY_TYPES = {
     "core": "معلومة أساسية عن المستخدم (اسم، مهنة، عمر، مكان إقامة)",
     "emotional": "لحظة عاطفية قوية (فرح، حزن، خوف، حب)",
@@ -99,15 +25,26 @@ MEMORY_TYPES = {
     "relationship": "معلومة عن علاقة المستخدم مع شخص آخر (أم، أب، صديق)",
 }
 
+# ========== عميل AI ==========
+def _get_multi_client():
+    try:
+        from multi_ai import MultiAIClient
+        return MultiAIClient()
+    except:
+        return None
+
+# ========== تصنيف الذكريات ==========
 async def classify_memory(text: str) -> str:
-    """تصنيف الذاكرة باستخدام Groq."""
+    """استخدم multi_ai لتصنيف نوع الذاكرة"""
+    client = _get_multi_client()
+    if not client:
+        return "core"
     try:
         prompt = f"""صنف هذه الذكرى إلى واحدة من: {', '.join(MEMORY_TYPES.keys())}
         أجب بنوع واحد فقط (core, emotional, preference, relationship).
         الذكرى: "{text}"
         النوع:"""
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, call_groq, prompt)
+        result = await client.get_best_reply(prompt, task="deep_reasoning")
         if result:
             resp_text = result.strip().lower()
             if resp_text in MEMORY_TYPES:
@@ -118,13 +55,12 @@ async def classify_memory(text: str) -> str:
 
 # ========== تخزين الذكريات ==========
 async def store_mem(uid: str, content: str, importance: float = 0.5, emotion: str = "neutral"):
-    """تخزين ذكرى جديدة وربطها بالكيانات الموجودة."""
+    """تخزين ذكرى مع تصنيفها التلقائي"""
     if not db:
         return
     try:
         mem_type = await classify_memory(content)
-        # تخزين الذاكرة
-        res = db.table("memories").insert({
+        db.table("memories").insert({
             "user_id": uid,
             "content": content,
             "importance": importance,
@@ -132,25 +68,12 @@ async def store_mem(uid: str, content: str, importance: float = 0.5, emotion: st
             "memory_type": mem_type,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
-        if res.data:
-            memory_id = res.data[0]["id"]
-            # ربط الذاكرة بالكيانات الموجودة
-            entities = db.table("knowledge_entities").select("id").eq("user_id", uid).execute()
-            for e in entities.data:
-                db.table("entity_relations").insert({
-                    "user_id": uid,
-                    "from_entity": memory_id,
-                    "to_entity": e["id"],
-                    "relation_type": "related_to",
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }).execute()
-            logger.info(f"✅ Memory stored [{mem_type}]: {content[:50]}...")
+        logger.info(f"✅ Memory stored [{mem_type}]: {content[:50]}...")
     except Exception as e:
         logger.error(f"Memory store error: {e}")
 
-# ========== استرجاع الذكريات (معزز) ==========
-async def retrieve(uid: str, query: str = "", days: int = 30, lim: int = 5, memory_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    """استرجاع الذكريات مع إمكانية التصفية حسب النوع."""
+# ========== استرجاع الذكريات ==========
+async def retrieve_memories(uid: str, query: str = "", days: int = 30, lim: int = 5, memory_type: Optional[str] = None) -> List[Dict[str, Any]]:
     if not db:
         return []
     try:
@@ -163,54 +86,166 @@ async def retrieve(uid: str, query: str = "", days: int = 30, lim: int = 5, memo
         logger.error(f"Memory retrieval error: {e}")
         return []
 
-# ========== استرجاع السياق المركب (Graph-based) ==========
-async def get_memory_context(user_id: str, limit: int = 10) -> str:
-    """
-    استرجاع سياق الذاكرة المركب بناءً على Graph.
-    - يجلب الكيانات والعلاقات المرتبطة.
-    - يبني نصًا منظمًا للـ Prompt.
-    """
+# ========== سياق الذاكرة للـ Prompt ==========
+async def get_memory_context(uid: str) -> str:
+    """بناء سياق نصي من جميع أنواع الذكريات والمعرفة الشخصية"""
     if not db:
         return ""
     try:
-        # جلب الكيانات
-        entities = db.table("knowledge_entities").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit).execute()
-        entity_map = {e["id"]: e for e in entities.data}
-        
-        # جلب العلاقات
-        relations = db.table("entity_relations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit * 2).execute()
-        
-        # بناء النص
-        lines = []
-        for e in entities.data:
-            lines.append(f"- {e['entity_type']}: {e['content']}")
-            # إضافة العلاقات المرتبطة
-            for r in relations.data:
-                if r["from_entity"] == e["id"]:
-                    target = entity_map.get(r["to_entity"])
-                    if target:
-                        lines.append(f"  → {r['relation_type']}: {target['content']}")
-                elif r["to_entity"] == e["id"]:
-                    source = entity_map.get(r["from_entity"])
-                    if source:
-                        lines.append(f"  ← {r['relation_type']}: {source['content']}")
-        return "\n".join(lines) if lines else "لا توجد ذكريات مرتبطة بعد."
+        core = await retrieve_memories(uid, memory_type="core", lim=3)
+        emotional = await retrieve_memories(uid, memory_type="emotional", lim=2)
+        preferences = await retrieve_memories(uid, memory_type="preference", lim=3)
+        relationships = await retrieve_memories(uid, memory_type="relationship", lim=2)
+
+        context = ""
+        if core:
+            context += "معلومات أساسية عن المستخدم: " + " | ".join([m["content"] for m in core]) + "\n"
+        if emotional:
+            context += "لحظات عاطفية مهمة: " + " | ".join([m["content"] for m in emotional]) + "\n"
+        if preferences:
+            context += "تفضيلات المستخدم: " + " | ".join([m["content"] for m in preferences]) + "\n"
+        if relationships:
+            context += "علاقات مهمة: " + " | ".join([m["content"] for m in relationships]) + "\n"
+
+        # دمج المعرفة الشخصية من الكيانات
+        knowledge = await get_knowledge_context(uid)
+        if knowledge:
+            context += "معرفة شخصية: " + knowledge + "\n"
+
+        return context
     except Exception as e:
         logger.error(f"Memory context error: {e}")
         return ""
 
-# ========== دالة تلخيص تلقائي ==========
+# ========== كيانات المعرفة ==========
+async def extract_entities(user_id: str, message: str, lang: str = "ar"):
+    """يستخرج الكيانات من رسالة المستخدم ويخزنها في جدول knowledge_entities"""
+    if not db or not message.strip():
+        return
+
+    client = _get_multi_client()
+    if not client:
+        return
+
+    prompt = f"""استخرج الكيانات التالية من هذه الرسالة وأعد ONLY JSON:
+{{
+  "people": ["اسم شخص وعلاقته"],
+  "preferences": ["شيء يحبه أو يكرهه"],
+  "goals": ["هدف أو طموح"],
+  "habits": ["عادة أو روتين"],
+  "facts": ["معلومة عامة عن المستخدم"]
+}}
+الرسالة: "{message}"
+JSON:"""
+
+    try:
+        result = await client.get_best_reply(prompt, task="deep_reasoning")
+        if result:
+            raw = result.strip()
+            if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
+            elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
+            entities = json.loads(raw)
+
+            for entity_type, items in entities.items():
+                for item in items:
+                    db.table("knowledge_entities").insert({
+                        "user_id": user_id,
+                        "entity_type": entity_type,
+                        "entity_name": str(item),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }).execute()
+
+            logger.info(f"✅ Extracted {sum(len(v) for v in entities.values())} entities for {user_id}")
+    except Exception as e:
+        logger.warning(f"Entity extraction failed: {e}")
+
+async def get_knowledge_context(user_id: str) -> str:
+    """استرجاع ملخص المعرفة الشخصية للمستخدم"""
+    if not db:
+        return ""
+    try:
+        res = db.table("knowledge_entities").select("entity_type, entity_name").eq("user_id", user_id).limit(10).execute()
+        if not res.data:
+            return ""
+
+        grouped: Dict[str, List[str]] = {}
+        for row in res.data:
+            t = row["entity_type"]
+            if t not in grouped:
+                grouped[t] = []
+            grouped[t].append(row["entity_name"])
+
+        parts = []
+        for t, items in grouped.items():
+            parts.append(f"{t}: {', '.join(items)}")
+        return " | ".join(parts)
+    except Exception as e:
+        logger.warning(f"Knowledge context failed: {e}")
+        return ""
+
+# ========== حفظ الكيانات والعلاقات ==========
+async def save_entity(user_id: str, entity_type: str, entity_name: str, attributes: Optional[Dict] = None) -> bool:
+    if not db:
+        return False
+    try:
+        db.table("knowledge_entities").insert({
+            "user_id": user_id,
+            "entity_type": entity_type,
+            "entity_name": entity_name,
+            "attributes": attributes or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        return True
+    except Exception as e:
+        logger.error(f"save_entity failed: {e}")
+        return False
+
+async def save_relation(user_id: str, entity1_id: int, relation_type: str, entity2_id: int, strength: float = 0.5) -> bool:
+    if not db:
+        return False
+    try:
+        db.table("entity_relations").insert({
+            "user_id": user_id,
+            "entity1_id": entity1_id,
+            "relation_type": relation_type,
+            "entity2_id": entity2_id,
+            "strength": strength,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        return True
+    except Exception as e:
+        logger.error(f"save_relation failed: {e}")
+        return False
+
+# ========== تلخيص المحادثات ==========
 async def check_and_summarize(uid: str, chat_history: List[Dict[str, str]], twin_name: str):
-    """تلخيص المحادثة تلقائيًا وتخزينها كذكرى."""
     if len(chat_history) < 20:
+        return
+    client = _get_multi_client()
+    if not client:
         return
     try:
         conversation = "\n".join([f"{'المستخدم' if m['role']=='user' else twin_name}: {m['content']}" for m in chat_history[-20:]])
         prompt = f"لخص هذه المحادثة في جملتين بالعربية، مع التركيز على أهم المواضيع والمشاعر:\n{conversation}"
-        loop = asyncio.get_running_loop()
-        summary = await loop.run_in_executor(None, call_groq, prompt)
+        summary = await client.get_best_reply(prompt, task="deep_reasoning")
         if summary:
             await store_mem(uid, summary.strip(), importance=0.7, emotion="neutral")
             logger.info(f"✅ Chat summarized for user {uid}")
     except Exception as e:
         logger.error(f"Summarization error: {e}")
+
+# ========== للتوافق مع الكود القديم ==========
+class DeepMemorySystem:
+    def retrieve(self, uid: str, query: str, days: int = 30, lim: int = 5, emotion_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        if not db:
+            return []
+        try:
+            req = db.table("memories").select("*").eq("user_id", uid).order("created_at", desc=True).limit(lim)
+            if emotion_filter:
+                req = req.eq("emotion", emotion_filter)
+            res = req.execute()
+            return res.data or []
+        except:
+            return []
+
+print("✅ Unified Memory System v4.0 جاهز")

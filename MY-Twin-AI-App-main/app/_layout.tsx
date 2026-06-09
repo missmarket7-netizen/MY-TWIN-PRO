@@ -1,32 +1,41 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { Pressable, StyleSheet, Animated, Modal, useWindowDimensions } from "react-native";
 import { useTwinStore } from "../store/useTwinStore";
 import { initAnalytics } from "../lib/analytics";
 import SideMenu from "../components/SideMenu";
 import { ToastProvider } from "../components/Toast";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { shallow } from 'zustand/shallow';
 
 export default function Layout() {
-  const { theme, menuVisible, closeMenu } = useTwinStore((s) => ({
-    theme: s.theme,
-    menuVisible: s.menuVisible,
-    closeMenu: s.closeMenu,
-  }));
+  // ✅ استخدام selectors منفصلة لمنع إعادة الرندر غير الضرورية
+  const theme = useTwinStore(s => s.theme);
+  const menuVisible = useTwinStore(s => s.menuVisible);
+  const closeMenu = useTwinStore(s => s.closeMenu);
   const isDark = theme === 'dark';
+  
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const { width } = useWindowDimensions();
   const drawerWidth = width * 0.8;
 
+  // ✅ Analytics يُشغّل مرة واحدة مع cleanup
   useEffect(() => {
-    initAnalytics();
+    let cancelled = false;
+    const setup = async () => {
+      if (!cancelled) await initAnalytics();
+    };
+    setup();
+    return () => { cancelled = true; };
   }, []);
 
+  // ✅ Animation أكثر سلاسة مع Animated.spring
   useEffect(() => {
-    Animated.timing(slideAnim, {
+    Animated.spring(slideAnim, {
       toValue: menuVisible ? 0 : -drawerWidth,
-      duration: 280,
+      damping: 18,
+      stiffness: 120,
       useNativeDriver: true,
     }).start();
   }, [menuVisible, drawerWidth]);
@@ -35,6 +44,7 @@ export default function Layout() {
     <ErrorBoundary>
       <ToastProvider>
         <StatusBar style={isDark ? "light" : "dark"} />
+        {/* ✅ لا حاجة لتعريف كل الشاشات يدوياً – Expo Router يكتشفها تلقائياً */}
         <Stack
           screenOptions={{
             headerShown: false,
@@ -42,32 +52,28 @@ export default function Layout() {
             animation: 'slide_from_right',
           }}
         >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="splash" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="terms" />
+          {/* نُبقي شاشة chat فقط لأنها تحتاج خيارًا خاصًا (headerShown: false) */}
           <Stack.Screen name="chat" options={{ headerShown: false }} />
-          <Stack.Screen name="history" />
-          <Stack.Screen name="profile" />
-          <Stack.Screen name="memories" />
-          <Stack.Screen name="customize" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="subscription" />
-          <Stack.Screen name="goals" />
-          <Stack.Screen name="mood" />
-          <Stack.Screen name="timeline" />
-          <Stack.Screen name="privacy" />
-          <Stack.Screen name="help" />
-          <Stack.Screen name="about" />
-          <Stack.Screen name="referral" />
         </Stack>
+
         {menuVisible && (
           <Modal visible transparent animationType="none" onRequestClose={closeMenu}>
+            {/* ✅ عزل اللمسات: الطبقة الخارجية للإغلاق، والداخلية تمنع تمرير اللمس */}
             <Pressable style={styles.overlay} onPress={closeMenu}>
-              <Animated.View style={[styles.sidebar, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', width: drawerWidth, transform: [{ translateX: slideAnim }] }]}>
-                <SideMenu onClose={closeMenu} />
-              </Animated.View>
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
+                <Animated.View
+                  style={[
+                    styles.sidebar,
+                    {
+                      backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                      width: drawerWidth,
+                      transform: [{ translateX: slideAnim }],
+                    },
+                  ]}
+                >
+                  <SideMenu onClose={closeMenu} />
+                </Animated.View>
+              </Pressable>
             </Pressable>
           </Modal>
         )}

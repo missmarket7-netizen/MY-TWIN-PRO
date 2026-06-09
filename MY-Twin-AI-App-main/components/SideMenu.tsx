@@ -20,7 +20,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
 
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
-  const t = (ar: string, en: string) => isAr ? ar : en;
+  const t = (ar: string, en: string) => isAr? ar : en;
 
   const navigate = (route: Href) => { router.replace(route); onClose(); };
   const startNewChat = () => { clearHistory(); onClose(); navigate('/chat'); };
@@ -37,9 +37,19 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
     return pathname === route;
   };
 
+  const getStage = (bond: number) => {
+    if (bond >= 95) return t('توأم روح', 'Soulmate');
+    if (bond >= 80) return t('ارتباط', 'Bonded');
+    if (bond >= 60) return t('ثقة', 'Trust');
+    if (bond >= 40) return t('مقربين', 'Close');
+    if (bond >= 20) return t('أصدقاء', 'Friends');
+    return t('غرباء', 'Strangers');
+  };
+
   const items = [
     { icon: Home, label: t('الرئيسية','Home'), route: '/chat' as Href },
     { icon: PlusCircle, label: t('دردشة جديدة','New Chat'), onPress: startNewChat },
+    { icon: Heart, label: t('علاقتي','My Relationship'), route: '/relationship' as Href },
     { icon: History, label: t('سجل المحادثات','History'), route: '/history' as Href },
     { icon: User, label: t('الملف الشخصي','Profile'), route: '/profile' as Href },
     { icon: BrainCircuit, label: t('ذكريات','Memories'), route: '/memories' as Href },
@@ -73,9 +83,9 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
         <View style={styles.avatar}><Sparkles size={28} stroke="#A855F7" /></View>
         <View style={{ flex: 1, marginLeft: isAr ? 0 : 12, marginRight: isAr ? 12 : 0 }}>
           <Text style={[styles.userName, isDark && { color: '#FFF' }]}>{twinName || t('توأمك', 'Your Twin')}</Text>
-          <View style={styles.bondRow}>
-            <Heart size={14} stroke="#EC4899" fill="#EC4899" />
-            <Text style={[styles.bondValue, isDark && { color: '#F472B6' }]}>{t('رابطة', 'Bond')} {Math.round(bondLevel)}%</Text>
+          <Text style={[styles.stageText, isDark && { color: '#D8B4FE' }]}>{getStage(bondLevel)} ❤️</Text>
+          <View style={[styles.progressBar, { backgroundColor: isDark ? '#444' : '#E5E7EB' }]}>
+            <View style={[styles.progressFill, { width: `${Math.min(bondLevel, 100)}%` }]} />
           </View>
           <Text style={[styles.tierText, isDark && { color: '#D8B4FE' }]}>{tierLabel[tier] || tier}</Text>
         </View>
@@ -83,7 +93,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
 
       <View style={[styles.vitalSection, isDark && { borderColor: '#333' }]}>
         <View style={styles.vitalRow}>{getEnergyIcon()}<Text style={[styles.vitalLabel, isDark && { color: '#CCC' }]}>{t('طاقة التوأم', 'Twin Energy')}</Text><Text style={[styles.vitalValue, isDark && { color: '#D8B4FE' }]}>{Math.round(energy)}%</Text></View>
-        <View style={styles.progressBar}><View style={[styles.progressFill, { width: `${Math.min(energy, 100)}%`, backgroundColor: energy >= 70 ? '#10B981' : energy >= 30 ? '#F59E0B' : '#EF4444' }]} /></View>
+        <View style={styles.energyBar}><View style={[styles.energyFill, { width: `${Math.min(energy, 100)}%`, backgroundColor: energy >= 70 ? '#10B981' : energy >= 30 ? '#F59E0B' : '#EF4444' }]} /></View>
       </View>
 
       {items.map((item) => {
@@ -116,15 +126,16 @@ const styles = StyleSheet.create({
   userCard: { flexDirection: 'row', alignItems: 'center', paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E8E8E3' },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F0FF', justifyContent: 'center', alignItems: 'center' },
   userName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-  bondRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  bondValue: { fontSize: 12, color: '#6B21A8', fontWeight: '500' },
-  tierText: { fontSize: 12, color: '#6B21A8', fontWeight: '500', marginTop: 2 },
+  stageText: { fontSize: 12, color: '#6B21A8', fontWeight: '600', marginTop: 2 },
+  progressBar: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 6, marginBottom: 4 },
+  progressFill: { height: '100%', backgroundColor: '#A855F7', borderRadius: 2 },
+  tierText: { fontSize: 11, color: '#6B21A8', fontWeight: '500' },
   vitalSection: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E8E8E3', paddingVertical: 16, marginBottom: 16 },
   vitalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   vitalLabel: { fontSize: 13, color: '#666', flex: 1 },
   vitalValue: { fontSize: 14, fontWeight: '700', color: '#6B21A8' },
-  progressBar: { height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
+  energyBar: { height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' },
+  energyFill: { height: '100%', borderRadius: 3 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, marginBottom: 2 },
   itemRTL: { flexDirection: 'row-reverse' },
   activeItem: { backgroundColor: '#F3F0FF', borderLeftWidth: 3, borderLeftColor: '#A855F7' },
