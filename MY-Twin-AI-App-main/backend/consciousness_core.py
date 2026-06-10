@@ -204,6 +204,8 @@ JSON:"""
         if not self.db:
             return
         try:
+            if not self.db.table("profiles").select("id").eq("id", user_id).single().execute().data:
+                return
             self.db.table("twin_states").upsert({
                 "user_id": user_id,
                 "state": {

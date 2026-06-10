@@ -86,7 +86,7 @@ def get_profile(uid: str) -> dict:
     k = f"p:{uid}"
     if c := cache_get(k): return c
     try:
-        r = db.table("profiles").select("*").eq("id", uid).single().execute()
+        r = db.table("profiles").select("*").eq("id", uid).maybeSingle().execute()
         p = r.data or {}
         cache_set(k, p, 600)
         return p
