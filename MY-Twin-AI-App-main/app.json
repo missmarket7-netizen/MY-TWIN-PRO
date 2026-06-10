@@ -68,6 +68,12 @@
           }
         }
       ],
+      [
+        "react-native-iap",
+        {
+          "store": "play"
+        }
+      ],
       "expo-localization"
     ],
     "extra": {

@@ -1,0 +1,6 @@
+// إخبار Gradle باختيار متجر Play Store لمكتبة react-native-iap
+android {
+    defaultConfig {
+        missingDimensionStrategy 'store', 'play'
+    }
+}
