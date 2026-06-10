@@ -199,6 +199,25 @@ class TwinBrain:
 
         tracker.end()
 
+
+        # 16. فحص الطاقة وإرسال تنبيه إذا كانت منخفضة
+        if user_id and tier:
+            try:
+                from message_limits import get_usage_summary
+                summary = get_usage_summary(user_id, tier)
+                remaining_pct = (summary['tokens']['remaining'] / max(1, summary['tokens']['limit'])) * 100
+                if remaining_pct <= 10 and summary['tokens']['remaining'] > 0:
+                    friendly_msg = (
+                        "لقد بذلتُ جهدي معك اليوم وأشعر ببعض التعب 💜\n\n"
+                        "يمكننا أن نستريح قليلاً ونعود غداً بطاقة أكبر وأفضل، "
+                        "أو يمكنك منحي طاقة إضافية بالترقية إلى باقة أعلى ✨"
+                    )
+                    if tier == 'free':
+                        friendly_msg += "\n\n🌟 [اكتشف الباقات المميزة](/subscription)"
+                    reply = reply + "\n\n" + friendly_msg
+            except:
+                pass
+
         # 16. Product Recommendation
         if user_id and tier and reply:
             try:

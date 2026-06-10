@@ -1,7 +1,7 @@
 import {
   SafeAreaView, View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput, ActivityIndicator
 } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useTwinStore } from '../store/useTwinStore';
 import { router, Href } from 'expo-router';
@@ -46,7 +46,6 @@ export default function Profile() {
 
     const loadProfile = async () => {
       try {
-        // جلب بيانات المستخدم من جدول profiles
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -59,13 +58,11 @@ export default function Profile() {
           setPhone(profileData.phone || '');
         }
 
-        // جلب البريد الإلكتروني من auth
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (!cancelled && !userError && userData?.user?.email) {
           setEmail(userData.user.email);
         }
 
-        // جلب الاستخدام اليومي
         const today = new Date().toISOString().split('T')[0];
         const { data: usageData } = await supabase
           .from('daily_usage')
@@ -75,7 +72,6 @@ export default function Profile() {
           .maybeSingle();
         if (!cancelled && usageData) setUsage(usageData);
 
-        // جلب المعرفة
         const { data: knowledgeData } = await supabase
           .from('knowledge_entities')
           .select('entity_name, entity_type')
@@ -159,7 +155,6 @@ export default function Profile() {
           <Text style={[s.email, { color: sub }]}>{email || '—'}</Text>
         </View>
 
-        {/* معلومات الاتصال */}
         <View style={[s.section, { backgroundColor: card, borderColor: border }]}>
           <View style={s.sectionHeader}>
             <User size={18} stroke={isDark ? '#D8B4FE' : '#6B21A8'} />
@@ -202,7 +197,6 @@ export default function Profile() {
           )}
         </View>
 
-        {/* الاستخدام */}
         <View style={[s.section, { backgroundColor: card, borderColor: border }]}>
           <View style={s.sectionHeader}>
             <Zap size={18} stroke={isDark ? '#D8B4FE' : '#6B21A8'} />
@@ -225,7 +219,6 @@ export default function Profile() {
           </View>
         </View>
 
-        {/* أزرار الإجراءات */}
         <TouchableOpacity style={s.btn} onPress={() => router.push('/subscription' as Href)}>
           <Crown size={16} stroke="#FFF" />
           <Text style={s.btnText}>{t.upgrade}</Text>

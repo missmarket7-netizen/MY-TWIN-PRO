@@ -38,8 +38,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
   const isDark = theme === 'dark';
   const t = (ar: string, en: string) => isAr ? ar : en;
 
-  // استخدام push بدلاً من replace للسماح بـ router.back()
-  const navigate = (route: string) => { router.push(route as Href); onClose(); };
+  const navigate = (route: string) => { router.push(route); onClose(); };
   const startNewChat = () => { clearHistory(); onClose(); navigate('/chat'); };
 
   const handleLogout = () => {
@@ -93,7 +92,6 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
         <X size={24} stroke={colors.primary} />
       </TouchableOpacity>
 
-      {/* بطاقة المستخدم */}
       <View style={[styles.userCard, { borderBottomColor: colors.border }]}>
         <View style={styles.avatar}><Sparkles size={28} stroke={colors.accent} /></View>
         <View style={{ flex: 1, marginStart: isAr ? 12 : 0, marginEnd: isAr ? 0 : 12 }}>
@@ -106,13 +104,11 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
         </View>
       </View>
 
-      {/* زر الرجوع السريع للدردشة */}
       <TouchableOpacity style={[styles.backToChatBtn, isDark && { backgroundColor: '#A855F722' }]} onPress={() => navigate('/chat')}>
         <ArrowRight size={18} stroke={colors.accent} />
         <Text style={[styles.backToChatText, { color: colors.accent }]}>{t('العودة للمحادثة', 'Back to Chat')}</Text>
       </TouchableOpacity>
 
-      {/* عناصر القائمة */}
       {items.map((item) => {
         const Icon = item.icon;
         const active = item.route ? isActive(item.route) : false;

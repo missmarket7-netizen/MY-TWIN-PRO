@@ -184,6 +184,7 @@ export default function Chat() {
           }
 
       updateBond(res.data.new_bond ?? 0);
+          if (res.data.energy !== undefined) useTwinStore.getState().setEnergy(res.data.energy);
           if (res.data.relationship_dims) updateRelationshipDims(res.data.relationship_dims); if (res.data.relationship_dims) updateRelationshipDims(res.data.relationship_dims);
       if (res.data.dims_update) updateRelationshipDims(res.data.dims_update);
       if (soundEnabled) { try { await speakResponse(res.data.reply, { pitch: 1.0, rate: 1.0 }); } catch {} }
