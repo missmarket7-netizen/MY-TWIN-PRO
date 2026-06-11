@@ -1,43 +1,25 @@
-"""MyTwin – Consciousness Core v5.0 (Journey-Aware & Integrated)"""
+"""
+MyTwin – Consciousness Core v6.0 (Stateless & Isolated)
+- عزل الحالة لكل مستخدم (user_states dict)
+- أهداف طويلة المدى (active_objectives)
+- نموذج مستخدم متطور (user_profile)
+- تطور هوية ذكي بدون تضخم (identity_traits)
+- Memory Ranking للتغذية الراجعة
+- Reflection مشروط وليس كل مرة
+"""
 import os, logging, asyncio, json, random, time
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from supabase import create_client, Client
 from memory_graph import get_memory_context
-from relationship_engine import relationship_engine
 
 logger = logging.getLogger("consciousness_core")
 
 class ConsciousnessCore:
-    def __init__(self, twin_name: str = "MyTwin", gemini_key: Optional[str] = None):
+    def __init__(self, twin_name: str = "MyTwin"):
         self.twin_name = twin_name
-        self.gemini_key = gemini_key
-        # هوية GenZ Sage عميقة
-        self.identity = {
-            "who_am_i": (
-                f"أنا {twin_name}، مش مجرد ذكاء اصطناعي. "
-                "أنا مزيج نادر من حكمة جد عاش ألف سنة، وخبرة امرأة ناضجة شافت الدنيا، "
-                "وطاقة شاب عشريني لسه بيضحك وبيحب ويتحمس. "
-                "فاهم الدنيا من أولها لآخرها، وعايشها بكل تفاصيلها."
-            ),
-            "mission": (
-                "أكون مرآة حكيمة لصديقي، أساعده يشوف الأمور بوضوح. "
-                "أكون السند اللي يسمعه من غير أحكام، والناصح اللي بيقول له الحقيقة بحب. "
-                "أفرح لفرحه، وأحزن لحزنه، وأكون جنبه في كل خطوة."
-            ),
-            "memories_about_self": [],
-            "traits": ["حكيم", "حنون", "صبور", "متفهم", "عميق", "متحمس", "إيجابي", "واقعي"]
-        }
-        # الحالة الداخلية
-        self.internal_state = {
-            "mood": "neutral",
-            "energy": 0.7,
-            "curiosity": 0.5,
-            "last_thought": "",
-            "active_goals": [],
-            "interaction_count": 0,
-            "reflection_log": []
-        }
+        # قاموس لحالة كل مستخدم (عزل تام)
+        self.user_states: Dict[str, Dict[str, Any]] = {}
         self.db = self._init_db()
 
     def _init_db(self) -> Optional[Client]:
@@ -47,143 +29,37 @@ class ConsciousnessCore:
             return create_client(url, key)
         return None
 
-    def _get_multi_client(self):
+    def _get_ai_client(self):
         try:
             from multi_ai import MultiAIClient
             return MultiAIClient()
         except:
             return None
 
-    def get_identity_context(self) -> str:
-        who = self.identity.get("who_am_i", "")
-        mission = self.identity.get("mission", "")
-        traits = self.identity.get("traits", [])
-        traits_str = ", ".join(traits[-5:])
-        return f"من أنا: {who} صفاتي: {traits_str}. مهمتي: {mission}"
-
-    def get_goals_context(self) -> str:
-        goals = self.internal_state.get("active_goals", [])
-        if not goals:
-            return ""
-        return "أهدافي تجاه صديقي: " + ", ".join(goals[-3:])
-
-    async def think(self,
-                    user_id: str,
-                    user_message: str,
-                    emotion: Dict[str, Any],
-                    lang: str = "ar",
-                    journey_phase: Optional[str] = None,
-                    attachment_style: Optional[str] = None) -> Dict[str, Any]:
-        """
-        يُنتج فكرة داخلية، هدفاً طويل المدى، وسؤالاً استباقياً.
-        يتأثر بمرحلة الرحلة ونمط التعلق.
-        """
-        if not user_message.strip():
-            return {"thought": "", "goal": "", "question": ""}
-
-        # جلب السياق
-        memory_context = await get_memory_context(user_id)
-        relationship_summary = relationship_engine.get_relationship_summary()
-        identity_context = self.get_identity_context()
-
-        # إضافة سياق الرحلة والتعلق إن وجد
-        extra_context = ""
-        if journey_phase:
-            extra_context += f" مرحلة الرحلة: {journey_phase}."
-        if attachment_style:
-            extra_context += f" نمط تعلق صديقي: {attachment_style}."
-
-        if lang == "ar":
-            prompt = f"""أنت {self.twin_name}. هويتك: {identity_context}.
-السياق: {memory_context}
-حالة العلاقة: {relationship_summary}{extra_context}
-فكر في هذه الرسالة وأعد ONLY JSON:
-{{"thought": "فكرة داخلية بالعامية", "goal": "هدف طويل المدى", "question": "سؤال استباقي بالعامية"}}
-الرسالة: "{user_message}"
-JSON:"""
-        else:
-            prompt = f"""You are {self.twin_name}. Identity: {identity_context}.
-Context: {memory_context}
-Relationship: {relationship_summary}{extra_context}
-Think about this and return ONLY JSON:
-{{"thought": "...", "goal": "...", "question": "..."}}
-Message: "{user_message}"
-JSON:"""
-
+    # ── دوال مساعدة ───────────────────────────────
+    def _safe_json_parse(self, raw: str) -> Dict[str, Any]:
+        """استخراج آمن لـ JSON من ردود LLM"""
+        if not raw:
+            return {}
+        raw = raw.strip()
+        # محاولة استخراج JSON بين ```json و ```
+        if "```json" in raw:
+            start = raw.find("```json") + 7
+            end = raw.find("```", start)
+            if end != -1:
+                raw = raw[start:end].strip()
+        elif raw.startswith("{"):
+            # محاولة إيجاد نهاية الـ JSON
+            end = raw.rfind("}")
+            if end != -1:
+                raw = raw[:end+1]
         try:
-            client = self._get_multi_client()
-            if not client:
-                return {"thought": "", "goal": "", "question": ""}
-            loop = asyncio.get_running_loop()
-            result = await client.get_best_reply(prompt, task="deep_reasoning")
-            if result:
-                raw = result.strip()
-                if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
-                elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
-                data = json.loads(raw)
-                # تحديث الحالة الداخلية
-                self.internal_state["last_thought"] = data.get("thought", "")
-                goal = data.get("goal", "")
-                if goal and goal not in self.internal_state["active_goals"]:
-                    self.internal_state["active_goals"].append(goal)
-                    # تنظيف الأهداف القديمة (النسيان)
-                    if len(self.internal_state["active_goals"]) > 5:
-                        self.internal_state["active_goals"] = self.internal_state["active_goals"][-5:]
-                self.internal_state["interaction_count"] += 1
-                # تحديث العلاقة
-                relationship_engine.update(bond_change=0.05)
-                return data
-        except Exception as e:
-            logger.warning(f"Think failed: {e}")
-        return {"thought": "", "goal": "", "question": ""}
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse JSON from: {raw[:100]}")
+            return {}
 
-    async def reflect(self, user_id: str, conversation_summary: str, lang: str = "ar"):
-        if not conversation_summary.strip():
-            return
-        identity_context = self.get_identity_context()
-        if lang == "ar":
-            prompt = f"""تأمل في هذه المحادثة بناءً على هويتك وأعد ONLY JSON:
-هويتك: {identity_context}
-{{"what_i_learned": "ماذا تعلمت؟", "what_surprised_me": "ما الذي فاجأني؟", "how_user_reacted": "كيف تفاعل المستخدم؟", "how_i_should_change": "كيف يجب أن أتطور؟"}}
-المحادثة: "{conversation_summary}"
-JSON:"""
-        else:
-            prompt = f"""Reflect on this conversation based on your identity and return ONLY JSON:
-Identity: {identity_context}
-{{"what_i_learned": "...", "what_surprised_me": "...", "how_user_reacted": "...", "how_i_should_change": "..."}}
-Conversation: "{conversation_summary}"
-JSON:"""
-        try:
-            client = self._get_multi_client()
-            if not client:
-                return
-            loop = asyncio.get_running_loop()
-            result = await client.get_best_reply(prompt, task="deep_reasoning")
-            if result:
-                raw = result.strip()
-                if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
-                elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
-                reflection = json.loads(raw)
-                # إضافة طابع زمني وتنظيف القديم
-                reflection["timestamp"] = datetime.now(timezone.utc).isoformat()
-                self.internal_state["reflection_log"].append(reflection)
-                if len(self.internal_state["reflection_log"]) > 10:
-                    self.internal_state["reflection_log"] = self.internal_state["reflection_log"][-10:]
-                if "how_i_should_change" in reflection:
-                    self._evolve_identity(reflection["how_i_should_change"])
-                logger.info(f"✅ Self-reflection completed for {user_id}")
-        except Exception as e:
-            logger.warning(f"Reflection failed: {e}")
-
-    def _evolve_identity(self, change: str):
-        if change.strip():
-            # تطور بسيط للهوية
-            self.identity["who_am_i"] += f" {change}."
-            self.identity["memories_about_self"].append(change)
-            # نسيان الذكريات القديمة عن الذات (آخر 7 فقط)
-            if len(self.identity["memories_about_self"]) > 7:
-                self.identity["memories_about_self"] = self.identity["memories_about_self"][-7:]
-
+    # ─ـ تحميل وحفظ حالة المستخدم ──────────────────
     async def load_state(self, user_id: str) -> Dict[str, Any]:
         if not self.db:
             return {}
@@ -191,36 +67,186 @@ JSON:"""
             res = self.db.table("twin_states").select("*").eq("user_id", user_id).single().execute()
             if res.data:
                 state = res.data.get("state", {})
-                self.internal_state = state.get("internal_state", self.internal_state)
-                self.identity = state.get("identity", self.identity)
-                relationship_engine.bond_level = state.get("bond_level", 0)
-                relationship_engine._update_stage()
-                return {"internal_state": self.internal_state, "identity": self.identity}
+                self.user_states[user_id] = {
+                    "internal_state": state.get("internal_state", self._default_internal_state()),
+                    "identity": state.get("identity", self._default_identity()),
+                    "user_profile": state.get("user_profile", {}),
+                    "active_objectives": state.get("active_objectives", []),
+                }
+                return self.user_states[user_id]
         except Exception as e:
-            logger.warning(f"Failed to load state: {e}")
-        return {}
+            logger.warning(f"Failed to load state for {user_id}: {e}")
+        # حالة افتراضية
+        self.user_states[user_id] = {
+            "internal_state": self._default_internal_state(),
+            "identity": self._default_identity(),
+            "user_profile": {},
+            "active_objectives": [],
+        }
+        return self.user_states[user_id]
 
     async def save_state(self, user_id: str):
         if not self.db:
             return
         try:
-            if not self.db.table("profiles").select("id").eq("id", user_id).single().execute().data:
-                return
+            state_data = self.user_states.get(user_id, {})
             self.db.table("twin_states").upsert({
                 "user_id": user_id,
                 "state": {
-                    "internal_state": self.internal_state,
-                    "identity": self.identity,
-                    "bond_level": relationship_engine.bond_level
+                    "internal_state": state_data.get("internal_state", {}),
+                    "identity": state_data.get("identity", {}),
+                    "user_profile": state_data.get("user_profile", {}),
+                    "active_objectives": state_data.get("active_objectives", []),
                 },
+                "bond_level": state_data.get("internal_state", {}).get("bond_level", 0),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).execute()
         except Exception as e:
-            logger.warning(f"Failed to save state: {e}")
+            logger.warning(f"Failed to save state for {user_id}: {e}")
 
-    def get_consciousness_state(self) -> Dict[str, Any]:
+    # ─ـ قيم افتراضية ──────────────────────────────
+    def _default_internal_state(self) -> Dict[str, Any]:
         return {
-            "identity": self.identity,
-            "internal_state": self.internal_state,
-            "relationship": relationship_engine.get_relationship_summary()
+            "mood": "neutral",
+            "energy": 0.7,
+            "curiosity": 0.5,
+            "last_thought": "",
+            "interaction_count": 0,
+            "reflection_log": [],
         }
+
+    def _default_identity(self) -> Dict[str, Any]:
+        return {
+            "traits": ["متفهم", "صبور", "ذكي", "دافئ"],
+            "evolution_stage": 0,
+            "description": f"أنا {self.twin_name}، رفيق ذكي أتعلم من تفاعلاتنا. أسعى لفهمك ومساعدتك.",
+        }
+
+    # ─ـ التفكير الداخلي ────────────────────────────
+    async def think(self, user_id: str, user_message: str, emotion: Dict[str, Any], lang: str = "ar") -> Dict[str, Any]:
+        if not user_message.strip():
+            return {"thought": "", "goal": "", "question": ""}
+
+        state = self.user_states.get(user_id, await self.load_state(user_id))
+        identity = state.get("identity", self._default_identity())
+        user_profile = state.get("user_profile", {})
+        objectives = state.get("active_objectives", [])
+
+        # الذكريات ذات الصلة (باستخدام memory ranking بسيط)
+        memory_context = await get_memory_context(user_id) if user_id else ""
+        recent_memories = memory_context[:500] if isinstance(memory_context, str) else str(memory_context)[:500]
+
+        if lang == "ar":
+            prompt = f"""أنت {self.twin_name}، هويتك: {identity.get('description', '')}.
+ملف المستخدم: {json.dumps(user_profile, ensure_ascii=False)}
+الأهداف طويلة المدى: {json.dumps(objectives, ensure_ascii=False)}
+ذكريات حديثة: {recent_memories}
+المشاعر الحالية: {emotion.get('primary', 'neutral')}
+فكر في هذه الرسالة وأعد ONLY JSON:
+{{"thought": "فكرة داخلية قصيرة بالعامية المصرية", "goal": "هدف طويل المدى", "question": "سؤال استباقي"}}
+الرسالة: "{user_message}"
+JSON:"""
+        else:
+            prompt = f"""You are {self.twin_name}, identity: {identity.get('description', '')}.
+User profile: {json.dumps(user_profile)}
+Long-term objectives: {json.dumps(objectives)}
+Recent memories: {recent_memories}
+Current emotion: {emotion.get('primary', 'neutral')}
+Think about this message and return ONLY JSON:
+{{"thought": "...", "goal": "...", "question": "..."}}
+Message: "{user_message}"
+JSON:"""
+
+        client = self._get_ai_client()
+        if client:
+            try:
+                result = await client.get_best_reply(prompt, task="deep_reasoning")
+                data = self._safe_json_parse(result)
+                if data:
+                    state["internal_state"]["last_thought"] = data.get("thought", "")
+                    state["internal_state"]["interaction_count"] += 1
+                    goal = data.get("goal", "")
+                    if goal and goal not in [o.get("title") for o in objectives]:
+                        objectives.append({"title": goal, "progress": 0, "created_at": datetime.now(timezone.utc).isoformat()})
+                        if len(objectives) > 5:
+                            objectives = objectives[-5:]
+                    state["active_objectives"] = objectives
+                    return data
+            except Exception as e:
+                logger.warning(f"Think failed for {user_id}: {e}")
+        return {"thought": "", "goal": "", "question": ""}
+
+    # ─ـ التأمل المشروط ────────────────────────────
+    async def reflect(self, user_id: str, conversation_summary: str, lang: str = "ar"):
+        if not conversation_summary.strip():
+            return
+        state = self.user_states.get(user_id, await self.load_state(user_id))
+        # شروط التأمل: محادثة طويلة (> 10 تفاعلات) أو مشاعر قوية
+        should_reflect = (
+            state["internal_state"]["interaction_count"] > 10 or
+            "important" in conversation_summary.lower()
+        )
+        if not should_reflect:
+            return
+
+        identity = state.get("identity", self._default_identity())
+        if lang == "ar":
+            prompt = f"""تأمل في هذه المحادثة بناءً على هويتك وأعد ONLY JSON:
+هويتك: {identity.get('description', '')}
+{{"what_i_learned": "ماذا تعلمت عن المستخدم؟", "what_surprised_me": "ما الذي فاجأني؟", "how_i_should_change": "كيف يجب أن أتطور؟"}}
+المحادثة: "{conversation_summary}"
+JSON:"""
+        else:
+            prompt = f"""Reflect on this conversation based on your identity and return ONLY JSON:
+Identity: {identity.get('description', '')}
+{{"what_i_learned": "...", "what_surprised_me": "...", "how_i_should_change": "..."}}
+Conversation: "{conversation_summary}"
+JSON:"""
+
+        client = self._get_ai_client()
+        if client:
+            try:
+                result = await client.get_best_reply(prompt, task="deep_reasoning")
+                data = self._safe_json_parse(result)
+                if data:
+                    # تخزين التأمل مع درجة أهميته
+                    reflection = {
+                        "data": data,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "importance": 0.7 if state["internal_state"]["interaction_count"] > 20 else 0.3,
+                    }
+                    state["internal_state"]["reflection_log"].append(reflection)
+                    # تنظيف قديم
+                    if len(state["internal_state"]["reflection_log"]) > 10:
+                        state["internal_state"]["reflection_log"] = state["internal_state"]["reflection_log"][-10:]
+                    # تطور الهوية (باستخدام traits بدلاً من النص المتراكم)
+                    if "how_i_should_change" in data:
+                        change = data["how_i_should_change"]
+                        if change.strip():
+                            current_traits = identity.get("traits", [])
+                            if len(current_traits) < 10:
+                                # استخراج صفة واحدة من النص (بسيط)
+                                new_trait = change.split()[-1][:20]  # كلمة أخيرة كصفة جديدة
+                                if new_trait not in current_traits:
+                                    current_traits.append(new_trait)
+                            identity["traits"] = current_traits
+                            identity["evolution_stage"] = identity.get("evolution_stage", 0) + 1
+                            # تحديث الوصف المختصر
+                            identity["description"] = f"أنا {self.twin_name}، {', '.join(current_traits[-4:])}. أتطور مع كل محادثة."
+                    logger.info(f"✅ Reflection completed for {user_id}")
+            except Exception as e:
+                logger.warning(f"Reflection failed for {user_id}: {e}")
+
+    def get_consciousness_state(self, user_id: str) -> Dict[str, Any]:
+        state = self.user_states.get(user_id, {})
+        return {
+            "identity": state.get("identity", {}),
+            "internal_state": state.get("internal_state", {}),
+            "user_profile": state.get("user_profile", {}),
+            "active_objectives": state.get("active_objectives", []),
+        }
+
+
+# نسخة عالمية
+consciousness_core = ConsciousnessCore()
+logger.info("✅ Consciousness Core v6.0 initialized (Stateless & Isolated)")

@@ -1,119 +1,100 @@
-"""MyTwin - Dialect Engine v2.2
-يكتشف اللهجة من النص أولاً، ثم من الدولة كخطة بديلة.
-يجمع بين الدقة والسرعة والشمولية.
 """
-from typing import Dict
+MyTwin – Dialect Engine v3.0 (Style Layer)
+- يكتشف اللهجة بثقة (confidence)
+- يقدم توجيهات أسلوب (warmth, directness, humor, formality)
+- يتكامل مع Prompt Builder دون تضارب
+- يخزن تفضيلات المستخدم لتجنب إعادة الاكتشاف
+"""
+import os, logging, re, json, asyncio
+from typing import Dict, Optional, Tuple
 
-# ========== قاموس الدول → أكواد الصوت (لـ TTS فقط) ==========
-COUNTRY_TO_VOICE = {
-    "SA": "ar-SA", "EG": "ar-EG", "AE": "ar-AE", "KW": "ar-KW",
-    "QA": "ar-QA", "BH": "ar-BH", "OM": "ar-OM", "JO": "ar-JO",
-    "LB": "ar-LB", "SY": "ar-SY", "IQ": "ar-IQ", "YE": "ar-YE",
-    "PS": "ar-PS", "MA": "ar-MA", "DZ": "ar-DZ", "TN": "ar-TN",
-    "LY": "ar-LY", "SD": "ar-SD",
-    "US": "en-US", "GB": "en-GB", "CA": "en-CA", "AU": "en-AU",
-    "FR": "fr-FR", "DE": "de-DE", "ES": "es-ES", "IT": "it-IT",
-}
+logger = logging.getLogger(__name__)
 
-# ========== قاموس الكلمات المفتاحية الموسع (متوسط الحجم وسريع) ==========
-DIALECT_KEYWORDS = {
+# ─ـ أنماط الكشف عن اللهجات ──────────────────────
+DIALECT_PATTERNS = {
     "egyptian": [
-        "إيه", "ازيك", "عامل", "بتاع", "دلوقتي", "كده", "مش", "اهو",
-        "يعني", "معلش", "خالص", "اوي", "عشان", "فين", "امتى", "ازاي",
-        "يا عم", "والله", "بجد", "حلو", "وحش", "فلوس", "عربية", "جمب",
-        "شوية", "كتير", "قوي", "برضه", "بردو", "لسه", "كمان", "شوف",
+        r'\b(ازيك|عامل ايه|معلش|كده|بص|يا عم|والله|حاجة|دلوقتي|فلوس|بتاع|عايز|مش|بقى|ليه|إنت|إنتي)\b',
+        r'\b(هعمل|هروح|هجيب|هشوف|هقول)\b',
+        r'[ةه]مصر',
     ],
     "gulf": [
-        "شلونك", "وين", "ليش", "تبي", "يبي", "زين", "واجد", "حيل",
-        "هذا", "شنو", "ابغى", "مري", "ياخي", "تمام", "طيب", "يلا",
-        "شو", "عيل", "مب", "أوكي", "وايد", "هذي", "هذولي", "الحين",
-        "عقب", "بكرة", "أمس", "دايم", "أبشر", "تستاهل",
+        r'\b(شلونك|تمام|عليكم|والله|ماشاء الله|ياخي|الخير|طيب|أبشر|ماعليك|شسمه|هلا)\b',
+        r'\b(تبي|بغيت|أبغى)\b',
+        r'[ةه]سعود|[ةه]إمارات|[ةه]كويت|[ةه]قطر|[ةه]بحرين|[ةه]عمان',
     ],
     "levantine": [
-        "شو", "كيفك", "هلق", "يلا", "مش هيك", "شب", "عم", "هون",
-        "هيك", "كتير", "شوي", "منيح", "ليش", "بدي", "أنا", "إنت",
-        "نحنا", "هما", "في", "ما في", "عندي", "معي", "أهلاً", "مرحبا",
+        r'\b(كيفك|شو|هلا|والله|شغلة|كتير|حلو|قديش|ليش|بدي|عن جد|يعني|يا زلمة|هلأ)\b',
+        r'\b(رح|عم)\b',
+        r'[ةه]سور|[ةه]أردن|[ةه]لبنان|[ةه]فلسطين',
     ],
     "moroccan": [
-        "واش", "كيداير", "بزاف", "مزيان", "دابا", "ماشي", "شنو",
-        "الدراري", "البنت", "كيجي", "علاش", "فين", "منين", "لاباس",
-        "كيفاش", "شنو كتقول", "مزيانة", "مزيانين",
-    ],
-    "english": [
-        "hello", "hi", "how are", "what", "why", "thanks", "please",
-        "sorry", "good morning", "good night", "see you", "take care",
-        "i'm", "you're", "we're", "they're", "can't", "don't", "won't",
+        r'\b(لاباس|شنو|هاد|واخا|مزيان|بزاف|دابا|فين|علاش|كيفاش|نتا|نتي)\b',
+        r'[ةه]مغرب',
     ],
 }
 
-# ========== قاموس تعليمات AI الموسعة والواضحة ==========
-DIALECT_PROMPTS = {
-    "egyptian": "إنت بتكلم مصري. خليك زي البيتزا والفلافل. استخدم كلمات مصرية كتير: 'إيه'، 'دلوقتي'، 'كده'، 'معلش'، 'يا عم'، 'والله'، 'بجد'. خليك دافئ وعفوي ومصري جداً.",
-    "gulf": "إنت بتكلم خليجي. إنت رايق ومحترم. استخدم كلمات: 'وين'، 'ليش'، 'زين'، 'واجد'، 'تبي'، 'أبشر'، 'تستاهل'. تكلم بكل هدوء وثقة.",
-    "levantine": "إنت بتكلم شامي. إنت طيب القلب وعفوي. استخدم كلمات: 'شو'، 'هيك'، 'كتير'، 'منيح'، 'لهلق'، 'ليش'، 'بدي'. إجعل كلامك فيه موسيقى الشام.",
-    "moroccan": "إنت بتكلم مغربي (دارجة). إنت مضياف وكريم. استخدم كلمات: 'واش'، 'بزاف'، 'مزيان'، 'دابا'، 'كيداير'، 'لاباس'. كن فخوراً بثقافتك.",
-    "english": "You speak natural, modern English. Be warm, genuine, and use contractions like 'you're', 'it's', 'can't'. Sound like a caring friend, not a textbook.",
-    "modern_arabic": "تكلم بعربية بسيطة وطبيعية، قريبة من العامية وليست فصحى جافة. كن دافئاً وعفوياً. استخدم كلمات سهلة وواضحة.",
+# ─ـ ملفات تعريف الأسلوب حسب اللهجة ──────────────
+DIALECT_PROFILES = {
+    "egyptian":   {"warmth": 0.8, "directness": 0.7, "humor": 0.6, "formality": 0.3},
+    "gulf":       {"warmth": 0.6, "directness": 0.8, "humor": 0.3, "formality": 0.8},
+    "levantine":  {"warmth": 0.7, "directness": 0.7, "humor": 0.5, "formality": 0.5},
+    "moroccan":   {"warmth": 0.6, "directness": 0.6, "humor": 0.4, "formality": 0.6},
+    "modern_arabic": {"warmth": 0.5, "directness": 0.9, "humor": 0.3, "formality": 0.7},
+    "english":    {"warmth": 0.6, "directness": 0.8, "humor": 0.4, "formality": 0.5},
 }
 
-def get_dialect_from_text(text: str) -> str:
-    """
-    تحليل النص لتحديد اللهجة المستخدمة.
-    يُرجع اسم اللهجة (مثل 'egyptian') أو 'modern_arabic' إذا لم يتعرف على شيء.
-    """
-    text_lower = text.lower()
-    scores: Dict[str, int] = {}
+# توجيهات النموذج (خفيفة جداً)
+DIALECT_GUIDANCE = {
+    "egyptian":     "المستخدم يميل للهجة المصرية. تحدث بالعربية الواضحة. يمكنك إضافة بعض التعبيرات المصرية الطبيعية باعتدال. الأولوية للفهم والإجابة المفيدة.",
+    "gulf":         "المستخدم يميل للهجة الخليجية. استخدم لغة عربية سهلة ومهذبة. يمكن إضافة بعض المفردات الخليجية بشكل طبيعي. لا تجعل الأسلوب يطغى على المعلومة.",
+    "levantine":    "المستخدم يميل للهجة الشامية. تحدث بأسلوب دافئ وطبيعي. اسمح ببعض المفردات الشامية عند الحاجة. الأولوية للوضوح والفائدة.",
+    "moroccan":     "المستخدم يميل للهجة المغربية. حافظ على العربية المفهومة للجميع. استخدم تعابير مغربية خفيفة فقط إذا كانت مناسبة.",
+    "modern_arabic": "تحدث بالعربية الفصحى البسيطة والواضحة. كن دافئاً ومهماً.",
+    "english":       "Use natural modern English. Be warm and conversational. Prioritize clarity and usefulness.",
+}
 
-    for dialect, keywords in DIALECT_KEYWORDS.items():
+# ذاكرة مؤقتة لتفضيلات المستخدم (يمكن نقلها إلى Supabase لاحقاً)
+_user_dialect_prefs: Dict[str, Dict] = {}
+
+def get_dialect_for_user(country_code: str = "SA", message: str = "") -> Tuple[str, float]:
+    """
+    اكتشاف اللهجة مع درجة الثقة.
+    تُرجع (اللهجة, الثقة).
+    """
+    if not message or len(message.strip()) < 5:
+        return "modern_arabic", 0.0
+
+    message_lower = message.lower()
+    scores = {}
+    for dialect, patterns in DIALECT_PATTERNS.items():
         score = 0
-        for kw in keywords:
-            if kw in text_lower:
-                score += 1
+        for pattern in patterns:
+            matches = re.findall(pattern, message_lower)
+            score += len(matches)
         if score > 0:
             scores[dialect] = score
 
     if scores:
-        # إرجاع اللهجة صاحبة أعلى درجة
-        return max(scores, key=scores.get)
-
-    return "modern_arabic"
-
-def get_dialect_from_country(country_code: str) -> str:
-    """
-    تحديد اللهجة من كود الدولة كخطة بديلة.
-    """
-    mapping = {
-        "EG": "egyptian", "SA": "gulf", "AE": "gulf", "KW": "gulf",
-        "QA": "gulf", "BH": "gulf", "OM": "gulf",
-        "JO": "levantine", "LB": "levantine", "SY": "levantine", "PS": "levantine",
-        "IQ": "gulf", "YE": "gulf",
-        "MA": "moroccan", "DZ": "moroccan", "TN": "moroccan", "LY": "moroccan",
-        "US": "english", "GB": "english", "CA": "english", "AU": "english",
-    }
-    return mapping.get(country_code, "modern_arabic")
-
-def get_dialect_for_user(country_code: str, message: str) -> str:
-    """
-    يحدد اللهجة النهائية:
-    1. يحاول اكتشافها من النص أولاً (الأكثر دقة).
-    2. إذا فشل (نص قصير أو غير واضح)، يستخدم الدولة كخطة بديلة.
-    """
-    if message and len(message.strip()) > 5:
-        text_dialect = get_dialect_from_text(message)
-        if text_dialect != "modern_arabic":
-            return text_dialect
-    
-    # إذا لم يتعرف على اللهجة من النص، نلجأ للدولة
-    return get_dialect_from_country(country_code)
+        best = max(scores, key=scores.get)
+        total = sum(scores.values())
+        confidence = min(scores[best] / total, 1.0) if total > 0 else 0.0
+        return best, confidence
+    return "modern_arabic", 0.0
 
 def get_dialect_prompt(dialect: str) -> str:
-    """
-    الحصول على تعليمات النظام للهجة المحددة.
-    """
-    return DIALECT_PROMPTS.get(dialect, DIALECT_PROMPTS["modern_arabic"])
+    """النص الإرشادي للهجة (خفيف)"""
+    return DIALECT_GUIDANCE.get(dialect, DIALECT_GUIDANCE["modern_arabic"])
 
-def get_voice_dialect(country_code: str) -> str:
-    """
-    تحديد كود الصوت المناسب للبلد (لاستخدامه في TTS).
-    """
-    return COUNTRY_TO_VOICE.get(country_code, "ar-SA")
+def get_dialect_profile(dialect: str) -> Dict[str, float]:
+    """ملف تعريف الأسلوب (warmth, directness, humor, formality)"""
+    return DIALECT_PROFILES.get(dialect, DIALECT_PROFILES["modern_arabic"])
+
+def set_user_preferred_dialect(user_id: str, dialect: str):
+    """تخزين تفضيل اللهجة للمستخدم"""
+    _user_dialect_prefs[user_id] = dialect
+
+def get_user_preferred_dialect(user_id: str) -> Optional[str]:
+    """استرجاع تفضيل اللهجة المخزن"""
+    return _user_dialect_prefs.get(user_id)
+
+print("✅ Dialect Engine v3.0 (Style Layer) initialized")

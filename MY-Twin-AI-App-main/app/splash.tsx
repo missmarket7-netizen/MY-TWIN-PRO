@@ -11,7 +11,6 @@ export default function SplashScreen() {
   const { setAuth, theme } = useTwinStore();
   const isDark = theme === 'dark';
 
-  // ✅ النوع الصحيح لـ Ref
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const brandTextOpacity = useRef(new Animated.Value(0)).current;
@@ -30,7 +29,6 @@ export default function SplashScreen() {
       Animated.timing(brandTextOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.timing(copyrightOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]);
-    // ✅ Optional Chaining
     animRef.current?.start();
 
     const bootPromise = (async () => {
@@ -65,7 +63,6 @@ export default function SplashScreen() {
     });
 
     return () => {
-      // ✅ Optional Chaining
       animRef.current?.stop();
     };
   }, []);
@@ -79,7 +76,7 @@ export default function SplashScreen() {
       <View style={[styles.container, isDark && { backgroundColor: '#1A1A1A' }]}>
         <View style={styles.contentGroup}>
           <Animated.Image
-            source={require('../assets/logo.png')}
+            source={require('../assets/icon.png')}
             style={[styles.logo, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}
             resizeMode="contain"
           />

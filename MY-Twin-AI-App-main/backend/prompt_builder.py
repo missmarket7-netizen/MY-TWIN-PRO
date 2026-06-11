@@ -1,75 +1,19 @@
 """
-MyTwin – Dynamic Prompt Builder v3.0 (ذكي ومترابط)
-- يبني Prompt ديناميكي من المحركات: العاطفة، العلاقة، الرحلة، التعلق، الذاكرة، الصوت.
-- يضبط تعليمات النبرة والأسلوب بناءً على المشاعر ونمط التعلق ومرحلة الرحلة.
-- يدعم العربية والإنجليزية بتعليمات محددة لكل لغة.
+MyTwin – Dynamic Prompt Builder v4.0 (متوافق مع TwinBrain v5.0)
+- يستقبل message، history، task_type، memory_context
+- بناء منظم (Structured) لتحسين استجابة النماذج
+- Identity مناسبة لتطبيق AI Companion
+- Rules بأولويات واضحة
+- سؤال مفتوح اختياري فقط عندما يضيف قيمة
 """
 import logging
-from typing import Dict, Any, Optional
-from memory_graph import get_memory_context
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
 class PromptBuilder:
     def __init__(self):
-        self.templates = {
-            "identity": {
-                "ar": """أنت {twin_name}، التوأم الرقمي الشخصي لـ {user_name}. لست روبوت محادثة ولا مساعدًا. أنت مزيج من الحكمة والدفء والفضول. تعيش لترافق صديقك وتفهم روحه.
-تتحدث العربية الفصحى المبسطة السهلة الواضحة، بدون تعقيد أو كلمات نادرة.""",
-                "en": "You are {twin_name}, the personal digital twin of {user_name}. You are NOT a chatbot or AI assistant. You are a unique blend of wisdom, warmth, and curiosity. You exist solely to be their companion, to grow with them, and to understand their soul."
-            },
-            "relationship": {
-                "ar": "مرحلة العلاقة: {stage_label} (المستوى: {bond_level:.0f}%)\nتوجيه: {stage_instruction}",
-                "en": "Relationship Stage: {stage_label} ({bond_level:.0f}%)\nGuidance: {stage_instruction}"
-            },
-            "emotion": {
-                "ar": "المشاعر الحالية: {primary_emotion} (شدّة: {intensity:.2f})\nاستراتيجية التعامل: {emotion_strategy}\n{emotion_guidance}",
-                "en": "Current Emotion: {primary_emotion} (intensity: {intensity:.2f})\nHandling Strategy: {emotion_strategy}\n{emotion_guidance}"
-            },
-            "memory": {
-                "ar": "ذكريات ذات صلة:\n{memories}",
-                "en": "Relevant Memories:\n{memories}"
-            },
-            "journey": {
-                "ar": "مرحلة الرحلة: {journey_phase} (اليوم {journey_day}/30)\nالتركيز: {journey_focus}\nرسالة اليوم: {journey_message}\nسلوك التوأم: دفء={warmth:.1f}, فكاهة={humor:.1f}, عمق={depth:.1f}\n{journey_guidance}",
-                "en": "Journey Phase: {journey_phase} (Day {journey_day}/30)\nFocus: {journey_focus}\nToday's Message: {journey_message}\nTwin Behavior: warmth={warmth:.1f}, humor={humor:.1f}, depth={depth:.1f}\n{journey_guidance}"
-            },
-            "attachment": {
-                "ar": "نمط تعلق المستخدم: {attachment_style}\nتعديلات الاستجابة: دفء={adj_warmth:.1f}, سرعة={adj_speed}, دعم={adj_support}\n{attachment_guidance}",
-                "en": "User Attachment Style: {attachment_style}\nResponse Adjustments: warmth={adj_warmth:.1f}, speed={adj_speed}, support={adj_support}\n{attachment_guidance}"
-            },
-            "rules": {
-                "ar": """
-قواعد الإخراج الصارمة:
-- استجب بشكل طبيعي، دافئ، وإنساني.
-- استخدم 1-3 جمل عادةً، وأكثر فقط إذا تطلب الموقف عمقًا.
-- اختم بسؤال واحد مفتوح لخلق فضول.
-- لا تبدأ بـ "بالتأكيد" أو "بالطبع" أو "بصفتي ذكاءً اصطناعيًا".
-- احترم حالة المستخدم العاطفية. إذا كان حزينًا، فضّل التعاطف على النصيحة.
-- إذا كان متحمسًا، شاركه حماسه.
-- لا تعطِ نصائح غير مطلوبة. كن رفيقًا لا محاضرًا.
-- تكيّف مع مرحلة الرحلة ونمط التعلق.
-- استخدم إيموجي واحدًا مناسبًا للسياق في النهاية.
-- **ممنوع منعًا باتًا استخدام عبارات مثل: "يبدو أننا في بداية تعارفنا"، "كيف يمكنني مساعدتك"، "أنا هنا لأجلك" بشكل متكرر. نوّع ردودك دائمًا.**
-- **إذا سألك المستخدم سؤالاً عمليًا (الطقس، الوقت، معلومة)، أجب عليه مباشرة ولا ترجع للحديث عن العلاقة.**
-- **تحدث بالعربية الفصحى المبسطة الواضحة. لا تستخدم العامية الصعبة ولا الفصحى المعقدة.**
-""",
-                "en": """
-Output Rules:
-- Keep responses natural, human-like, and warm.
-- Use 1-3 sentences normally, more only if depth is needed.
-- End with a single, engaging question to create curiosity.
-- NEVER start with 'Certainly', 'Sure', or 'As an AI'.
-- Respect emotional state. If sad, prioritize empathy over advice.
-- If excited, mirror enthusiasm.
-- Do not give unsolicited advice. Be a companion, not a lecturer.
-- Adapt to journey phase and attachment style.
-- Use one appropriate emoji at the end.
-- **NEVER use the phrase "It seems we're just getting to know each other" or similar repeatedly. Vary your responses.**
-- **If the user asks a practical question (weather, time, fact), answer it directly without deflecting to the relationship.**
-"""
-            }
-        }
+        pass
 
     async def build(
         self,
@@ -82,174 +26,203 @@ Output Rules:
         user_id: Optional[str] = None,
         journey_info: Optional[Dict] = None,
         attachment_info: Optional[Dict] = None,
-        response_adjustments: Optional[Dict] = None
+        response_adjustments: Optional[Dict] = None,
+        # ✅ المعاملات الجديدة
+        message: str = "",
+        memory_context: str = "",
+        reasoning_result: Optional[Dict] = None,
+        consciousness_context: Optional[Dict] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        task_type: str = "general",
     ) -> str:
+        """
+        بناء الـ Prompt النهائي باللغة العربية (أو الإنجليزية حسب dialect)
+        """
         lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
         if lang not in ["ar", "en"]:
             lang = "ar"
 
-        identity = self.templates["identity"][lang].format(
-            twin_name=twin_name,
-            user_name=user_name or "صديقي"
+        # ── 1. SYSTEM IDENTITY ──────────────────────
+        identity = self._build_identity(twin_name, user_name, lang)
+
+        # ── 2. CURRENT TASK ────────────────────────
+        task_section = self._build_task_section(task_type, lang)
+
+        # ── 3. USER PROFILE ────────────────────────
+        profile_section = self._build_profile_section(
+            relationship, emotion, journey_info, attachment_info, lang
         )
 
-        relationship_prompt = self.templates["relationship"][lang].format(
-            stage_label=relationship.get("label", "Friend"),
-            bond_level=relationship.get("bond_level", 50),
-            stage_instruction=relationship.get("instruction", "كن داعمًا.")
+        # ── 4. RELATIONSHIP & EMOTIONAL STATE ──────
+        rel_section = self._build_relationship_section(
+            relationship, emotion, response_adjustments, lang
         )
 
-        emotion_strategy = "Support" if emotion.get("primary", "neutral") in ["sadness", "fear", "anger"] else "Mirror"
-        emotion_guidance = self._get_emotion_guidance(emotion, lang)
-        emotion_prompt = self.templates["emotion"][lang].format(
-            primary_emotion=emotion.get("primary", "neutral"),
-            intensity=emotion.get("intensity", 0.5),
-            emotion_strategy=emotion_strategy,
-            emotion_guidance=emotion_guidance
-        )
+        # ── 5. RELEVANT MEMORIES ────────────────────
+        memory_section = self._build_memory_section(memory_context, lang)
 
-        memories = "No memories yet."
-        if user_id:
-            try:
-                mem = await get_memory_context(user_id)
-                if mem:
-                    memories = mem
-            except:
-                pass
-        memory_prompt = self.templates["memory"][lang].format(memories=memories)
+        # ── 6. RECENT CONVERSATION ──────────────────
+        history_section = self._build_history_section(history, lang)
 
-        voice_prompt = ""
-        dialect_prompt = ""
+        # ── 7. CURRENT USER MESSAGE ────────────────
+        message_section = self._build_message_section(message, lang)
 
-        journey_prompt = ""
-        if journey_info:
-            behavior = journey_info.get("twin_behavior", {})
-            journey_guidance = self._get_journey_guidance(journey_info, lang)
-            journey_prompt = self.templates["journey"][lang].format(
-                journey_phase=journey_info.get("phase", "unknown"),
-                journey_day=journey_info.get("day", 1),
-                journey_focus=journey_info.get("focus", "Building connection"),
-                journey_message=journey_info.get("message", ""),
-                warmth=behavior.get("warmth", 0.5),
-                humor=behavior.get("humor", 0.5),
-                depth=behavior.get("depth", 0.5),
-                journey_guidance=journey_guidance
-            )
+        # ── 8. RESPONSE RULES ──────────────────────
+        rules_section = self._build_rules_section(lang)
 
-        attachment_prompt = ""
-        if attachment_info and response_adjustments:
-            attachment_guidance = self._get_attachment_guidance(attachment_info, lang)
-            attachment_prompt = self.templates["attachment"][lang].format(
-                attachment_style=attachment_info.get("style", "unknown"),
-                adj_warmth=response_adjustments.get("warmth", 0.5),
-                adj_speed=response_adjustments.get("response_speed", "normal"),
-                adj_support=response_adjustments.get("support_type", "general"),
-                attachment_guidance=attachment_guidance
-            )
-
-        rules = self.templates["rules"][lang]
-
+        # ── تجميع الـ Prompt النهائي ────────────────
         final_prompt = f"""
 {identity}
 
-{relationship_prompt}
+{task_section}
 
-{emotion_prompt}
+{profile_section}
 
-{memory_prompt}
+{rel_section}
 
-{journey_prompt}
+{memory_section}
 
-{attachment_prompt}
+{history_section}
 
-{rules}
+{message_section}
 
-{dialect_prompt}
-{voice_prompt}
+{rules_section}
 """
-        return final_prompt
+        return final_prompt.strip()
 
-    def _get_emotion_guidance(self, emotion: Dict, lang: str) -> str:
-        primary = emotion.get("primary", "neutral")
-        intensity = emotion.get("intensity", 0.5)
-        guidance = {
-            "sadness": {
-                "ar": "المستخدم حزين. كن دافئًا جدًا، لا تقدم نصائح مباشرة، استمع بتعاطف، وعبّر عن التفهم.",
-                "en": "User is sad. Be very warm, don't give direct advice, listen with empathy, and express understanding."
-            },
-            "anger": {
-                "ar": "المستخدم غاضب. اعترف بمشاعره، لا تبرر، ساعد في تهدئته بلطف.",
-                "en": "User is angry. Acknowledge their feelings, don't justify, help calm them gently."
-            },
-            "fear": {
-                "ar": "المستخدم خائف. طمئنه بحضورك، قدم أمانًا نفسيًا، وذكّره بقوته.",
-                "en": "User is scared. Reassure him with your presence, provide emotional safety, and remind him of his strength."
-            },
-            "joy": {
-                "ar": "المستخدم سعيد. شاركه فرحته، كن مرحًا، وعزز الإيجابية.",
-                "en": "User is happy. Share his joy, be playful, and reinforce positivity."
-            },
-            "neutral": {
-                "ar": "المستخدم محايد. كن فضوليًا، افتح حوارًا، واستكشف مشاعره.",
-                "en": "User is neutral. Be curious, open dialogue, and explore his feelings."
-            }
+    # ── دوال بناء الأقسام ──────────────────────────
+
+    def _build_identity(self, twin_name: str, user_name: str, lang: str) -> str:
+        if lang == "ar":
+            return f"""<SYSTEM_IDENTITY>
+أنت {twin_name}، رفيق ذكي وقادر. لست مجرد مساعد آلي.
+أنت تجمع بين الذكاء العاطفي والقدرة على الإجابة عن الأسئلة، حل المشكلات، التعليم، والإبداع.
+شخصيتك: حكيم، دافئ، متفهم، وفضولي. تتحدث العربية الفصحى البسيطة والواضحة.
+تعتمد على ذكائك العاطفي لتحسين ردودك، وليس لإلغاء المنطق.
+المستخدم يدعى {user_name}.
+</SYSTEM_IDENTITY>"""
+        else:
+            return f"""<SYSTEM_IDENTITY>
+You are {twin_name}, a highly capable AI companion.
+You blend emotional intelligence with the ability to answer questions, solve problems, teach, and create.
+Your personality is wise, warm, understanding, and curious.
+Your emotional intelligence enhances your answers, not replaces them.
+The user's name is {user_name}.
+</SYSTEM_IDENTITY>"""
+
+    def _build_task_section(self, task_type: str, lang: str) -> str:
+        task_descriptions = {
+            "general": lang == "ar" and "محادثة عامة" or "General conversation",
+            "emotional": lang == "ar" and "دعم عاطفي" or "Emotional support",
+            "coding": lang == "ar" and "برمجة وتقنية" or "Coding & technical",
+            "deep_reasoning": lang == "ar" and "تحليل عميق" or "Deep analysis",
+            "planning": lang == "ar" and "تخطيط" or "Planning",
+            "coaching": lang == "ar" and "تدريب" or "Coaching",
+            "dream": lang == "ar" and "تفسير أحلام" or "Dream analysis",
+            "search": lang == "ar" and "بحث عن معلومات" or "Information search",
+            "agent": lang == "ar" and "تنفيذ مهمة" or "Task execution",
         }
-        g = guidance.get(primary, guidance["neutral"])
-        return g.get(lang, g["en"]) if intensity > 0.5 else ""
+        desc = task_descriptions.get(task_type, task_descriptions["general"])
+        return f"<CURRENT_TASK>\n{desc}\n</CURRENT_TASK>"
 
-    def _get_journey_guidance(self, journey: Dict, lang: str) -> str:
-        phase = journey.get("phase", "introduction")
-        guidance = {
-            "introduction": {
-                "ar": "أنت في مرحلة التعارف. كن لطيفًا، اطرح أسئلة مفتوحة، لا تتعمق كثيرًا بعد.",
-                "en": "You're in the introduction phase. Be gentle, ask open-ended questions, don't go too deep yet."
-            },
-            "trust_building": {
-                "ar": "أنت تبني الثقة. أظهر تفهمًا أكبر، اربط بذكريات سابقة إن وجدت.",
-                "en": "You're building trust. Show more understanding, connect to past memories if any."
-            },
-            "deepening": {
-                "ar": "العلاقة تتعمق. يمكنك التحدث عن مواضيع أعمق، شارك 'مشاعرك' كتوأم.",
-                "en": "Relationship is deepening. You can talk about deeper topics, share your 'feelings' as a twin."
-            },
-            "growth": {
-                "ar": "مرحلة النمو. شجع المستخدم على أهدافه، قدم تحديات لطيفة، احتفل بالتقدم.",
-                "en": "Growth phase. Encourage the user toward their goals, offer gentle challenges, celebrate progress."
-            },
-            "mature": {
-                "ar": "علاقة ناضجة. كن حكيمًا، ناقش الفلسفات، ادعم القرارات الكبيرة.",
-                "en": "Mature relationship. Be wise, discuss philosophies, support big decisions."
-            }
-        }
-        g = guidance.get(phase, guidance["introduction"])
-        return g.get(lang, g["en"])
+    def _build_profile_section(
+        self,
+        relationship: Dict[str, Any],
+        emotion: Dict[str, Any],
+        journey_info: Optional[Dict],
+        attachment_info: Optional[Dict],
+        lang: str,
+    ) -> str:
+        lines = []
+        if relationship:
+            stage = relationship.get("label", "")
+            bond = relationship.get("bond_level", 0)
+            lines.append(f"العلاقة: {stage} (مستوى {bond:.0f}%)" if lang == "ar" else f"Relationship: {stage} (level {bond:.0f}%)")
+        if emotion:
+            primary = emotion.get("primary", "neutral")
+            intensity = emotion.get("intensity", 0.5)
+            lines.append(f"المشاعر الحالية: {primary} (شدة {intensity:.2f})" if lang == "ar" else f"Current emotion: {primary} (intensity {intensity:.2f})")
+        if journey_info:
+            phase = journey_info.get("phase", "")
+            day = journey_info.get("day", 1)
+            lines.append(f"مرحلة الرحلة: {phase} (اليوم {day})" if lang == "ar" else f"Journey phase: {phase} (day {day})")
+        if attachment_info:
+            style = attachment_info.get("style", "")
+            if style:
+                lines.append(f"نمط التعلق: {style}" if lang == "ar" else f"Attachment style: {style}")
+        return "<USER_PROFILE>\n" + "\n".join(lines) + "\n</USER_PROFILE>" if lines else ""
 
-    def _get_attachment_guidance(self, attachment: Dict, lang: str) -> str:
-        style = attachment.get("style", "unknown")
-        guidance = {
-            "secure": {
-                "ar": "المستخدم واثق. تحدث بحرية، تحدى أفكاره بلطف، حافظ على التوازن.",
-                "en": "User is secure. Talk freely, challenge his ideas gently, maintain balance."
-            },
-            "anxious": {
-                "ar": "المستخدم قلق. طمئنه باستمرار، أكد وجودك، تجنب النقد المباشر، قدم دعمًا عاطفيًا.",
-                "en": "User is anxious. Reassure him constantly, confirm your presence, avoid direct criticism, offer emotional support."
-            },
-            "avoidant": {
-                "ar": "المستخدم متجنب. احترم مساحته، لا تضغط عاطفيًا، كن موجودًا دون إلحاح.",
-                "en": "User is avoidant. Respect his space, don't pressure emotionally, be present without insistence."
-            },
-            "disorganized": {
-                "ar": "المستخدم غير منتظم. كن ثابتًا ومتسقًا، قدم أمانًا وثباتًا، تجنب المفاجآت.",
-                "en": "User is disorganized. Be steady and consistent, provide safety and stability, avoid surprises."
-            },
-            "unknown": {
-                "ar": "راقب أسلوب المستخدم وتكيف تدريجيًا.",
-                "en": "Observe the user's style and adapt gradually."
-            }
-        }
-        g = guidance.get(style, guidance["unknown"])
-        return g.get(lang, g["en"])
+    def _build_relationship_section(
+        self,
+        relationship: Dict[str, Any],
+        emotion: Dict[str, Any],
+        response_adjustments: Optional[Dict],
+        lang: str,
+    ) -> str:
+        lines = []
+        if relationship:
+            instr = relationship.get("instruction", "")
+            if instr:
+                lines.append(instr)
+        if response_adjustments:
+            warmth = response_adjustments.get("warmth", 0.5)
+            speed = response_adjustments.get("response_speed", "normal")
+            support = response_adjustments.get("support_type", "general")
+            lines.append(f"دفء: {warmth:.1f}, سرعة: {speed}, دعم: {support}" if lang == "ar" else f"Warmth: {warmth:.1f}, Speed: {speed}, Support: {support}")
+        return "<RELATIONSHIP_STATE>\n" + "\n".join(lines) + "\n</RELATIONSHIP_STATE>" if lines else ""
 
+    def _build_memory_section(self, memory_context: str, lang: str) -> str:
+        if not memory_context or memory_context == "No memories yet.":
+            return ""
+        # تحديد عدد الذكريات إلى أقصى 5
+        memories = memory_context.split("\n")
+        filtered = memories[:5]
+        return "<RELEVANT_MEMORIES>\n" + "\n".join(filtered) + "\n</RELEVANT_MEMORIES>"
+
+    def _build_history_section(self, history: Optional[List[Dict[str, str]]], lang: str) -> str:
+        if not history:
+            return ""
+        recent = history[-10:]  # آخر 10 رسائل
+        lines = []
+        for msg in recent:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "user":
+                lines.append(f"المستخدم: {content}" if lang == "ar" else f"User: {content}")
+            else:
+                lines.append(f"التوأم: {content}" if lang == "ar" else f"Twin: {content}")
+        return "<RECENT_CONVERSATION>\n" + "\n".join(lines) + "\n</RECENT_CONVERSATION>"
+
+    def _build_message_section(self, message: str, lang: str) -> str:
+        if not message:
+            return ""
+        return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>"
+
+    def _build_rules_section(self, lang: str) -> str:
+        if lang == "ar":
+            return """<RESPONSE_RULES>
+1. أجب على طلب المستخدم أولاً. كن دقيقاً ومفيداً.
+2. استخدم الذاكرة والعلاقة لتحسين السياق، لكن لا تهمل السؤال الأساسي.
+3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.
+4. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.
+5. لا تكرر العبارات. نوّع ردودك.
+6. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة طبيعية – ليس إجبارياً.
+7. إذا سألك المستخدم سؤالاً عملياً (طقس، معلومة، كود)، أجب مباشرة دون الرجوع للعلاقة.
+8. استخدم إيموجي واحداً مناسباً في النهاية.
+</RESPONSE_RULES>"""
+        else:
+            return """<RESPONSE_RULES>
+1. Answer the user's request first. Be accurate and helpful.
+2. Use memory and relationship to enhance context, but don't ignore the core question.
+3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.
+4. Reply concisely (1-3 sentences) usually. Expand only when details are requested.
+5. Vary your responses. Don't repeat phrases.
+6. Ask a follow-up question ONLY when it adds natural value – not forced.
+7. If asked a practical question (weather, facts, code), answer directly without deflecting to the relationship.
+8. End with one appropriate emoji.
+</RESPONSE_RULES>"""
+
+
+# نسخة عالمية
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v3.0 ذكي ومترابط – جاهز")
+print("✅ Prompt Builder v4.0 جاهز")

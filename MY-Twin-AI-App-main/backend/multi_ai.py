@@ -1,9 +1,10 @@
-import os, logging, asyncio, warnings
-from typing import Optional, AsyncGenerator
+import os, logging, asyncio, time, random, warnings
+from typing import Optional, AsyncGenerator, List, Tuple
 
 warnings.filterwarnings("ignore", message="All support for the `google.generativeai` package has ended")
 import google.generativeai as genai
 from openai import OpenAI
+from model_registry import TASK_CHAINS, MODEL_COSTS, MODEL_LATENCY_ESTIMATE, FALLBACK_MESSAGES
 
 logger = logging.getLogger("multi_ai")
 
@@ -12,17 +13,15 @@ class AIUnavailable(Exception):
 
 class MultiAIClient:
     def __init__(self):
-        # Gemini 1.5 Flash (local fallback – مجاني من Google AI Studio)
+        # Gemini
         gemini_key = os.getenv("GEMINI_API_KEY")
+        self.gemini_model = None
         if gemini_key:
             try:
                 genai.configure(api_key=gemini_key)
-                self.gemini_flash = genai.GenerativeModel("gemini-1.5-flash")
+                self.gemini_model = genai.GenerativeModel("gemini-1.5-flash")
             except Exception as e:
                 logger.error(f"Gemini init failed: {e}")
-                self.gemini_flash = None
-        else:
-            self.gemini_flash = None
 
         # Groq
         groq_key = os.getenv("GROQ_API_KEY")
@@ -32,161 +31,117 @@ class MultiAIClient:
         or_key = os.getenv("OPENROUTER_API_KEY")
         self.or_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_key) if or_key else None
 
-    # ── أدوات الاتصال ──────────────────────────────
-    def _groq(self, model: str, prompt: str, max_tokens: int = 100) -> Optional[str]:
-        if not self.groq_client: return None
+    async def _call_model(self, provider: str, model: str, prompt: str, max_t: int, timeout: int = 8) -> Tuple[Optional[str], str, float, int]:
+        """استدعاء نموذج واحد مع timeout وإرجاع (رد, مزود, زمن, تكلفة)"""
+        start = time.time()
         try:
-            resp = self.groq_client.chat.completions.create(
-                model=model, messages=[{"role":"user","content":prompt}],
-                temperature=0.7, max_tokens=max_tokens
-            )
-            return resp.choices[0].message.content
-        except Exception as e:
-            logger.warning(f"Groq [{model}]: {e}")
-            return None
+            if provider == "groq" and self.groq_client:
+                resp = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, 
+                        lambda: self.groq_client.chat.completions.create(
+                            model=model.split("/")[-1],
+                            messages=[{"role":"user","content":prompt}],
+                            temperature=0.8, max_tokens=max_t
+                        )
+                    ),
+                    timeout=timeout
+                )
+                result = resp.choices[0].message.content
+                latency = (time.time() - start) * 1000
+                return result.strip() if result else None, "Groq", latency, 0
 
-    def _or(self, model: str, prompt: str, max_tokens: int = 100) -> Optional[str]:
-        if not self.or_client: return None
-        try:
-            resp = self.or_client.chat.completions.create(
-                model=model, messages=[{"role":"user","content":prompt}],
-                temperature=0.7, max_tokens=max_tokens
-            )
-            return resp.choices[0].message.content
-        except Exception as e:
-            logger.warning(f"OpenRouter [{model}]: {e}")
-            return None
+            elif provider == "openrouter" and self.or_client:
+                resp = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.or_client.chat.completions.create(
+                            model=model.split("/", 1)[-1],
+                            messages=[{"role":"user","content":prompt}],
+                            temperature=0.8, max_tokens=max_t
+                        )
+                    ),
+                    timeout=timeout
+                )
+                result = resp.choices[0].message.content
+                latency = (time.time() - start) * 1000
+                return result.strip() if result else None, "OpenRouter", latency, 0
 
-    # ── Groq Models ─────────────────────────────────
-    def groq_llama(self, p, max_t=100):   return self._groq("llama-3.3-70b-versatile", p, max_t)
-    def groq_gemma(self, p, max_t=80):    return self._groq("gemma2-9b-it", p, max_t)  # خفيف وسريع
+            elif provider == "gemini" and self.gemini_model:
+                resp = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.gemini_model.generate_content(
+                            prompt,
+                            generation_config=genai.GenerationConfig(temperature=0.8, max_output_tokens=max_t)
+                        )
+                    ),
+                    timeout=timeout
+                )
+                result = resp.text
+                latency = (time.time() - start) * 1000
+                return result.strip() if result else None, "Gemini", latency, 0
 
-    # ── OpenRouter Models ────────────────────────────
-    def or_llama4(self, p, max_t=100):    return self._or("meta-llama/llama-4-maverick", p, max_t)
-    def or_deepseek(self, p, max_t=120):  return self._or("deepseek/deepseek-v4-flash", p, max_t)
-    def or_kimi(self, p, max_t=100):      return self._or("moonshotai/kimi-k2.6:free", p, max_t)
-    def or_mistral(self, p, max_t=100):   return self._or("mistralai/mistral-small-3.1-24b-instruct", p, max_t)
-    def or_gemma(self, p, max_t=80):      return self._or("google/gemma-2-9b-it:free", p, max_t)  # خفيف وسريع
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.warning(f"Model {provider}/{model} failed: {e}")
+        
+        return None, provider, 0, 0
 
-    # ── Gemini (احتياطي نهائي) ──────────────────────
-    def gemini_chat(self, p: str, max_t: int = 100) -> str:
-        if not self.gemini_flash:
-            return "أنا هنا معاك 💜"
-        try:
-            genai.GenerationConfig(temperature=0.7, max_output_tokens=max_t)
-            resp = self.gemini_flash.generate_content(p)
-            return resp.text.strip() if resp.text else "أنا هنا معاك 💜"
-        except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            return "أنا هنا معاك 💜"
-
-    # ── توزيع المهام الذكي (3 نماذج + احتياطي لكل مهمة) ──
     async def get_best_reply(self, prompt: str, task: str = "general") -> str:
-        # تقدير عدد التوكنات المناسب بناءً على طول prompt المدخل
-        estimated_tokens = max(60, min(150, len(prompt) // 2))
+        """تشغيل أول 3 نماذج بالتوازي واختيار أسرع رد صالح"""
+        chains = TASK_CHAINS.get(task, TASK_CHAINS["general"])
+        
+        # تشغيل أول 3 نماذج معاً
+        tasks = []
+        for i, model_spec in enumerate(chains[:3]):
+            parts = model_spec.split("/", 1)
+            provider = parts[0]
+            model = parts[1]
+            max_t = max(60, min(150, len(prompt) // 2))
+            timeout = int(MODEL_LATENCY_ESTIMATE.get(provider, 3.0) * 2)  # timeout = ضعف الزمن المتوقع
+            tasks.append(self._call_model(provider, model, prompt, max_t, timeout))
 
-        chains = {
-            # كل سلسلة: [Primary, Secondary, Tertiary, Quaternary (Gemini fallback)]
-            "general": [
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "emotional": [
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "coding": [
-                lambda p: self.or_deepseek(p, estimated_tokens),
-                lambda p: self.or_mistral(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "deep_reasoning": [
-                lambda p: self.or_deepseek(p, estimated_tokens),
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "multilingual": [
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "planning": [
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "coaching": [
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.or_kimi(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "dream": [
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_gemma(p, min(80, estimated_tokens)),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "music": [
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.or_gemma(p, min(80, estimated_tokens)),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "video": [
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_llama4(p, estimated_tokens),
-                lambda p: self.or_gemma(p, min(80, estimated_tokens)),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "search": [
-                lambda p: self.or_deepseek(p, estimated_tokens),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.or_mistral(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-            "agent": [
-                lambda p: self.or_mistral(p, estimated_tokens),
-                lambda p: self.groq_gemma(p, min(80, estimated_tokens)),
-                lambda p: self.groq_llama(p, estimated_tokens),
-                lambda p: self.gemini_chat(p, estimated_tokens),
-            ],
-        }
-
-        selected = chains.get(task, chains["general"])
-        loop = asyncio.get_running_loop()
-        for i, fn in enumerate(selected):
-            try:
-                result = await loop.run_in_executor(None, fn, prompt)
+        # انتظار أول رد صالح
+        pending = set(tasks)
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                result, provider, latency, cost = task.result()
                 if result and len(result.strip()) >= 1:
-                    logger.info(f"✅ [{task}] → model {i+1}")
+                    logger.info(f"✅ [{task}] → {provider} ({latency:.0f}ms)")
                     return result.strip()
-            except Exception:
-                continue
-        return "أنا هنا معاك 💜"
 
-    # ── البث المباشر ──────────────────────────────────
+        # إذا فشل الجميع، جرب النموذج الرابع (Gemini)
+        if len(chains) > 3:
+            parts = chains[3].split("/", 1)
+            result, provider, latency, cost = await self._call_model(parts[0], parts[1], prompt, 100, 10)
+            if result:
+                return result.strip()
+
+        # رد احتياطي عشوائي
+        return random.choice(FALLBACK_MESSAGES)
+
     async def stream_reply(self, prompt: str, task: str = "general") -> AsyncGenerator[str, None]:
         if self.groq_client:
             try:
-                stream = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role":"user","content":prompt}],
-                    temperature=0.7, max_tokens=100, stream=True
+                stream = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.groq_client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role":"user","content":prompt}],
+                            temperature=0.8, max_tokens=100, stream=True
+                        )
+                    ),
+                    timeout=5
                 )
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-                return
+                if stream:
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                    return
             except Exception as e:
                 logger.warning(f"Groq stream failed: {e}")
+        
         full = await self.get_best_reply(prompt, task)
         yield full

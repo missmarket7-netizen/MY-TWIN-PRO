@@ -1,43 +1,54 @@
 """
-MyTwin – Reasoning Engine v7.0 (Agent Framework with Real Tools)
-- تخطيط متعدد الخطوات (Multi-step Planning) مع وعي بالرحلة والتعلق.
-- أدوات حقيقية: تذكير بأهداف، تحليل تقدم، جلب ذكريات، بحث، يوتيوب.
-- تكامل مع multi_ai و twin_journey و attachment_engine.
+MyTwin – Reasoning Engine v8.0 (Agent Brain)
+- يكتشف النية (Intent) بدون LLM عبر Rules + Keywords
+- يدير أدوات متعددة مع أولويات وتكلفة
+- يدمج وعي المستخدم (Consciousness)
+- يُنتج response_mode لتوجيه MultiAI
+- يوفر سياق الأدوات (tool_context) لـ PromptBuilder
 """
-import os, logging, json, asyncio
+import os, logging, re, asyncio, json, time
 from typing import Dict, Any, Optional, List, Callable
+from datetime import datetime, timezone
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("reasoning_engine")
 
+# ========== أدوات معرفة مسبقاً مع أولويات ==========
 class ToolRegistry:
-    """سجل الأدوات الديناميكي"""
-    _tools: Dict[str, Callable] = {}
+    _tools: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
-    def register(cls, name: str, func: Callable):
-        cls._tools[name] = func
+    def register(cls, name: str, func: Callable, priority: int = 5, cost: int = 1, category: str = "general"):
+        cls._tools[name] = {
+            "function": func,
+            "priority": priority,
+            "cost": cost,
+            "category": category,
+        }
 
     @classmethod
     def get_tool(cls, name: str) -> Optional[Callable]:
-        return cls._tools.get(name)
+        tool = cls._tools.get(name)
+        return tool["function"] if tool else None
 
     @classmethod
-    def list_tools(cls) -> List[str]:
+    def get_tools_by_category(cls, category: str) -> List[str]:
+        return [name for name, info in cls._tools.items() if info["category"] == category]
+
+    @classmethod
+    def get_all_tools(cls) -> List[str]:
         return list(cls._tools.keys())
 
     @classmethod
-    def has_tool(cls, name: str) -> bool:
-        return name in cls._tools
+    def get_tool_info(cls, name: str) -> Optional[Dict]:
+        return cls._tools.get(name)
 
-# ── تسجيل الأدوات الحقيقية ──────────────────────────
+# ========== أدوات حقيقية (مسجلة) ==========
 async def _tool_remind_goal(user_id: str, query: str = "") -> Optional[str]:
-    """تذكير بأهداف المستخدم من Supabase"""
     try:
         from supabase import create_client
         url = os.getenv("SUPABASE_URL", "")
         key = os.getenv("SUPABASE_SERVICE_KEY", "")
-        if not url or not key:
-            return None
+        if not url or not key: return None
         db = create_client(url, key)
         res = db.table("goals").select("*").eq("user_id", user_id).eq("status", "active").order("created_at", desc=True).limit(3).execute()
         if res.data:
@@ -49,7 +60,6 @@ async def _tool_remind_goal(user_id: str, query: str = "") -> Optional[str]:
         return None
 
 async def _tool_analyze_progress(user_id: str, query: str = "") -> Optional[str]:
-    """تحليل تقدم المستخدم بناءً على سجل النمو"""
     try:
         from growth_tracker import get_growth_history
         history = await get_growth_history(user_id, limit=1)
@@ -62,7 +72,6 @@ async def _tool_analyze_progress(user_id: str, query: str = "") -> Optional[str]
         return None
 
 async def _tool_fetch_memory(user_id: str, query: str = "") -> Optional[str]:
-    """جلب ذاكرة محددة تتعلق بكلمة مفتاحية"""
     try:
         from memory_graph import get_memory_context
         context = await get_memory_context(user_id)
@@ -73,146 +82,6 @@ async def _tool_fetch_memory(user_id: str, query: str = "") -> Optional[str]:
         logger.warning(f"Tool fetch_memory failed: {e}")
         return None
 
-# تسجيل الأدوات
-ToolRegistry.register("remind_goal", _tool_remind_goal)
-ToolRegistry.register("analyze_progress", _tool_analyze_progress)
-ToolRegistry.register("fetch_memory", _tool_fetch_memory)
-
-class ReasoningEngine:
-    def __init__(self, gemini_key: Optional[str] = None):
-        self.gemini_key = gemini_key
-        self.max_steps = 3
-
-    def _get_multi_client(self):
-        try:
-            from multi_ai import MultiAIClient
-            return MultiAIClient()
-        except:
-            return None
-
-    async def plan(self,
-                   message: str,
-                   emotion: Dict[str, Any],
-                   context: str = "",
-                   lang: str = "ar",
-                   journey_phase: Optional[str] = None,
-                   attachment_style: Optional[str] = None) -> Dict[str, Any]:
-        """
-        التخطيط: تحليل الرسالة وبناء خطة خطوات (وعي بالرحلة والتعلق)
-        """
-        available_tools = ", ".join(ToolRegistry.list_tools())
-        extra_context = ""
-        if journey_phase:
-            extra_context += f" مرحلة الرحلة: {journey_phase}."
-        if attachment_style:
-            extra_context += f" نمط تعلق المستخدم: {attachment_style}."
-
-        if lang == "ar":
-            prompt = f"""أنت وكيل ذكي. حلل الرسالة وابني خطة عمل. أعد ONLY JSON:
-{{
-  "analysis": "تحليل سريع",
-  "steps": [
-    {{"action": "search", "tool": "google_search", "query": "..."}},
-    {{"action": "tool", "tool": "remind_goal", "query": ""}},
-    {{"action": "process", "tool": "none", "reasoning": "..."}}
-  ],
-  "final_action": "general"
-}}
-السياق: {context}{extra_context}
-الرسالة: "{message}"
-المشاعر: {emotion.get('primary', 'neutral')}
-الأدوات المتاحة: {available_tools}
-JSON:"""
-        else:
-            prompt = f"""You are an intelligent agent. Analyze and build a plan. Return ONLY JSON:
-{{"analysis": "...", "steps": [...], "final_action": "..."}}
-Context: {context}{extra_context}
-Message: "{message}"
-Available tools: {available_tools}
-JSON:"""
-
-        try:
-            client = self._get_multi_client()
-            if not client:
-                return {"analysis": "", "steps": [], "final_action": "general"}
-            loop = asyncio.get_running_loop()
-            result = await client.get_best_reply(prompt, task="planning")
-            if result:
-                raw = result.strip()
-                if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
-                elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
-                plan = json.loads(raw)
-                if len(plan.get("steps", [])) > self.max_steps:
-                    plan["steps"] = plan["steps"][:self.max_steps]
-                return plan
-        except Exception as e:
-            logger.warning(f"Planning failed: {e}")
-        return {"analysis": "", "steps": [], "final_action": "general"}
-
-    async def execute_step(self, step: Dict[str, Any], user_id: Optional[str] = None) -> Optional[str]:
-        """تنفيذ خطوة واحدة"""
-        action = step.get("action", "none")
-        tool = step.get("tool", "none")
-        query = step.get("query", "")
-
-        if action == "tool":
-            tool_func = ToolRegistry.get_tool(tool)
-            if tool_func:
-                try:
-                    loop = asyncio.get_running_loop()
-                    result = await tool_func(user_id, query) if asyncio.iscoroutinefunction(tool_func) else await loop.run_in_executor(None, tool_func, user_id, query)
-                    return str(result) if result else None
-                except Exception as e:
-                    logger.warning(f"Tool {tool} failed: {e}")
-                    return None
-
-        elif action == "search":
-            if tool == "google_search":
-                try:
-                    from external_services import search_google
-                    return await search_google(query)
-                except:
-                    pass
-            elif tool == "youtube":
-                try:
-                    from external_services import search_youtube
-                    return await search_youtube(query)
-                except:
-                    pass
-
-        return None
-
-    async def reflect(self, plan: Dict[str, Any], result: str, lang: str = "ar") -> Dict[str, Any]:
-        """التأمل في نتيجة الخطة"""
-        if lang == "ar":
-            prompt = f"""تأمل في نتيجة الخطة وأعد ONLY JSON:
-{{"was_effective": true/false, "what_worked": "...", "what_didnt": "...", "adjustment": "..."}}
-الخطة: {json.dumps(plan)}
-النتيجة: "{result}"
-JSON:"""
-        else:
-            prompt = f"""Reflect on the plan's result and return ONLY JSON:
-{{"was_effective": true/false, "what_worked": "...", "what_didnt": "...", "adjustment": "..."}}
-Plan: {json.dumps(plan)}
-Result: "{result}"
-JSON:"""
-
-        try:
-            client = self._get_multi_client()
-            if not client:
-                return {"was_effective": True}
-            loop = asyncio.get_running_loop()
-            result = await client.get_best_reply(prompt, task="planning")
-            if result:
-                raw = result.strip()
-                if raw.startswith("```json"): raw = raw.split("```json")[1].split("```")[0].strip()
-                elif raw.startswith("```"): raw = raw.split("```")[1].split("```")[0].strip()
-                return json.loads(raw)
-        except Exception as e:
-            logger.warning(f"Reflection failed: {e}")
-        return {"was_effective": True}
-
-# تسجيل أداة توصية المنتجات
 async def _tool_recommend_product(user_id: str, query: str = "") -> Optional[str]:
     try:
         from product_recommender import product_recommender
@@ -226,4 +95,180 @@ async def _tool_recommend_product(user_id: str, query: str = "") -> Optional[str
         logger.warning(f"Tool recommend_product failed: {e}")
         return None
 
-ToolRegistry.register("recommend_product", _tool_recommend_product)
+async def _tool_smart_home(user_id: str, query: str = "") -> Optional[str]:
+    try:
+        from smart_home import process_voice_command
+        return await process_voice_command(query, user_id, "free")
+    except Exception as e:
+        logger.warning(f"Tool smart_home failed: {e}")
+        return None
+
+async def _tool_weather(user_id: str, query: str = "") -> Optional[str]:
+    try:
+        from external_services import get_weather
+        return await get_weather(city=query)
+    except Exception as e:
+        logger.warning(f"Tool weather failed: {e}")
+        return None
+
+async def _tool_youtube(user_id: str, query: str = "") -> Optional[str]:
+    try:
+        from external_services import search_youtube
+        return await search_youtube(query)
+    except Exception as e:
+        logger.warning(f"Tool youtube failed: {e}")
+        return None
+
+# تسجيل الأدوات
+ToolRegistry.register("remind_goal", _tool_remind_goal, priority=9, cost=1, category="memory")
+ToolRegistry.register("analyze_progress", _tool_analyze_progress, priority=8, cost=1, category="growth")
+ToolRegistry.register("fetch_memory", _tool_fetch_memory, priority=8, cost=1, category="memory")
+ToolRegistry.register("recommend_product", _tool_recommend_product, priority=3, cost=2, category="commerce")
+ToolRegistry.register("smart_home", _tool_smart_home, priority=3, cost=3, category="home")
+ToolRegistry.register("weather", _tool_weather, priority=7, cost=1, category="external")
+ToolRegistry.register("youtube", _tool_youtube, priority=6, cost=2, category="external")
+
+# ========== كشف النية بدون LLM ==========
+INTENT_KEYWORDS = {
+    "goal_tracking": ["هدف", "أهداف", "خطة", "تقدم", "progress", "goal", "target"],
+    "memory_retrieval": ["ذكرت", "قلت", "اتذكر", "قبل كده", "remember", "told", "mentioned"],
+    "emotional_support": ["حزين", "خايف", "قلق", "متضايق", "sad", "worried", "anxious", "fear", "lonely"],
+    "learning": ["علمني", "شرح", "افهم", "دورة", "كورس", "learn", "teach", "explain", "course"],
+    "productivity": ["تنظيم", "جدول", "إنتاجية", "وقت", "productivity", "schedule", "plan"],
+    "shopping": ["اشتري", "شراء", "منتج", "سعر", "buy", "purchase", "price", "shopping"],
+    "search": ["بحث", "معلومات", "ما هو", "من هو", "search", "information", "who is", "what is"],
+    "coding": ["كود", "برمجة", "بايثون", "جافا", "code", "python", "programming", "function"],
+    "dream": ["حلم", "حلمت", "تفسير", "dream", "nightmare"],
+    "home": ["نور", "إضاءة", "مكيف", "light", "ac", "temperature"],
+    "general": []
+}
+
+def detect_intent(message: str) -> Tuple[str, float]:
+    """يكتشف النية من الرسالة باستخدام الكلمات المفتاحية"""
+    if not message:
+        return "general", 0.0
+    msg_lower = message.lower()
+    max_score = 0
+    best_intent = "general"
+    for intent, keywords in INTENT_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in msg_lower)
+        if score > max_score:
+            max_score = score
+            best_intent = intent
+    confidence = min(max_score / 3.0, 1.0) if max_score > 0 else 0.5
+    return best_intent, confidence
+
+# ========== المحرك الرئيسي ==========
+class ReasoningEngine:
+    def __init__(self, gemini_key: Optional[str] = None):
+        self.gemini_key = gemini_key
+        self.context_cache: Dict[str, Dict[str, Any]] = {}
+        self.cache_ttl = 60  # ثواني
+
+    def _get_multi_client(self):
+        try:
+            from multi_ai import MultiAIClient
+            return MultiAIClient()
+        except:
+            return None
+
+    def _get_cached(self, key: str) -> Optional[str]:
+        entry = self.context_cache.get(key)
+        if entry and time.time() - entry["timestamp"] < self.cache_ttl:
+            return entry["value"]
+        return None
+
+    def _set_cache(self, key: str, value: str):
+        self.context_cache[key] = {"value": value, "timestamp": time.time()}
+
+    async def plan(self, message: str, emotion: Dict[str, Any], consciousness_context: Optional[Dict] = None, user_id: Optional[str] = None, lang: str = "ar") -> Dict[str, Any]:
+        """
+        يخطط للاستجابة بناءً على النية والأدوات والسياق.
+        يُرجع metadata للاستخدام في TwinBrain و PromptBuilder.
+        """
+        # 1. اكتشاف النية (محلي)
+        intent, confidence = detect_intent(message)
+
+        # 2. اختيار الأدوات المناسبة (بدون LLM)
+        selected_tools = []
+        tool_context = {}
+
+        if intent == "goal_tracking":
+            selected_tools = ["remind_goal", "analyze_progress"]
+        elif intent == "memory_retrieval":
+            selected_tools = ["fetch_memory"]
+        elif intent == "shopping":
+            selected_tools = ["recommend_product"]
+        elif intent == "home":
+            selected_tools = ["smart_home"]
+        elif intent == "search":
+            selected_tools = ["youtube", "weather"]  # weather as fallback
+        elif intent == "coding":
+            selected_tools = []  # no tool, rely on AI reasoning
+        else:
+            selected_tools = []
+
+        # 3. تنفيذ الأدوات (متوازي مع التخزين المؤقت)
+        if selected_tools and user_id:
+            for tool_name in selected_tools:
+                cache_key = f"{user_id}:{tool_name}"
+                cached = self._get_cached(cache_key)
+                if cached:
+                    tool_context[tool_name] = cached
+                    continue
+                tool_func = ToolRegistry.get_tool(tool_name)
+                if tool_func:
+                    try:
+                        loop = asyncio.get_running_loop()
+                        result = await tool_func(user_id, message) if asyncio.iscoroutinefunction(tool_func) else await loop.run_in_executor(None, tool_func, user_id, message)
+                        if result:
+                            self._set_cache(cache_key, result)
+                            tool_context[tool_name] = result
+                    except Exception as e:
+                        logger.warning(f"Tool {tool_name} failed: {e}")
+
+        # 4. تحديد وضع الاستجابة (response_mode) لـ MultiAI
+        response_mode_map = {
+            "emotional_support": "emotional",
+            "coding": "coding",
+            "learning": "general",
+            "search": "search",
+            "goal_tracking": "coaching",
+            "memory_retrieval": "general",
+            "shopping": "general",
+            "home": "agent",
+            "dream": "dream",
+            "general": "general"
+        }
+        response_mode = response_mode_map.get(intent, "general")
+
+        # 5. وزن المشاعر
+        emotion_primary = emotion.get("primary", "neutral")
+        emotion_weight = 0.5
+        if emotion_primary in ["sadness", "fear", "anger"]:
+            emotion_weight = 0.8
+            response_mode = "emotional"  # override for strong emotions
+        elif emotion_primary in ["joy", "love"]:
+            emotion_weight = 0.6
+
+        return {
+            "intent": intent,
+            "intent_confidence": confidence,
+            "response_mode": response_mode,
+            "emotion_weight": emotion_weight,
+            "selected_tools": selected_tools,
+            "tool_context": tool_context if tool_context else "",
+            "reasoning_depth": "medium",
+        }
+
+    async def execute_plan(self, plan: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+        """تنفيذ خطة الأدوات (استدعاء خارجي)"""
+        return await self.plan(plan.get("message", ""), plan.get("emotion", {}), user_id=user_id)
+
+    async def reflect(self, plan: Dict[str, Any], result: str, lang: str = "ar") -> Dict[str, Any]:
+        return {"was_effective": True, "what_worked": "", "what_didnt": "", "adjustment": ""}
+
+
+# نسخة عالمية
+reasoning_engine = ReasoningEngine()
+logger.info("✅ Reasoning Engine v8.0 (Agent Brain) initialized")
