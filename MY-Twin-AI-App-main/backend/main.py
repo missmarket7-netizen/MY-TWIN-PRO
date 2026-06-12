@@ -1,5 +1,5 @@
 """
-MyTwin API v10.2 – Final Stable Version
+MyTwin API v10.3 – Final Stable Version with Proactive Support
 """
 import os, asyncio, logging, json
 from datetime import datetime, timezone, timedelta, date
@@ -57,7 +57,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.2.0")
+app = FastAPI(title="MyTwin API", version="10.3.0")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -185,7 +185,7 @@ async def activate_referral_endpoint(body: ReferralCodeReq, uid: str = Depends(g
         return {"success": True, "bonus": 500}
     raise HTTPException(400, result.get("error", "invalid_code"))
 
-# ========== Cron ==========
+# ========== Proactive ==========
 @app.post("/cron/proactive")
 async def cron_proactive(req: Request):
     key = req.headers.get("X-Cron-Key", "")
@@ -193,6 +193,27 @@ async def cron_proactive(req: Request):
         raise HTTPException(401, "unauthorized")
     result = await proactive_engine.run_cron_job()
     return result
+
+@app.post("/api/proactive/trigger")
+async def trigger_proactive_manual(uid: str = Depends(get_user)):
+    """تشغيل proactive لمستخدم واحد يدويًا (للاختبار)."""
+    p = get_profile(uid)
+    allowed, _, _ = await proactive_engine.run_cron_job() if False else (True, None, None)
+    # للتبسيط، نرسل إشعار "missed_you" إذا كان مؤهلاً
+    if proactive_engine.should_send_proactive(uid):
+        msg = await proactive_engine.generate_proactive_message(uid, p.get("twin_name", "صديقي"), p.get("lang", "ar"))
+        sent = await proactive_engine.send_notification(uid, "MyTwin 💜", msg or "أفتقدك 💜")
+        return {"sent": sent, "message": msg}
+    return {"sent": False, "reason": "cooldown"}
+
+@app.get("/api/proactive/check")
+async def proactive_check(uid: str = Depends(get_user)):
+    try:
+        should_send = proactive_engine.should_send_proactive(uid)
+        return {"should_send": should_send, "user_id": uid}
+    except Exception as e:
+        logger.error(f"Proactive check error: {e}")
+        return {"error": "unavailable", "details": str(e)}
 
 # ========== أحلام ==========
 @app.post("/api/dream/analyze")
@@ -225,16 +246,12 @@ async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.2.0"}
+    return {"status": "ok", "version": "10.3.0"}
 
-@app.get("/api/proactive/check")
-async def proactive_check(uid: str = Depends(get_user)):
-    try:
-        should_send = proactive_engine.should_send_proactive(uid)
-        return {"should_send": should_send, "user_id": uid}
-    except Exception as e:
-        logger.error(f"Proactive check error: {e}")
-        return {"error": "unavailable", "details": str(e)}
+@app.get("/health")
+async def health_check():
+    """Health check for Railway deployment."""
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.get("/api/health/ai")
 async def ai_health_check():
@@ -291,10 +308,9 @@ async def check_limits(uid: str = Depends(get_user), feature: str = ""):
     summary = get_usage_summary(uid, p.get("tier", "free"), p.get("created_at"))
     return summary
 
-# ========== توليد الصور (تم إصلاح self) ==========
+# ========== توليد الصور ==========
 @app.post("/api/image/generate")
 async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(get_user)):
-    """توليد صورة باستخدام Gemini Image API"""
     try:
         import google.generativeai as genai
         image_key = os.getenv("GEMINI_IMAGE_API_KEY")
