@@ -145,3 +145,36 @@ class MultiAIClient:
         
         full = await self.get_best_reply(prompt, task)
         yield full
+
+    def generate_image(self, prompt: str) -> Optional[str]:
+        """توليد صورة باستخدام Gemini Image API (مفتاح منفصل)"""
+        image_key = os.getenv("GEMINI_IMAGE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+        if not image_key:
+            logger.warning("No Gemini image API key configured")
+            return None
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=image_key)
+            model = genai.GenerativeModel("gemini-2.5-flash-image")
+            response = model.generate_content(prompt)
+            if response.parts and hasattr(response.parts[0], 'inline_data'):
+                return response.parts[0].inline_data.data
+        except Exception as e:
+            logger.warning(f"Image generation failed: {e}")
+        return None
+
+    def _get_balanced_key(self, provider: str) -> Optional[str]:
+        """اختيار مفتاح API بشكل متوازن من قائمة مفاتيح لنفس المزود"""
+        keys_map = {
+            "groq": ["GROQ_API_KEY", "GROQ_API_KEY_2"],
+            "openrouter": ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2"],
+            "gemini": ["GEMINI_API_KEY", "GEMINI_API_KEY_2"],
+        }
+        key_names = keys_map.get(provider, [])
+        valid_keys = [os.getenv(k) for k in key_names if os.getenv(k)]
+        if not valid_keys:
+            return None
+        if len(valid_keys) == 1:
+            return valid_keys[0]
+        index = hash(str(time.time())) % len(valid_keys)
+        return valid_keys[index]

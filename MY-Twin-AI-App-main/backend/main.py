@@ -340,3 +340,21 @@ async def ai_health_check():
         results["gemini"] = {"status": "❌ فشل", "error": str(e)[:100]}
 
     return results
+
+@app.post("/api/image/generate")
+async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(get_user)):
+    """توليد صورة باستخدام Gemini Image API"""
+    try:
+        import google.generativeai as genai
+        image_key = os.getenv("GEMINI_IMAGE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+        if not image_key:
+            return {"status": "error", "message": "Image API key not configured"}
+        genai.configure(api_key=image_key)
+        model = genai.GenerativeModel("gemini-2.5-flash-image")
+        response = model.generate_content(prompt)
+        if response.parts and hasattr(response.parts[0], 'inline_data'):
+            return {"status": "success", "image_base64": response.parts[0].inline_data.data}
+        return {"status": "error", "message": "No image generated"}
+    except Exception as e:
+        logger.error(f"Image generation failed: {e}")
+        return {"status": "error", "message": str(e)}
