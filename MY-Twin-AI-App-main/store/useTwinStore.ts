@@ -20,11 +20,11 @@ export interface ChatMessage {
   memoryRecall?: boolean; thinkingStage?: string;
 }
 
-// ✅ إصلاح: السماح بمفاتيح إضافية وقيم undefined
 export interface RelationshipDims {
   trust: number; attachment: number; comfort: number; openness: number;
   romantic: number; humor: number; attStyle: number;
   empathy?: number; support?: number; communication?: number;
+  affection?: number; dependency?: number;
   [key: string]: number | undefined;
 }
 
@@ -48,7 +48,6 @@ interface TwinStore {
   updateBond: (newBond: number) => void;
   updateRelationshipDims: (dims: Partial<RelationshipDims>) => void;
 
-  // ✅ إصلاح: إضافة subscriptionTier
   subscriptionTier?: string;
 
   emotionState: EmotionState | null; setEmotionState: (emotion: EmotionState) => void;
@@ -88,7 +87,6 @@ const initialState = {
   userId: '', twinName: 'توأمك', twinGender: 'female' as TwinGender,
   twinStyle: 'supportive' as TwinStyle, bondLevel: 0, energy: 50,
   relationshipDims: { trust: 0, attachment: 0, comfort: 0, openness: 0, romantic: 0, humor: 0, attStyle: 0 } as RelationshipDims,
-  // ✅ إصلاح: قيمة افتراضية لـ subscriptionTier
   subscriptionTier: 'free',
   emotionState: null as EmotionState | null,
   journeyPhase: 'introduction' as JourneyPhase, attachmentStyle: 'unknown' as AttachmentStyle,
@@ -119,7 +117,6 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     return { bondLevel: safeBond, badges };
   }),
 
-  // ✅ إصلاح: قبول Partial<RelationshipDims> مع أي مفاتيح
   updateRelationshipDims: (dims) => set((state) => ({
     relationshipDims: { ...state.relationshipDims, ...dims }
   })),

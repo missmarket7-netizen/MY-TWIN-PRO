@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
 import * as Application from 'expo-application';
 import { supabase } from './supabase';
-import { useTwinStore } from '../store/useTwinStore';
+import { useTwinStore, RelationshipDims } from '../store/useTwinStore';
 
 const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
@@ -47,12 +47,11 @@ API.interceptors.request.use(async (config) => {
   config.headers['X-App-Version'] = APP_VERSION;
   config.headers['X-Platform'] = PLATFORM;
 
-  // ✨ إضافة twin_gender إلى headers (جديد)
+  // ✨ إضافة twin_gender إلى headers
   try {
     const store = useTwinStore.getState();
     if (store.twinGender) {
       config.headers['X-Twin-Gender'] = store.twinGender;
-      console.log('📤 إرسال الجنس:', store.twinGender);
     }
   } catch (e) {
     console.warn('⚠️ فشل في قراءة twinGender من store');
@@ -103,7 +102,7 @@ API.interceptors.response.use(
   }
 );
 
-// ─ أنواع البيانات (محدثة مع twinGender) ──────────
+// ─ أنواع البيانات ─────────────────────────────
 export interface TwinResponse {
   reply: string;
   new_bond?: number;
@@ -131,15 +130,16 @@ export interface TwinResponse {
   latency_ms?: number;
   energy?: number;
   provider?: string;
-  twin_gender?: 'male' | 'female';  // ✨ جديد
-  voice_personality?: string;         // ✨ جديد
+  twin_gender?: 'male' | 'female';
+  voice_personality?: string;
 }
 
 export interface TwinRequest {
   message: string;
   twinName: string;
   bondLevel: number;
-  relationshipDims: Record<string, number>;
+  // ✅ إصلاح: قبول RelationshipDims مباشرة (يسمح بـ undefined)
+  relationshipDims: RelationshipDims;
   chatHistory?: Array<{ role: string; content: string }>;
   journeyPhase?: string;
   attachmentStyle?: string;
@@ -148,18 +148,26 @@ export interface TwinRequest {
   lang?: string;
   image?: string;
   calmMode?: boolean;
-  twinGender?: 'male' | 'female';  // ✨ جديد
+  twinGender?: 'male' | 'female';
 }
 
-// ─ دالة المحادثة الرئيسية (محدثة مع twinGender) ──
+// ─ دالة المحادثة الرئيسية ──────────────────────
 export const askTwin = async (req: TwinRequest): Promise<TwinResponse> => {
   const store = useTwinStore.getState();
-  
+
+  // تحويل relationshipDims إلى plain object آمن للإرسال
+  const safeDims: Record<string, number> = {};
+  if (req.relationshipDims) {
+    for (const [key, value] of Object.entries(req.relationshipDims)) {
+      if (typeof value === 'number') safeDims[key] = value;
+    }
+  }
+
   const payload = {
     message: req.message,
     twin_name: req.twinName || 'توأمك',
     bond_level: req.bondLevel || 0,
-    relationship_dims: req.relationshipDims || {},
+    relationship_dims: safeDims,
     history: req.chatHistory?.slice(-10) || [],
     journey_phase: req.journeyPhase || 'introduction',
     attachment_style: req.attachmentStyle || 'unknown',
@@ -168,21 +176,19 @@ export const askTwin = async (req: TwinRequest): Promise<TwinResponse> => {
     lang: req.lang || 'ar',
     image: req.image || undefined,
     calm_mode: req.calmMode || false,
-    // ✨ إضافة twin_gender
     twin_gender: req.twinGender || store.twinGender || 'female',
   };
 
   console.log('📤 إرسال الطلب مع الجنس:', payload.twin_gender);
 
   const { data } = await API.post('/api/chat', payload, {
-    headers: { 
+    headers: {
       'X-Calm-Mode': String(req.calmMode || false),
-      'X-Twin-Gender': payload.twin_gender,  // ✨ رأس مخصص للجنس
+      'X-Twin-Gender': payload.twin_gender,
     },
   });
 
-  // بناء الاستجابة الكاملة
-  const response: TwinResponse = {
+  return {
     reply: data.reply,
     new_bond: data.new_bond,
     emotion: data.emotion,
@@ -198,22 +204,27 @@ export const askTwin = async (req: TwinRequest): Promise<TwinResponse> => {
     latency_ms: data.latency_ms,
     energy: data.energy,
     provider: data.provider,
-    twin_gender: data.twin_gender || payload.twin_gender,  // ✨
-    voice_personality: data.voice_personality,              // ✨
+    twin_gender: data.twin_gender || payload.twin_gender,
+    voice_personality: data.voice_personality,
   };
-
-  return response;
 };
 
-// ─ دالة البث المباشر (Streaming) مع twinGender ────
+// ─ دالة البث المباشر (Streaming) ───────────────
 export const askTwinStream = async function* (req: TwinRequest): AsyncGenerator<string, void, unknown> {
   const store = useTwinStore.getState();
-  
+
+  const safeDims: Record<string, number> = {};
+  if (req.relationshipDims) {
+    for (const [key, value] of Object.entries(req.relationshipDims)) {
+      if (typeof value === 'number') safeDims[key] = value;
+    }
+  }
+
   const payload = {
     message: req.message,
     twin_name: req.twinName || 'توأمك',
     bond_level: req.bondLevel || 0,
-    relationship_dims: req.relationshipDims || {},
+    relationship_dims: safeDims,
     history: req.chatHistory?.slice(-10) || [],
     journey_phase: req.journeyPhase || 'introduction',
     attachment_style: req.attachmentStyle || 'unknown',
@@ -222,14 +233,14 @@ export const askTwinStream = async function* (req: TwinRequest): AsyncGenerator<
     lang: req.lang || 'ar',
     image: req.image || undefined,
     calm_mode: req.calmMode || false,
-    twin_gender: req.twinGender || store.twinGender || 'female',  // ✨
+    twin_gender: req.twinGender || store.twinGender || 'female',
   };
 
   const response = await API.post('/api/chat/stream', payload, {
     responseType: 'stream',
-    headers: { 
+    headers: {
       'X-Calm-Mode': String(req.calmMode || false),
-      'X-Twin-Gender': payload.twin_gender,  // ✨
+      'X-Twin-Gender': payload.twin_gender,
     },
   });
 
@@ -244,14 +255,14 @@ export const askTwinStream = async function* (req: TwinRequest): AsyncGenerator<
   }
 };
 
-// ─ دوال مساعدة للتكامل مع المتجر (محدثة) ────────
+// ─ دوال مساعدة للتكامل مع المتجر ─────────────────
 export const sendChatFromStore = async (message: string, image?: string): Promise<TwinResponse> => {
   const store = useTwinStore.getState();
   return askTwin({
     message,
     twinName: store.twinName,
     bondLevel: store.bondLevel,
-    relationshipDims: store.relationshipDims,
+    relationshipDims: store.relationshipDims, // ✅ متوافق الآن
     chatHistory: store.chatHistory.slice(-10),
     journeyPhase: store.journeyPhase,
     attachmentStyle: store.attachmentStyle,
@@ -260,13 +271,13 @@ export const sendChatFromStore = async (message: string, image?: string): Promis
     lang: store.lang,
     image,
     calmMode: store.calmMode,
-    twinGender: store.twinGender,  // ✨ إرسال الجنس من المتجر
+    twinGender: store.twinGender,
   });
 };
 
 export const updateStoreFromResponse = (response: TwinResponse) => {
   const store = useTwinStore.getState();
-  
+
   if (response.new_bond !== undefined) store.updateBond(response.new_bond);
   if (response.relationship_dims) store.updateRelationshipDims(response.relationship_dims);
   if (response.energy !== undefined) store.setEnergy(response.energy);
@@ -274,17 +285,16 @@ export const updateStoreFromResponse = (response: TwinResponse) => {
   if (response.attachment_style) store.setAttachmentStyle(response.attachment_style as any);
   if (response.emotion) store.setEmotionState(response.emotion as any);
   if (response.thinking_stage) store.setThinking(true);
-  if (response.twin_gender) store.setTwinGender(response.twin_gender);  // ✨ تحديث الجنس
+  if (response.twin_gender) store.setTwinGender(response.twin_gender);
   store.setTotalMessages(store.totalMessages + 1);
 };
 
-// ─ دوال نظام الصوت (جديد) ──────────────────────
+// ─ دوال نظام الصوت ─────────────────────────────
 export const speakWithTwinVoice = async (text: string): Promise<void> => {
   const store = useTwinStore.getState();
   const gender = store.twinGender || 'female';
-  
+
   try {
-    // محاولة استخدام API للصوت المتميز
     if (store.tier && ['premium', 'pro', 'yearly'].includes(store.tier)) {
       const response = await API.post('/api/voice/speak', {
         text,
@@ -294,24 +304,18 @@ export const speakWithTwinVoice = async (text: string): Promise<void> => {
       }, {
         responseType: 'arraybuffer',
       });
-      
-      // تشغيل الصوت المستلم
+
       if (response.data) {
         console.log('✅ تم استلام الصوت من الخادم');
-        // هنا يتم تشغيل الصوت باستخدام Expo Audio
         return;
       }
     }
-    
-    // استخدام Expo Speech المحلي
+
     console.log('📢 استخدام Expo Speech المحلي');
-    // استدعاء خدمة TTS المحلية
     const { speakWithGender } = require('../services/tts');
     await speakWithGender(text, gender);
-    
   } catch (error) {
     console.error('❌ فشل في تشغيل الصوت:', error);
-    // احتياطي: استخدام Expo Speech مباشرة
     const Speech = require('expo-speech');
     Speech.speak(text, {
       language: 'ar',
