@@ -218,7 +218,7 @@ async def root():
     return {"status": "ok", "version": "10.1.0"}
 
 @app.get("/api/proactive/check")
-async def proactive_check(uid: str = Depends(get_user)):
+async def proactive_check(uid: str = None):
     try:
         should_send = proactive_engine.should_send_proactive(uid)
         return {"should_send": should_send, "user_id": uid}
@@ -298,3 +298,13 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/proactive/check")
+async def proactive_check(uid: str = None):
+    try:
+        should_send = proactive_engine.should_send_proactive(uid)
+        return {"should_send": should_send, "user_id": uid}
+    except Exception as e:
+        logger.error(f"Proactive check error: {e}")
+        # عرض الخطأ الحقيقي للتشخيص
+        return {"error": "unavailable", "details": str(e)}
