@@ -272,6 +272,27 @@ export default function Chat() {
     } else if (action === 'search') { setFeatureModal({ visible: true, type: 'search' }); setFeatureInput(''); }
   }, [send, lang, handleCamera, isFree]);
 
+  const handleImageGeneration = async () => {
+    if (!input.trim()) {
+      Alert.alert(lang === 'ar' ? 'تنبيه' : 'Notice', lang === 'ar' ? 'اكتب وصفاً للصورة أولاً' : 'Enter a description first');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await API.post('/api/image/generate', { prompt: input });
+      if (res.data.status === 'success' && res.data.image_base64) {
+        addMessage({ id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), role: 'twin', content: '🖼️ صورة مولدة', image: res.data.image_base64, timestamp: Date.now() });
+        setInput('');
+      } else {
+        Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', res.data.message || 'فشل توليد الصورة');
+      }
+    } catch (e) {
+      Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', 'تعذر الاتصال بالخادم');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFeatureSend = () => {
     const prompts: Record<string, string> = {
       search: '/search ', coach: lang === 'ar' ? 'أريد جلسة تدريب: ' : 'Coaching session: ',
@@ -287,6 +308,7 @@ export default function Chat() {
     { icon: Search, label_ar: 'بحث', label_en: 'Search', action: 'search', color: '#10B981' },
     { icon: Dumbbell, label_ar: 'جلسة تدريب', label_en: 'Coaching', action: 'coach', color: '#3B82F6' },
     { icon: Moon, label_ar: 'تفسير حلم', label_en: 'Dream Analysis', action: 'dream', color: '#6366F1' },
+    { icon: ImageIcon, label_ar: 'إنشاء صورة', label_en: 'Generate Image', action: 'generate_image', color: '#06B6D4' },
   ];
 
   const renderMsg = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
