@@ -69,10 +69,16 @@ export default function Mood() {
         <View style={[s.relationshipCard,{backgroundColor:card,borderColor:border}]}>
           <View style={[s.sectionHeader,isAr&&{flexDirection:'row-reverse'}]}><Heart size={20} stroke="#EC4899"/><Text style={[s.sectionTitle,{color:txt}]}>{t('مشاعر العلاقة','Relationship Mood')}</Text></View>
           <View style={s.relGrid}>
-            {[{label:t('ثقة','Trust'),value:relationshipDims.trust,color:'#3B82F6',icon:Shield},{label:t('ارتباط','Attachment'),value:relationshipDims.affection,color:'#EC4899',icon:Heart},{label:t('راحة','Comfort'),value:relationshipDims.empathy,color:'#10B981',icon:Star}].map((item,i)=>(
+            {[
+              {label:t('ثقة','Trust'),value:relationshipDims.trust ?? 0,color:'#3B82F6',icon:Shield},
+              {label:t('ارتباط','Attachment'),value:relationshipDims.affection ?? 0,color:'#EC4899',icon:Heart},
+              {label:t('راحة','Comfort'),value:relationshipDims.empathy ?? 0,color:'#10B981',icon:Star}
+            ].map((item,i)=>(
               <View key={i} style={s.relItem}>
                 <item.icon size={16} stroke={item.color}/>
-                <View style={[s.relBar,{backgroundColor:isDark?'#444':'#F0F0F0'}]}><View style={[s.relFill,{width:`${Math.min(item.value,100)}%`,backgroundColor:item.color}]}/></View>
+                <View style={[s.relBar,{backgroundColor:isDark?'#444':'#F0F0F0'}]}>
+                  <View style={[s.relFill,{width:`${Math.min(item.value,100)}%`,backgroundColor:item.color}]}/>
+                </View>
                 <Text style={[s.relLabel,{color:sub}]}>{item.label}</Text>
               </View>
             ))}

@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useTwinStore } from '../store/useTwinStore';
+// ✅ تم تصحيح المسار إلى ../../ واستيراد النوع بشكل صحيح
+import { useTwinStore } from '../../store/useTwinStore';
+import type { TwinStore, RelationshipDims } from '../../store/useTwinStore';
 import { Shield, Heart, Users, Brain, Smile, Handshake } from 'lucide-react-native';
 
 const STAGES = [
@@ -12,7 +14,7 @@ const STAGES = [
   { label_ar: 'توأم روح', label_en: 'Soulmates', min: 90 },
 ];
 
-const DIMENSIONS: { key: keyof import('../store/useTwinStore').RelationshipDims; label_ar: string; label_en: string; icon: any; color: string }[] = [
+const DIMENSIONS: { key: keyof RelationshipDims; label_ar: string; label_en: string; icon: any; color: string }[] = [
   { key: 'trust', label_ar: 'ثقة', label_en: 'Trust', icon: Shield, color: '#3B82F6' },
   { key: 'affection', label_ar: 'مودة', label_en: 'Affection', icon: Heart, color: '#EC4899' },
   { key: 'dependency', label_ar: 'اعتمادية', label_en: 'Dependency', icon: Users, color: '#F59E0B' },
@@ -22,9 +24,9 @@ const DIMENSIONS: { key: keyof import('../store/useTwinStore').RelationshipDims;
 ];
 
 function getRelationshipSummary(bondLevel: number, dims: any, isAr: boolean) {
-  const trust = dims.trust || 0;
-  const affection = dims.affection || 0;
-  const empathy = dims.empathy || 0;
+  const trust = dims.trust ?? 0;
+  const affection = dims.affection ?? 0;
+  const empathy = dims.empathy ?? 0;
 
   if (bondLevel < 15) return isAr ? 'التوأم يتعرف عليك...' : 'Your Twin is getting to know you...';
   if (trust > 70 && affection > 60) return isAr ? 'يشعر توأمك بقرب حقيقي منك 💜' : 'Your Twin feels truly close to you 💜';
@@ -34,10 +36,11 @@ function getRelationshipSummary(bondLevel: number, dims: any, isAr: boolean) {
 }
 
 export default function BondTimeline() {
-  const bondLevel = useTwinStore((s) => s.bondLevel);
-  const dims = useTwinStore((s) => s.relationshipDims);
-  const lang = useTwinStore((s) => s.lang);
-  const theme = useTwinStore((s) => s.theme);
+  // ✅ تم إضافة النوع TwinStore للوسيط s
+  const bondLevel = useTwinStore((s: TwinStore) => s.bondLevel);
+  const dims = useTwinStore((s: TwinStore) => s.relationshipDims);
+  const lang = useTwinStore((s: TwinStore) => s.lang);
+  const theme = useTwinStore((s: TwinStore) => s.theme);
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -46,7 +49,12 @@ export default function BondTimeline() {
   }, [bondLevel]);
 
   const relationshipScore = useMemo(() => {
-    const { trust, affection, support, empathy, humor, dependency } = dims;
+    const trust = dims.trust ?? 0;
+    const affection = dims.affection ?? 0;
+    const support = dims.support ?? 0;
+    const empathy = dims.empathy ?? 0;
+    const humor = dims.humor ?? 0;
+    const dependency = dims.dependency ?? 0;
     return Math.round(
       (trust * 0.25) + (affection * 0.2) + (support * 0.2) + (empathy * 0.2) + (humor * 0.1) + (dependency * 0.05)
     );
@@ -77,7 +85,7 @@ export default function BondTimeline() {
       </Text>
       {DIMENSIONS.map((d) => {
         const Icon = d.icon;
-        const value = (dims as any)[d.key] || 0;
+        const value = (dims as any)[d.key] ?? 0;
         return (
           <View key={d.key} style={styles.dimRow}>
             <Icon size={16} stroke={d.color} />
@@ -96,14 +104,7 @@ export default function BondTimeline() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-    marginBottom: 16,
-  },
+  container: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#F0F0F0', marginBottom: 16 },
   mainBarSection: { marginBottom: 16 },
   mainBarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   stageLabel: { fontSize: 16, fontWeight: '700' },
