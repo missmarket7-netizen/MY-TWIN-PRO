@@ -13,13 +13,13 @@ class AIUnavailable(Exception):
 
 class MultiAIClient:
     def __init__(self):
-        # Gemini
+        # Gemini 3.1 Flash Lite (1000 طلب/يوم مجاناً)
         gemini_key = os.getenv("GEMINI_API_KEY")
         self.gemini_model = None
         if gemini_key:
             try:
                 genai.configure(api_key=gemini_key)
-                self.gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+                self.gemini_model = genai.GenerativeModel("gemini-3.1-flash-lite")
             except Exception as e:
                 logger.error(f"Gemini init failed: {e}")
 
@@ -32,7 +32,6 @@ class MultiAIClient:
         self.or_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_key) if or_key else None
 
     async def _call_model(self, provider: str, model: str, prompt: str, max_t: int, timeout: int = 8) -> Tuple[Optional[str], str, float, int]:
-        """استدعاء نموذج واحد مع timeout وإرجاع (رد, مزود, زمن, تكلفة)"""
         start = time.time()
         try:
             if provider == "groq" and self.groq_client:
@@ -88,20 +87,17 @@ class MultiAIClient:
         return None, provider, 0, 0
 
     async def get_best_reply(self, prompt: str, task: str = "general") -> str:
-        """تشغيل أول 3 نماذج بالتوازي واختيار أسرع رد صالح"""
         chains = TASK_CHAINS.get(task, TASK_CHAINS["general"])
         
-        # تشغيل أول 3 نماذج معاً
         tasks = []
         for i, model_spec in enumerate(chains[:3]):
             parts = model_spec.split("/", 1)
             provider = parts[0]
             model = parts[1]
             max_t = max(60, min(150, len(prompt) // 2))
-            timeout = int(MODEL_LATENCY_ESTIMATE.get(provider, 3.0) * 2)  # timeout = ضعف الزمن المتوقع
+            timeout = int(MODEL_LATENCY_ESTIMATE.get(provider, 3.0) * 2)
             tasks.append(self._call_model(provider, model, prompt, max_t, timeout))
 
-        # انتظار أول رد صالح
         pending = set(tasks)
         while pending:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
@@ -111,14 +107,12 @@ class MultiAIClient:
                     logger.info(f"✅ [{task}] → {provider} ({latency:.0f}ms)")
                     return result.strip()
 
-        # إذا فشل الجميع، جرب النموذج الرابع (Gemini)
         if len(chains) > 3:
             parts = chains[3].split("/", 1)
             result, provider, latency, cost = await self._call_model(parts[0], parts[1], prompt, 100, 10)
             if result:
                 return result.strip()
 
-        # رد احتياطي عشوائي
         return random.choice(FALLBACK_MESSAGES)
 
     async def stream_reply(self, prompt: str, task: str = "general") -> AsyncGenerator[str, None]:
@@ -147,13 +141,11 @@ class MultiAIClient:
         yield full
 
     def generate_image(self, prompt: str) -> Optional[str]:
-        """توليد صورة باستخدام Gemini Image API (مفتاح منفصل)"""
         image_key = os.getenv("GEMINI_IMAGE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
         if not image_key:
             logger.warning("No Gemini image API key configured")
             return None
         try:
-            import google.generativeai as genai
             genai.configure(api_key=image_key)
             model = genai.GenerativeModel("gemini-2.5-flash-image")
             response = model.generate_content(prompt)
@@ -164,7 +156,6 @@ class MultiAIClient:
         return None
 
     def _get_balanced_key(self, provider: str) -> Optional[str]:
-        """اختيار مفتاح API بشكل متوازن من قائمة مفاتيح لنفس المزود"""
         keys_map = {
             "groq": ["GROQ_API_KEY", "GROQ_API_KEY_2"],
             "openrouter": ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2"],

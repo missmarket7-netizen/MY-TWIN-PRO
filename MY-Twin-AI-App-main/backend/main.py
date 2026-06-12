@@ -257,7 +257,7 @@ async def ai_health_check():
             results["gemini"] = {"status": "❌ مفتاح مفقود"}
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-3.1-flash-lite")
             resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
             results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
     except Exception as e:
@@ -280,66 +280,6 @@ async def check_limits(uid: str = Depends(get_user), feature: str = ""):
     p = get_profile(uid)
     summary = get_usage_summary(uid, p.get("tier", "free"), p.get("created_at"))
     return summary
-
-@app.get("/api/health/ai")
-async def ai_health_check():
-    """
-    فحص صحة جميع مزودي الذكاء الاصطناعي.
-    يُرجع حالة كل مزود (✅ يعمل / ❌ معطل) وسبب الفشل.
-    """
-    results = {}
-    
-    # اختبار Groq
-    try:
-        import os
-        from openai import OpenAI
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key:
-            results["groq"] = {"status": "❌ مفتاح مفقود"}
-        else:
-            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=groq_key)
-            resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role":"user","content":"Hi"}],
-                max_tokens=5,
-                timeout=8
-            )
-            results["groq"] = {"status": "✅ يعمل", "response": resp.choices[0].message.content[:50]}
-    except Exception as e:
-        results["groq"] = {"status": "❌ فشل", "error": str(e)[:100]}
-
-    # اختبار OpenRouter
-    try:
-        or_key = os.getenv("OPENROUTER_API_KEY")
-        if not or_key:
-            results["openrouter"] = {"status": "❌ مفتاح مفقود"}
-        else:
-            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_key)
-            resp = client.chat.completions.create(
-                model="meta-llama/llama-4-maverick",
-                messages=[{"role":"user","content":"Hi"}],
-                max_tokens=5,
-                timeout=8
-            )
-            results["openrouter"] = {"status": "✅ يعمل", "response": resp.choices[0].message.content[:50]}
-    except Exception as e:
-        results["openrouter"] = {"status": "❌ فشل", "error": str(e)[:100]}
-
-    # اختبار Gemini
-    try:
-        import google.generativeai as genai
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        if not gemini_key:
-            results["gemini"] = {"status": "❌ مفتاح مفقود"}
-        else:
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
-            results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
-    except Exception as e:
-        results["gemini"] = {"status": "❌ فشل", "error": str(e)[:100]}
-
-    return results
 
 @app.post("/api/image/generate")
 async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(get_user)):
