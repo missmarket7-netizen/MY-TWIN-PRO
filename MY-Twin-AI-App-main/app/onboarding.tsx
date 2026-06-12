@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { router } from 'expo-router';
 import { useTwinStore, TwinGender } from '../store/useTwinStore';
 import { supabase } from '../lib/supabase';
-import { Sparkles, ArrowLeft, ArrowRight, Check, Brain, Heart, Star, User } from 'lucide-react-native';
+import { Sparkles, ArrowLeft, ArrowRight, Check, Volume2 } from 'lucide-react-native';
 
 const QUESTIONS = {
   ar: [
@@ -67,7 +67,6 @@ function analyzePersonality(answers: Record<string, string>, lang: string) {
   const sorted = Object.entries(traits).sort((a,b) => b[1] - a[1]);
   return { traits, dominant: sorted[0][0], secondary: sorted[1][0] };
 }
-
 export default function Onboarding() {
   const { userId, twinName, twinGender, setTwinName, setTwinGender, addMessage, lang, theme } = useTwinStore();
   const isAr = lang === 'ar';
@@ -85,46 +84,78 @@ export default function Onboarding() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => { Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start(); }, [step]);
+  useEffect(() => { 
+    Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start(); 
+  }, [step]);
 
   const handleAnswer = (qId: string, opt: string) => {
     setAnswers(prev => ({ ...prev, [qId]: opt }));
     if (step < questions.length - 1) {
-      Animated.timing(fadeAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => setStep(prev => prev + 1));
+      Animated.timing(fadeAnim, { toValue: 0, duration: 100, useNativeDriver: true })
+        .start(() => setStep(prev => prev + 1));
     }
   };
 
-  const handleBack = () => { if (step > 0) { Animated.timing(fadeAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => setStep(prev => prev - 1)); } };
+  const handleBack = () => { 
+    if (step > 0) { 
+      Animated.timing(fadeAnim, { toValue: 0, duration: 100, useNativeDriver: true })
+        .start(() => setStep(prev => prev - 1)); 
+    } 
+  };
+  
   const handleSkip = () => setStep(questions.length - 1);
 
   const handleFinalSubmit = async () => {
-    if (!userName.trim()) { Alert.alert(isAr? 'تنبيه' : 'Notice', isAr? 'من فضلك أدخل اسمك' : 'Please enter your name'); return; }
+    if (!userName.trim()) { 
+      Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'من فضلك أدخل اسمك' : 'Please enter your name'); 
+      return; 
+    }
     setLoading(true);
     try {
       const analysis = analyzePersonality(answers, lang);
       setAnalysisResult(analysis);
       setTwinName(newTwinName.trim() || (isAr ? 'توأمك' : 'Your Twin'));
       setTwinGender(newTwinGender);
-      await supabase.from('profiles').upsert({
-        id: userId, twin_name: newTwinName.trim() || (isAr ? 'توأمك' : 'Your Twin'),
-        twin_gender: newTwinGender, full_name: userName.trim(), onboarded: true,
-        personality_analysis: JSON.stringify(analysis), free_info: freeInfo,
+      
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId, 
+        twin_name: newTwinName.trim() || (isAr ? 'توأمك' : 'Your Twin'),
+        twin_gender: newTwinGender,
+        full_name: userName.trim(), 
+        onboarded: true,
+        personality_analysis: analysis,
+        free_info: freeInfo,
       });
+      
+      if (error) throw error;
+      console.log('✅ تم الحفظ:', { name: userName, twin: newTwinName, gender: newTwinGender });
       setShowAnalysis(true);
-    } catch (e: any) { Alert.alert(isAr? 'خطأ' : 'Error', e.message || (isAr? 'فشل الحفظ' : 'Save failed')); }
-    finally { setLoading(false); }
+    } catch (e: any) { 
+      console.error('❌ فشل:', e);
+      Alert.alert(isAr ? 'خطأ' : 'Error', e.message || (isAr ? 'فشل الحفظ' : 'Save failed')); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleContinueToChat = () => {
     setShowAnalysis(false);
     const analysis = analysisResult;
     if (!analysis) { router.replace('/chat'); return; }
+    
     const d = TRAIT_INFO[analysis.dominant];
     const s = TRAIT_INFO[analysis.secondary];
+    const genderEmoji = newTwinGender === 'male' ? '♂️' : '♀️';
+    
     const welcomeMsg = isAr
-      ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'}، وقد حللت إجاباتك.\n\n**طابعك الأساسي:** ${d.emoji} ${d.ar}\n**الثانوي:** ${s.emoji} ${s.ar}\n\nأنا هنا لمساعدتك في رحلتك. اسألني أي شيء! 💜`
-      : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'}, and I analyzed your answers.\n\n**Primary trait:** ${d.emoji} ${d.en}\n**Secondary:** ${s.emoji} ${s.en}\n\nI'm here to help you on your journey. Ask me anything! 💜`;
-    addMessage({ role: 'twin', content: welcomeMsg, id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), timestamp: Date.now() });
+      ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'} ${genderEmoji}\n\n**طابعك الأساسي:** ${d.emoji} ${d.ar}\n**الثانوي:** ${s.emoji} ${s.ar}\n\nأنا هنا لمساعدتك في رحلتك. اسألني أي شيء! 💜`
+      : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'} ${genderEmoji}\n\n**Primary trait:** ${d.emoji} ${d.en}\n**Secondary:** ${s.emoji} ${s.en}\n\nI'm here to help you on your journey. Ask me anything! 💜`;
+    
+    addMessage({ 
+      role: 'twin', content: welcomeMsg, 
+      id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), 
+      timestamp: Date.now() 
+    });
     router.replace('/chat');
   };
 
@@ -141,44 +172,53 @@ export default function Onboarding() {
             </View>
             {!isLastStep && (
               <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
-                <Text style={[styles.skipText, isDark && { color: '#D8B4FE' }]}>{isAr? 'تخطي' : 'Skip'}</Text>
-                <ArrowRight size={16} stroke={isDark? '#D8B4FE' : '#6B21A8'} />
+                <Text style={[styles.skipText, isDark && { color: '#D8B4FE' }]}>{isAr ? 'تخطي' : 'Skip'}</Text>
+                <ArrowRight size={16} stroke={isDark ? '#D8B4FE' : '#6B21A8'} />
               </TouchableOpacity>
             )}
           </View>
+          
           {!isLastStep ? (
             <>
-              <Sparkles size={40} stroke={isDark? '#D8B4FE' : '#6B21A8'} style={{ alignSelf:'center', marginBottom:20 }} />
+              <Sparkles size={40} stroke={isDark ? '#D8B4FE' : '#6B21A8'} style={{ alignSelf:'center', marginBottom:20 }} />
               <Text style={[styles.question, isDark && { color:'#FFF' }]}>{currentQ.q}</Text>
               {currentQ.options.map((opt, i) => (
-                <TouchableOpacity key={i} style={[styles.option, answers[currentQ.id]===opt&&styles.selectedOption, isDark&&{borderColor:'#444'}]} onPress={()=>handleAnswer(currentQ.id,opt)}>
-                  <Text style={[styles.optionText, isDark&&{color:'#CCC'}]}>{opt}</Text>
+                <TouchableOpacity key={i} style={[styles.option, answers[currentQ.id]===opt && styles.selectedOption, isDark && { borderColor:'#444' }]} onPress={() => handleAnswer(currentQ.id, opt)}>
+                  <Text style={[styles.optionText, isDark && { color:'#CCC' }]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
               {step > 0 && (
                 <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-                  <ArrowLeft size={18} stroke={isDark? '#D8B4FE' : '#6B21A8'} />
-                  <Text style={[styles.backText, isDark && { color: '#D8B4FE' }]}>{isAr? 'رجوع' : 'Back'}</Text>
+                  <ArrowLeft size={18} stroke={isDark ? '#D8B4FE' : '#6B21A8'} />
+                  <Text style={[styles.backText, isDark && { color: '#D8B4FE' }]}>{isAr ? 'رجوع' : 'Back'}</Text>
                 </TouchableOpacity>
               )}
             </>
           ) : (
             <>
-              <Sparkles size={48} stroke={isDark? '#D8B4FE' : '#6B21A8'} style={{ alignSelf:'center', marginBottom:20 }} />
-              <Text style={[styles.title, isDark && { color:'#FFF' }]}>{isAr? 'خطوة أخيرة!' : 'Final Step!'}</Text>
-              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr? 'ما اسمك؟' : 'What is your name?'}</Text>
-              <TextInput style={[styles.input, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr? 'أدخل اسمك' : 'Enter your name'} placeholderTextColor="#999" value={userName} onChangeText={setUserName} />
-              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr? 'ماذا تريد أن تسمي توأمك؟' : 'What would you name your Twin?'}</Text>
-              <TextInput style={[styles.input, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr? 'اسم التوأم' : 'Twin name'} placeholderTextColor="#999" value={newTwinName} onChangeText={setNewTwinName} />
-              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr? 'نوع التوأم' : 'Twin Gender'}</Text>
+              <Sparkles size={48} stroke={isDark ? '#D8B4FE' : '#6B21A8'} style={{ alignSelf:'center', marginBottom:20 }} />
+              <Text style={[styles.title, isDark && { color:'#FFF' }]}>{isAr ? 'خطوة أخيرة!' : 'Final Step!'}</Text>
+              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr ? 'ما اسمك؟' : 'What is your name?'}</Text>
+              <TextInput style={[styles.input, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr ? 'أدخل اسمك' : 'Enter your name'} placeholderTextColor="#999" value={userName} onChangeText={setUserName} />
+              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr ? 'ماذا تريد أن تسمي توأمك؟' : 'What would you name your Twin?'}</Text>
+              <TextInput style={[styles.input, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr ? 'اسم التوأم' : 'Twin name'} placeholderTextColor="#999" value={newTwinName} onChangeText={setNewTwinName} />
+              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr ? 'اختر صوت توأمك' : 'Choose Twin Voice'}</Text>
               <View style={styles.genderRow}>
-                <TouchableOpacity style={[styles.genderBtn, newTwinGender==='female'&&styles.genderBtnActive]} onPress={()=>setNewTwinGender('female')}><Text style={[styles.genderText, newTwinGender==='female'&&styles.genderTextActive]}>{isAr?'♀ أنثى':'♀ Female'}</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.genderBtn, newTwinGender==='male'&&styles.genderBtnActive]} onPress={()=>setNewTwinGender('male')}><Text style={[styles.genderText, newTwinGender==='male'&&styles.genderTextActive]}>{isAr?'♂ ذكر':'♂ Male'}</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.genderBtn, newTwinGender==='female' && styles.genderBtnActive]} onPress={() => setNewTwinGender('female')}>
+                  <Text style={styles.genderEmoji}>♀️</Text>
+                  <Volume2 size={20} stroke={newTwinGender==='female' ? '#6B21A8' : '#999'} />
+                  <Text style={[styles.genderText, newTwinGender==='female' && styles.genderTextActive]}>{isAr ? 'أنثى' : 'Female'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.genderBtn, newTwinGender==='male' && styles.genderBtnActive]} onPress={() => setNewTwinGender('male')}>
+                  <Text style={styles.genderEmoji}>♂️</Text>
+                  <Volume2 size={20} stroke={newTwinGender==='male' ? '#6B21A8' : '#999'} />
+                  <Text style={[styles.genderText, newTwinGender==='male' && styles.genderTextActive]}>{isAr ? 'ذكر' : 'Male'}</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr? 'أخبرني عن نفسك (اختياري)' : 'Tell me about yourself (optional)'}</Text>
-              <TextInput style={[styles.textArea, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr? 'اكتب بحرية...' : 'Write freely...'} placeholderTextColor="#999" value={freeInfo} onChangeText={setFreeInfo} multiline numberOfLines={4} />
-              <TouchableOpacity style={[styles.submitBtn, (!userName.trim()||loading)&&{opacity:0.6}]} onPress={handleFinalSubmit} disabled={!userName.trim()||loading}>
-                {loading ? <ActivityIndicator color="#FFF" /> : (<><Check size={20} stroke="#FFF" /><Text style={styles.submitText}>{isAr? 'ابدأ رحلتك' : 'Start Your Journey'}</Text></>)}
+              <Text style={[styles.label, isDark && { color:'#CCC' }]}>{isAr ? 'أخبرني عن نفسك (اختياري)' : 'Tell me about yourself (optional)'}</Text>
+              <TextInput style={[styles.textArea, isDark && { backgroundColor:'#333', color:'#FFF', borderColor:'#444' }]} placeholder={isAr ? 'اكتب بحرية...' : 'Write freely...'} placeholderTextColor="#999" value={freeInfo} onChangeText={setFreeInfo} multiline numberOfLines={4} />
+              <TouchableOpacity style={[styles.submitBtn, (!userName.trim() || loading) && { opacity:0.6 }]} onPress={handleFinalSubmit} disabled={!userName.trim() || loading}>
+                {loading ? <ActivityIndicator color="#FFF" /> : (<><Check size={20} stroke="#FFF" /><Text style={styles.submitText}>{isAr ? 'ابدأ رحلتك' : 'Start Your Journey'}</Text></>)}
               </TouchableOpacity>
             </>
           )}
@@ -188,27 +228,24 @@ export default function Onboarding() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, isDark && { backgroundColor:'#2A2A2A' }]}>
             <Sparkles size={40} stroke="#A855F7" style={{ alignSelf:'center', marginBottom:16 }} />
-            <Text style={[styles.modalTitle, isDark && { color:'#FFF' }]}>{isAr? 'تم تحليل شخصيتك!' : 'Your Personality Analysis!'}</Text>
-            {analysisResult && (
-              <>
-                <View style={styles.traitsRow}>
-                  <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.dominant]?.color }]}>
-                    <Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.dominant]?.emoji}</Text>
-                    <Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.dominant]?.ar : TRAIT_INFO[analysisResult.dominant]?.en}</Text>
-                    <Text style={styles.traitType}>{isAr? 'الأساسي' : 'Primary'}</Text>
-                  </View>
-                  <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.secondary]?.color }]}>
-                    <Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.secondary]?.emoji}</Text>
-                    <Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.secondary]?.ar : TRAIT_INFO[analysisResult.secondary]?.en}</Text>
-                    <Text style={styles.traitType}>{isAr? 'الثانوي' : 'Secondary'}</Text>
-                  </View>
+            <Text style={[styles.modalTitle, isDark && { color:'#FFF' }]}>{isAr ? 'تم تحليل شخصيتك!' : 'Your Personality Analysis!'}</Text>
+            {analysisResult && (<>
+              <View style={styles.traitsRow}>
+                <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.dominant]?.color }]}>
+                  <Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.dominant]?.emoji}</Text>
+                  <Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.dominant]?.ar : TRAIT_INFO[analysisResult.dominant]?.en}</Text>
+                  <Text style={styles.traitType}>{isAr ? 'الأساسي' : 'Primary'}</Text>
                 </View>
-                <Text style={[styles.modalSubtext, isDark && { color:'#CCC' }]}>{isAr? 'فهم شخصيتك يساعدني في أن أكون أقرب إليك 💜' : 'Understanding your personality helps me be closer to you 💜'}</Text>
-              </>
-            )}
+                <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.secondary]?.color }]}>
+                  <Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.secondary]?.emoji}</Text>
+                  <Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.secondary]?.ar : TRAIT_INFO[analysisResult.secondary]?.en}</Text>
+                  <Text style={styles.traitType}>{isAr ? 'الثانوي' : 'Secondary'}</Text>
+                </View>
+              </View>
+              <Text style={[styles.modalSubtext, isDark && { color:'#CCC' }]}>{isAr ? 'فهم شخصيتك يساعدني في أن أكون أقرب إليك 💜' : 'Understanding your personality helps me be closer to you 💜'}</Text>
+            </>)}
             <TouchableOpacity style={styles.modalBtn} onPress={handleContinueToChat}>
-              <Check size={20} stroke="#FFF" />
-              <Text style={styles.modalBtnText}>{isAr? 'ابدأ المحادثة' : 'Start Chat'}</Text>
+              <Check size={20} stroke="#FFF" /><Text style={styles.modalBtnText}>{isAr ? 'ابدأ المحادثة' : 'Start Chat'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -216,7 +253,6 @@ export default function Onboarding() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
@@ -237,8 +273,9 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#666', marginBottom: 8, marginTop: 12 },
   input: { backgroundColor: '#F8F6F2', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A', borderWidth: 1, borderColor: '#E0D9F5', marginBottom: 8 },
   genderRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  genderBtn: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E0D9F5', alignItems: 'center' },
+  genderBtn: { flex: 1, padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#E0D9F5', alignItems: 'center', gap: 8 },
   genderBtnActive: { borderColor: '#6B21A8', backgroundColor: '#F3F0FF' },
+  genderEmoji: { fontSize: 24 },
   genderText: { fontSize: 15, fontWeight: '600', color: '#666' },
   genderTextActive: { color: '#6B21A8' },
   textArea: { backgroundColor: '#F8F6F2', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A', borderWidth: 1, borderColor: '#E0D9F5', minHeight: 100, textAlignVertical: 'top', marginBottom: 20 },

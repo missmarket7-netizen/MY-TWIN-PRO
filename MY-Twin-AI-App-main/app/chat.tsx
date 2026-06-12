@@ -279,12 +279,25 @@ export default function Chat() {
     }
     setLoading(true);
     try {
-      const res = await API.post('/api/image/generate', { prompt: input });
-      if (res.data.status === 'success' && res.data.image_base64) {
-        addMessage({ id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), role: 'twin', content: '🖼️ صورة مولدة', image: res.data.image_base64, timestamp: Date.now() });
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('No token');
+      
+      const res = await fetch('https://my-twin-pro-production-b744.up.railway.app/api/image/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: input })
+      });
+      const data = await res.json();
+      
+      if (data.status === 'success' && data.image_base64) {
+        addMessage({ id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), role: 'twin', content: '🖼️ صورة مولدة', image: data.image_base64, timestamp: Date.now() });
         setInput('');
       } else {
-        Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', res.data.message || 'فشل توليد الصورة');
+        Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', data.message || 'فشل توليد الصورة');
       }
     } catch (e) {
       Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', 'تعذر الاتصال بالخادم');

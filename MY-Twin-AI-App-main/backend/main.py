@@ -1,5 +1,5 @@
 """
-MyTwin API v10.1 – يدعم البث المباشر (Streaming)
+MyTwin API v10.2 – Final Stable Version
 """
 import os, asyncio, logging, json
 from datetime import datetime, timezone, timedelta, date
@@ -57,7 +57,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.1.0")
+app = FastAPI(title="MyTwin API", version="10.2.0")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -104,7 +104,7 @@ class ChatReq(BaseModel):
 class ReferralCodeReq(BaseModel):
     code: str = Field(..., min_length=2, max_length=20)
 
-# ========== المحادثة العادية ==========
+# ========== المحادثة ==========
 @app.post("/api/chat")
 @limiter.limit("30/minute")
 async def chat(
@@ -148,6 +148,12 @@ async def chat(
         logger.error(f"Critical Brain Error: {e}")
         res = {"reply": "أواجه ضغطاً تقنياً 💜", "provider": "exception_handler"}
 
+    # تحديث last_active تلقائياً بعد كل محادثة
+    try:
+        db.table("profiles").update({"last_active": datetime.now(timezone.utc).isoformat()}).eq("id", uid).execute()
+    except:
+        pass
+
     return {
         "reply": res.get("reply", "..."),
         "new_bond": res.get("new_bond", 0),
@@ -161,7 +167,7 @@ async def chat(
         "energy": res.get("energy"),
     }
 
-# ========== باقي المسارات ==========
+# ========== الإحالة ==========
 @app.post("/api/referral/generate")
 async def generate_referral(uid: str = Depends(get_user)):
     code = generate_referral_code(uid)
@@ -179,6 +185,7 @@ async def activate_referral_endpoint(body: ReferralCodeReq, uid: str = Depends(g
         return {"success": True, "bonus": 500}
     raise HTTPException(400, result.get("error", "invalid_code"))
 
+# ========== Cron ==========
 @app.post("/cron/proactive")
 async def cron_proactive(req: Request):
     key = req.headers.get("X-Cron-Key", "")
@@ -187,6 +194,7 @@ async def cron_proactive(req: Request):
     result = await proactive_engine.run_cron_job()
     return result
 
+# ========== أحلام ==========
 @app.post("/api/dream/analyze")
 async def analyze_dream_endpoint(body: dict, uid: str = Depends(get_user)):
     return await analyze_dream(uid, body.get("dream", ""), body.get("lang", "ar"))
@@ -195,6 +203,7 @@ async def analyze_dream_endpoint(body: dict, uid: str = Depends(get_user)):
 async def growth_history(uid: str = Depends(get_user)):
     return await get_growth_history(uid)
 
+# ========== خدمات ==========
 @app.get("/api/services/youtube")
 async def youtube_endpoint(query: str, lang: str = "ar", uid: str = Depends(get_user)):
     p = get_profile(uid)
@@ -213,9 +222,10 @@ async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
     result = await get_weather(city)
     return {"result": result} if result else {"error": "unavailable"}
 
+# ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.1.0"}
+    return {"status": "ok", "version": "10.2.0"}
 
 @app.get("/api/proactive/check")
 async def proactive_check(uid: str = Depends(get_user)):
@@ -224,7 +234,7 @@ async def proactive_check(uid: str = Depends(get_user)):
         return {"should_send": should_send, "user_id": uid}
     except Exception as e:
         logger.error(f"Proactive check error: {e}")
-        return {"error": "unavailable"}
+        return {"error": "unavailable", "details": str(e)}
 
 @app.get("/api/health/ai")
 async def ai_health_check():
@@ -257,7 +267,7 @@ async def ai_health_check():
             results["gemini"] = {"status": "❌ مفتاح مفقود"}
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-3.1-flash-lite")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
             results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
     except Exception as e:
@@ -281,12 +291,13 @@ async def check_limits(uid: str = Depends(get_user), feature: str = ""):
     summary = get_usage_summary(uid, p.get("tier", "free"), p.get("created_at"))
     return summary
 
+# ========== توليد الصور (تم إصلاح self) ==========
 @app.post("/api/image/generate")
 async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(get_user)):
     """توليد صورة باستخدام Gemini Image API"""
     try:
         import google.generativeai as genai
-        image_key = os.getenv("GEMINI_IMAGE_API_KEY", self._get_balanced_key("gemini"))
+        image_key = os.getenv("GEMINI_IMAGE_API_KEY")
         if not image_key:
             return {"status": "error", "message": "Image API key not configured"}
         genai.configure(api_key=image_key)
@@ -298,13 +309,3 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         return {"status": "error", "message": str(e)}
-
-@app.get("/api/proactive/check")
-async def proactive_check(uid: str = Depends(get_user)):
-    try:
-        should_send = proactive_engine.should_send_proactive(uid)
-        return {"should_send": should_send, "user_id": uid}
-    except Exception as e:
-        logger.error(f"Proactive check error: {e}")
-        # عرض الخطأ الحقيقي للتشخيص
-        return {"error": "unavailable", "details": str(e)}

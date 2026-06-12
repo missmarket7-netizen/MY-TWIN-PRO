@@ -5,49 +5,27 @@ import * as Haptics from 'expo-haptics';
 
 const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
-// ─ـ واجهات ──────────────────────────────────────
 export interface EmotionState {
-  primary: string;
-  secondary: string;
-  intensity: number;
-  valence: number;
-  arousal: number;
-  trend?: 'improving' | 'worsening' | 'stable';
-  riskLevel?: 'low' | 'medium' | 'high';
-  needsSupport: boolean;
+  primary: string; secondary: string; intensity: number; valence: number; arousal: number;
+  trend?: 'improving' | 'worsening' | 'stable'; riskLevel?: 'low' | 'medium' | 'high'; needsSupport: boolean;
 }
 
 export interface ConsciousnessState {
-  mood: string;
-  energy: number;
-  curiosity: number;
-  activeGoals: string[];
-  lastThought: string;
+  mood: string; energy: number; curiosity: number; activeGoals: string[]; lastThought: string;
 }
 
 export interface ChatMessage {
-  id: string;
-  role: 'user' | 'twin';
-  content: string;
-  image?: string;
-  timestamp: number;
-  failed?: boolean;
-  emotion?: string;
-  journeyPhase?: string;
-  relationshipStage?: string;
-  memoryRecall?: boolean;
-  thinkingStage?: string;
+  id: string; role: 'user' | 'twin'; content: string; image?: string; timestamp: number;
+  failed?: boolean; emotion?: string; journeyPhase?: string; relationshipStage?: string;
+  memoryRecall?: boolean; thinkingStage?: string;
 }
 
+// ✅ إصلاح: السماح بمفاتيح إضافية وقيم undefined
 export interface RelationshipDims {
-  [key: string]: number;
-  trust: number;
-  attachment: number;
-  comfort: number;
-  openness: number;
-  romantic: number;
-  humor: number;
-  attStyle: number;
+  trust: number; attachment: number; comfort: number; openness: number;
+  romantic: number; humor: number; attStyle: number;
+  empathy?: number; support?: number; communication?: number;
+  [key: string]: number | undefined;
 }
 
 export type Tier = 'free' | 'free_trial_14d' | 'premium_trial' | 'premium' | 'pro' | 'yearly' | 'plus';
@@ -58,6 +36,7 @@ export type TwinStyle = 'supportive' | 'coach' | 'wise' | 'fun' | 'calm';
 export type ReplyStyle = 'short' | 'medium' | 'long';
 export type JourneyPhase = 'introduction' | 'trust_building' | 'deepening' | 'growth' | 'mature';
 export type AttachmentStyle = 'secure' | 'anxious' | 'avoidant' | 'disorganized' | 'unknown';
+export type VoicePersonality = 'mentor' | 'friend' | 'romantic' | 'energetic' | 'calm';
 
 interface TwinStore {
   userId: string; setAuth: (userId: string) => void;
@@ -69,24 +48,16 @@ interface TwinStore {
   updateBond: (newBond: number) => void;
   updateRelationshipDims: (dims: Partial<RelationshipDims>) => void;
 
-  emotionState: EmotionState | null;
-  setEmotionState: (emotion: EmotionState) => void;
+  // ✅ إصلاح: إضافة subscriptionTier
+  subscriptionTier?: string;
 
-  journeyPhase: JourneyPhase;
-  setJourneyPhase: (phase: JourneyPhase) => void;
-  attachmentStyle: AttachmentStyle;
-  setAttachmentStyle: (style: AttachmentStyle) => void;
+  emotionState: EmotionState | null; setEmotionState: (emotion: EmotionState) => void;
+  journeyPhase: JourneyPhase; setJourneyPhase: (phase: JourneyPhase) => void;
+  attachmentStyle: AttachmentStyle; setAttachmentStyle: (style: AttachmentStyle) => void;
+  consciousnessState: ConsciousnessState | null; setConsciousnessState: (state: ConsciousnessState) => void;
+  isThinking: boolean; thinkingStage: string; setThinking: (val: boolean) => void; setThinkingStage: (stage: string) => void;
 
-  consciousnessState: ConsciousnessState | null;
-  setConsciousnessState: (state: ConsciousnessState) => void;
-  isThinking: boolean;
-  thinkingStage: string;
-  setThinking: (val: boolean) => void;
-  setThinkingStage: (stage: string) => void;
-
-  chatHistory: ChatMessage[];
-  addMessage: (msg: Partial<ChatMessage>) => void;
-  clearHistory: () => void;
+  chatHistory: ChatMessage[]; addMessage: (msg: Partial<ChatMessage>) => void; clearHistory: () => void;
 
   calmMode: boolean; toggleCalmMode: () => void;
   theme: Theme; toggleTheme: () => void;
@@ -100,9 +71,9 @@ interface TwinStore {
   voiceDialect: string; setVoiceDialect: (dialect: string) => void;
   voiceSpeed: number; setVoiceSpeed: (speed: number) => void;
   voicePitch: number; setVoicePitch: (pitch: number) => void;
+  voicePersonality: VoicePersonality; setVoicePersonality: (p: VoicePersonality) => void;
 
   menuVisible: boolean; openMenu: () => void; closeMenu: () => void;
-
   hasUsedTrial: boolean; setHasUsedTrial: (val: boolean) => void;
   twinTraits: string[]; setTwinTraits: (traits: string[]) => void;
 
@@ -110,21 +81,22 @@ interface TwinStore {
   totalMinutes: number; setTotalMinutes: (val: number) => void;
   streakDays: number; setStreakDays: (val: number) => void;
 
-  triggerHaptic: () => void;
-  logout: () => void;
+  triggerHaptic: () => void; logout: () => void;
 }
 
 const initialState = {
   userId: '', twinName: 'توأمك', twinGender: 'female' as TwinGender,
   twinStyle: 'supportive' as TwinStyle, bondLevel: 0, energy: 50,
   relationshipDims: { trust: 0, attachment: 0, comfort: 0, openness: 0, romantic: 0, humor: 0, attStyle: 0 } as RelationshipDims,
+  // ✅ إصلاح: قيمة افتراضية لـ subscriptionTier
+  subscriptionTier: 'free',
   emotionState: null as EmotionState | null,
   journeyPhase: 'introduction' as JourneyPhase, attachmentStyle: 'unknown' as AttachmentStyle,
   consciousnessState: null as ConsciousnessState | null, isThinking: false, thinkingStage: 'thinking',
   chatHistory: [] as ChatMessage[],
   calmMode: false, theme: 'light' as Theme, lang: 'ar' as Lang, tier: 'free' as Tier,
   points: 0, badges: [] as string[], voiceEnabled: false, replyStyle: 'medium' as ReplyStyle,
-  voiceDialect: 'modern_arabic', voiceSpeed: 0.9, voicePitch: 1.0,
+  voiceDialect: 'modern_arabic', voiceSpeed: 0.9, voicePitch: 1.0, voicePersonality: 'friend' as VoicePersonality,
   menuVisible: false, hasUsedTrial: false, twinTraits: [] as string[],
   totalMessages: 0, totalMinutes: 0, streakDays: 0,
 };
@@ -132,15 +104,14 @@ const initialState = {
 export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   ...initialState,
 
-  setAuth: (userId) => set({ userId }),
+  setAuth: (userId) => { console.log('🔑 setAuth:', userId); set({ userId }); },
   setTwinName: (name) => set({ twinName: name }),
-  setTwinGender: (gender) => set({ twinGender: gender }),
+  setTwinGender: (gender) => { console.log('👤 setTwinGender:', gender); set({ twinGender: gender }); },
   setTwinStyle: (style) => set({ twinStyle: style }),
   setEnergy: (value) => set({ energy: Math.max(0, Math.min(value, 100)) }),
 
   updateBond: (newBond) => set((state) => {
-    const safeBond = Math.max(0, Math.min(newBond, 100));
-    const badges = [...state.badges];
+    const safeBond = Math.max(0, Math.min(newBond, 100)); const badges = [...state.badges];
     if (safeBond >= 40 && !badges.includes('friend')) badges.push('friend');
     if (safeBond >= 60 && !badges.includes('trusted')) badges.push('trusted');
     if (safeBond >= 80 && !badges.includes('soulmate')) badges.push('soulmate');
@@ -148,8 +119,9 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     return { bondLevel: safeBond, badges };
   }),
 
-  updateRelationshipDims: (dims: any) => set((state) => ({
-    relationshipDims: { ...state.relationshipDims, ...(dims as any) }
+  // ✅ إصلاح: قبول Partial<RelationshipDims> مع أي مفاتيح
+  updateRelationshipDims: (dims) => set((state) => ({
+    relationshipDims: { ...state.relationshipDims, ...dims }
   })),
 
   setEmotionState: (emotion) => set({ emotionState: emotion }),
@@ -159,22 +131,13 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setThinking: (val) => set({ isThinking: val }),
   setThinkingStage: (stage) => set({ thinkingStage: stage }),
 
-  // ✅ `addMessage` يقبل كائن ChatMessage كامل
-  addMessage: (msg) => set((state) => ({
-    chatHistory: [...state.chatHistory, {
-      id: msg.id || generateId(),
-      role: msg.role || 'user',
-      content: msg.content || '',
-      image: msg.image || undefined,
-      timestamp: msg.timestamp || Date.now(),
-      failed: msg.failed || false,
-      emotion: msg.emotion || undefined,
-      journeyPhase: msg.journeyPhase || undefined,
-      relationshipStage: msg.relationshipStage || undefined,
-      memoryRecall: msg.memoryRecall || undefined,
-      thinkingStage: msg.thinkingStage || undefined,
-    }].slice(-200)
-  })),
+  addMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, {
+    id: msg.id || generateId(), role: msg.role || 'user', content: msg.content || '',
+    image: msg.image || undefined, timestamp: msg.timestamp || Date.now(),
+    failed: msg.failed || false, emotion: msg.emotion || undefined,
+    journeyPhase: msg.journeyPhase || undefined, relationshipStage: msg.relationshipStage || undefined,
+    memoryRecall: msg.memoryRecall || undefined, thinkingStage: msg.thinkingStage || undefined,
+  }].slice(-200) })),
 
   clearHistory: () => set({ chatHistory: [] }),
   toggleCalmMode: () => set((s) => ({ calmMode: !s.calmMode })),
@@ -190,6 +153,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setVoiceDialect: (dialect) => set({ voiceDialect: dialect }),
   setVoiceSpeed: (speed) => set({ voiceSpeed: speed }),
   setVoicePitch: (pitch) => set({ voicePitch: pitch }),
+  setVoicePersonality: (p) => set({ voicePersonality: p }),
 
   openMenu: () => set({ menuVisible: true }),
   closeMenu: () => set({ menuVisible: false }),
@@ -209,12 +173,14 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   partialize: (state) => ({
     userId: state.userId, twinName: state.twinName, twinGender: state.twinGender,
     twinStyle: state.twinStyle, bondLevel: state.bondLevel, relationshipDims: state.relationshipDims,
+    subscriptionTier: state.subscriptionTier,
     energy: state.energy, emotionState: state.emotionState,
     journeyPhase: state.journeyPhase, attachmentStyle: state.attachmentStyle,
     calmMode: state.calmMode, theme: state.theme, lang: state.lang,
     tier: state.tier, points: state.points, badges: state.badges,
     voiceEnabled: state.voiceEnabled, replyStyle: state.replyStyle,
     voiceDialect: state.voiceDialect, voiceSpeed: state.voiceSpeed, voicePitch: state.voicePitch,
+    voicePersonality: state.voicePersonality,
     hasUsedTrial: state.hasUsedTrial, twinTraits: state.twinTraits,
     totalMessages: state.totalMessages, totalMinutes: state.totalMinutes, streakDays: state.streakDays,
   }),
