@@ -217,6 +217,53 @@ async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
 async def root():
     return {"status": "ok", "version": "10.1.0"}
 
+@app.get("/api/proactive/check")
+async def proactive_check(uid: str = Depends(get_user)):
+    try:
+        should_send = proactive_engine.should_send_proactive(uid)
+        return {"should_send": should_send, "user_id": uid}
+    except Exception as e:
+        logger.error(f"Proactive check error: {e}")
+        return {"error": "unavailable"}
+
+@app.get("/api/health/ai")
+async def ai_health_check():
+    results = {}
+    try:
+        from openai import OpenAI
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+            results["groq"] = {"status": "❌ مفتاح مفقود"}
+        else:
+            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=groq_key)
+            resp = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role":"user","content":"Hi"}], max_tokens=5, timeout=8)
+            results["groq"] = {"status": "✅ يعمل", "response": resp.choices[0].message.content[:50]}
+    except Exception as e:
+        results["groq"] = {"status": "❌ فشل", "error": str(e)[:100]}
+    try:
+        or_key = os.getenv("OPENROUTER_API_KEY")
+        if not or_key:
+            results["openrouter"] = {"status": "❌ مفتاح مفقود"}
+        else:
+            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_key)
+            resp = client.chat.completions.create(model="meta-llama/llama-4-maverick", messages=[{"role":"user","content":"Hi"}], max_tokens=5, timeout=8)
+            results["openrouter"] = {"status": "✅ يعمل", "response": resp.choices[0].message.content[:50]}
+    except Exception as e:
+        results["openrouter"] = {"status": "❌ فشل", "error": str(e)[:100]}
+    try:
+        import google.generativeai as genai
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_key:
+            results["gemini"] = {"status": "❌ مفتاح مفقود"}
+        else:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel("gemini-1.5-flash-latest")
+            resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
+            results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
+    except Exception as e:
+        results["gemini"] = {"status": "❌ فشل", "error": str(e)[:100]}
+    return results
+
 @app.delete("/api/account")
 async def del_acc(uid: str = Depends(get_user)):
     db.table("profiles").delete().eq("id", uid).execute()
@@ -286,7 +333,7 @@ async def ai_health_check():
             results["gemini"] = {"status": "❌ مفتاح مفقود"}
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-1.5-flash-latest")
             resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
             results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
     except Exception as e:
