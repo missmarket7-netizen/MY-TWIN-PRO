@@ -1,3 +1,4 @@
+from typing import Optional
 import os, logging, random, asyncio, httpx
 from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
