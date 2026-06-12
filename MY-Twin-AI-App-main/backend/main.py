@@ -257,7 +257,7 @@ async def ai_health_check():
             results["gemini"] = {"status": "❌ مفتاح مفقود"}
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
+            model = genai.GenerativeModel("gemini-2.0-flash-latest")
             resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
             results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
     except Exception as e:
@@ -333,7 +333,7 @@ async def ai_health_check():
             results["gemini"] = {"status": "❌ مفتاح مفقود"}
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
+            model = genai.GenerativeModel("gemini-2.0-flash-latest")
             resp = model.generate_content("Hi", generation_config=genai.GenerationConfig(max_output_tokens=5))
             results["gemini"] = {"status": "✅ يعمل", "response": resp.text[:50]}
     except Exception as e:

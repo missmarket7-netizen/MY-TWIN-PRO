@@ -19,7 +19,7 @@ class MultiAIClient:
         if gemini_key:
             try:
                 genai.configure(api_key=gemini_key)
-                self.gemini_model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                self.gemini_model = genai.GenerativeModel("gemini-2.0-flash-latest")
             except Exception as e:
                 logger.error(f"Gemini init failed: {e}")
 
