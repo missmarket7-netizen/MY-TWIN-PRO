@@ -2,7 +2,10 @@ import os, logging, random, asyncio, httpx
 from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 from memory_graph import get_memory_context
-from emotional_timeline import emotional_timeline
+try:
+    from emotional_timeline import emotional_timeline
+except ImportError:
+    emotional_timeline = None
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +57,10 @@ class ProactiveEngine:
             goal = random.choice(goals.data)
             return f"كيف تسير عملية '{goal['title']}'؟ محتاج مساعدة؟ 💜"
         try:
-            emotion_summary = await emotional_timeline.get_emotion_summary(user_id)
+            if emotional_timeline:
+                emotion_summary = await emotional_timeline.get_emotion_summary(user_id)
+            else:
+                emotion_summary = {}
             if "dominant" in emotion_summary:
                 return f"لاحظت إن الأيام الأخيرة كانت {emotion_summary['dominant']}. كفاية كده؟ 💜"
         except:
