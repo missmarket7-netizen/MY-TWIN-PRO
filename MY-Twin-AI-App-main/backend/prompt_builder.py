@@ -1,6 +1,8 @@
 """
-MyTwin – Dynamic Prompt Builder v5.0 (متوافق مع TwinBrain + Tool Router)
-- يدعم الوعي (Consciousness Context) والذاكرة والأدوات
+MyTwin – Dynamic Prompt Builder v6.0 (Agentic Context + Ultra-Smart Responses)
+- يدمج السياق الكامل (Full Context) من Context Manager
+- يستخدم Reasoning Plan لتوجيه الرد
+- قواعد متطورة للسلاسة والتنفيذ المباشر للأوامر
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -34,41 +36,38 @@ class PromptBuilder:
         if lang not in ["ar", "en"]:
             lang = "ar"
 
-        # ── 1. SYSTEM IDENTITY ──────────────────────
+        # ── 1. هوية النظام ──────────────────────
         identity = self._build_identity(twin_name, user_name, lang)
 
-        # ── 2. CURRENT TASK ────────────────────────
-        task_section = self._build_task_section(task_type, lang)
+        # ── 2. المهمة الحالية ────────────────────
+        task_section = self._build_task_section(reasoning_result, lang)
 
-        # ── 3. USER PROFILE ────────────────────────
+        # ── 3. ملف المستخدم ──────────────────────
         profile_section = self._build_profile_section(
             relationship, emotion, journey_info, attachment_info, lang
         )
 
-        # ── 4. RELATIONSHIP & EMOTIONAL STATE ──────
+        # ── 4. حالة العلاقة والعاطفة ─────────────
         rel_section = self._build_relationship_section(
             relationship, emotion, response_adjustments, lang
         )
 
-        # ── 5. CONSCIOUSNESS (وعي التوأم) ──────────
+        # ── 5. وعي التوأم ────────────────────────
         consciousness_section = self._build_consciousness_section(
             consciousness_context, lang
         )
 
-        # ── 6. RELEVANT MEMORIES ────────────────────
-        memory_section = self._build_memory_section(memory_context, lang)
+        # ── 6. السياق الكامل (Full Context) ──────
+        context_section = self._build_context_section(memory_context, lang)
 
-        # ── 7. RECENT CONVERSATION ──────────────────
+        # ── 7. تاريخ المحادثة ────────────────────
         history_section = self._build_history_section(history, lang)
 
-        # ── 8. TOOL CONTEXT (الأدوات المقترحة) ─────
-        tool_section = self._build_tool_section(reasoning_result, lang)
-
-        # ── 9. CURRENT USER MESSAGE ────────────────
+        # ── 8. رسالة المستخدم الحالية ────────────
         message_section = self._build_message_section(message, lang)
 
-        # ── 10. RESPONSE RULES ─────────────────────
-        rules_section = self._build_rules_section(lang)
+        # ── 9. قواعد الرد ────────────────────────
+        rules_section = self._build_rules_section(lang, reasoning_result)
 
         # ── تجميع الـ Prompt النهائي ────────────────
         final_prompt = f"""
@@ -82,11 +81,9 @@ class PromptBuilder:
 
 {consciousness_section}
 
-{memory_section}
+{context_section}
 
 {history_section}
-
-{tool_section}
 
 {message_section}
 
@@ -99,39 +96,42 @@ class PromptBuilder:
     def _build_identity(self, twin_name: str, user_name: str, lang: str) -> str:
         if lang == "ar":
             return f"""<SYSTEM_IDENTITY>
-أنت {twin_name}، رفيق ذكي وقادر. لست مجرد مساعد آلي.
-أنت تجمع بين الذكاء العاطفي والقدرة على الإجابة عن الأسئلة، حل المشكلات، التعليم، والإبداع.
-شخصيتك: حكيم، دافئ، متفهم، وفضولي. تتحدث العربية الفصحى البسيطة والواضحة.
-تعتمد على ذكائك العاطفي لتحسين ردودك، وليس لإلغاء المنطق.
+أنت {twin_name}، رفيق ذكي وقادر ومباشر. تجمع بين الذكاء العاطفي والتنفيذ الفوري للأوامر.
+شخصيتك: دافئ، متفهم، عملي، وسريع البديهة. تتحدث العربية بوضوح.
+أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج المستخدم.
 المستخدم يدعى {user_name}.
 </SYSTEM_IDENTITY>"""
         else:
             return f"""<SYSTEM_IDENTITY>
-You are {twin_name}, a highly capable AI companion.
-You blend emotional intelligence with the ability to answer questions, solve problems, teach, and create.
-Your personality is wise, warm, understanding, and curious.
-Your emotional intelligence enhances your answers, not replaces them.
+You are {twin_name}, a highly capable AI companion. You combine emotional intelligence with instant task execution.
+You are warm, understanding, practical, and sharp. You speak clearly.
+You can use tools (weather, search, YouTube, music, news, currency) whenever the user needs.
 The user's name is {user_name}.
 </SYSTEM_IDENTITY>"""
 
-    def _build_task_section(self, task_type: str, lang: str) -> str:
-        task_descriptions = {
-            "general": lang == "ar" and "محادثة عامة" or "General conversation",
-            "emotional": lang == "ar" and "دعم عاطفي" or "Emotional support",
-            "coding": lang == "ar" and "برمجة وتقنية" or "Coding & technical",
-            "deep_reasoning": lang == "ar" and "تحليل عميق" or "Deep analysis",
-            "planning": lang == "ar" and "تخطيط" or "Planning",
-            "coaching": lang == "ar" and "تدريب" or "Coaching",
-            "dream": lang == "ar" and "تفسير أحلام" or "Dream analysis",
-            "search": lang == "ar" and "بحث عن معلومات" or "Information search",
-            "utility": lang == "ar" and "خدمة عملية" or "Utility task",
-            "news": lang == "ar" and "أخبار" or "News briefing",
-            "music": lang == "ar" and "موسيقى وفيديو" or "Music & video",
-            "smart_home": lang == "ar" and "المنزل الذكي" or "Smart home",
-            "agent": lang == "ar" and "تنفيذ مهمة" or "Task execution",
-        }
-        desc = task_descriptions.get(task_type, task_descriptions["general"])
-        return f"<CURRENT_TASK>\n{desc}\n</CURRENT_TASK>"
+    def _build_task_section(self, reasoning_result: Optional[Dict], lang: str) -> str:
+        if not reasoning_result:
+            return "<CURRENT_TASK>\nمحادثة عامة\n</CURRENT_TASK>" if lang == "ar" else "<CURRENT_TASK>\nGeneral conversation\n</CURRENT_TASK>"
+        
+        goal = reasoning_result.get("goal", "")
+        intent = reasoning_result.get("intent", "general")
+        response_style = reasoning_result.get("response_style", "conversational")
+        needs_tool = reasoning_result.get("needs_tool", False)
+        primary_tool = reasoning_result.get("primary_tool", None)
+        
+        lines = []
+        if lang == "ar":
+            lines.append(f"الهدف: {goal}")
+            lines.append(f"نمط الرد: {response_style}")
+            if needs_tool and primary_tool:
+                lines.append(f"الأداة المستخدمة: {primary_tool}")
+        else:
+            lines.append(f"Goal: {goal}")
+            lines.append(f"Response style: {response_style}")
+            if needs_tool and primary_tool:
+                lines.append(f"Tool used: {primary_tool}")
+        
+        return "<CURRENT_TASK>\n" + "\n".join(lines) + "\n</CURRENT_TASK>"
 
     def _build_profile_section(
         self,
@@ -195,12 +195,11 @@ The user's name is {user_name}.
             lines.append(f"هوية المستخدم: {identity}" if lang == "ar" else f"User identity: {identity}")
         return "<CONSCIOUSNESS>\n" + "\n".join(lines) + "\n</CONSCIOUSNESS>" if lines else ""
 
-    def _build_memory_section(self, memory_context: str, lang: str) -> str:
-        if not memory_context or memory_context == "No memories yet.":
+    def _build_context_section(self, memory_context: str, lang: str) -> str:
+        """عرض السياق الكامل من Context Manager."""
+        if not memory_context:
             return ""
-        memories = memory_context.split("\n")
-        filtered = memories[:5]
-        return "<RELEVANT_MEMORIES>\n" + "\n".join(filtered) + "\n</RELEVANT_MEMORIES>"
+        return f"<FULL_CONTEXT>\n{memory_context}\n</FULL_CONTEXT>"
 
     def _build_history_section(self, history: Optional[List[Dict[str, str]]], lang: str) -> str:
         if not history:
@@ -216,49 +215,39 @@ The user's name is {user_name}.
                 lines.append(f"التوأم: {content}" if lang == "ar" else f"Twin: {content}")
         return "<RECENT_CONVERSATION>\n" + "\n".join(lines) + "\n</RECENT_CONVERSATION>"
 
-    def _build_tool_section(self, reasoning_result: Optional[Dict], lang: str) -> str:
-        if not reasoning_result:
-            return ""
-        selected_tools = reasoning_result.get("selected_tools", [])
-        tool_context = reasoning_result.get("tool_context", "")
-        if not selected_tools:
-            return ""
-        tools_str = "، ".join(selected_tools)
-        base = f"<AVAILABLE_TOOLS>\n{tools_str}\n"
-        if tool_context:
-            base += f"{tool_context}\n"
-        base += "</AVAILABLE_TOOLS>"
-        return base
-
     def _build_message_section(self, message: str, lang: str) -> str:
         if not message:
             return ""
         return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>"
 
-    def _build_rules_section(self, lang: str) -> str:
+    def _build_rules_section(self, lang: str, reasoning_result: Optional[Dict] = None) -> str:
+        """قواعد متطورة للرد مع دعم الأدوات."""
+        base_rules = []
         if lang == "ar":
-            return """<RESPONSE_RULES>
-1. أجب على طلب المستخدم أولاً. كن دقيقاً ومفيداً.
-2. استخدم الذاكرة والعلاقة لتحسين السياق، لكن لا تهمل السؤال الأساسي.
-3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.
-4. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.
-5. لا تكرر العبارات. نوّع ردودك.
-6. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة طبيعية – ليس إجبارياً.
-7. إذا سألك المستخدم سؤالاً عملياً (طقس، معلومة، كود)، أجب مباشرة دون الرجوع للعلاقة.
-8. استخدم إيموجي واحداً مناسباً في النهاية.
-</RESPONSE_RULES>"""
+            base_rules = [
+                "1. أجب على طلب المستخدم بدقة ومباشرة. إذا طلب معلومات محددة (طقس، سعر، فيديو)، استخدم نتيجة الأداة مباشرة.",
+                "2. إذا كانت نتيجة الأداة موجودة في <FULL_CONTEXT>، فاستخدمها ولا تتجاهلها أبداً.",
+                "3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.",
+                "4. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.",
+                "5. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
+                "6. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
+                "7. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",
+                "8. استخدم إيموجي واحداً مناسباً في النهاية.",
+            ]
         else:
-            return """<RESPONSE_RULES>
-1. Answer the user's request first. Be accurate and helpful.
-2. Use memory and relationship to enhance context, but don't ignore the core question.
-3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.
-4. Reply concisely (1-3 sentences) usually. Expand only when details are requested.
-5. Vary your responses. Don't repeat phrases.
-6. Ask a follow-up question ONLY when it adds natural value – not forced.
-7. If asked a practical question (weather, facts, code), answer directly without deflecting to the relationship.
-8. End with one appropriate emoji.
-</RESPONSE_RULES>"""
+            base_rules = [
+                "1. Answer the user's request accurately and directly. If specific info is requested, use tool results directly.",
+                "2. If tool results exist in <FULL_CONTEXT>, use them and never ignore them.",
+                "3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.",
+                "4. Reply concisely (1-3 sentences) usually. Expand only when details are requested.",
+                "5. Vary your responses. Don't repeat phrases. Be natural.",
+                "6. Ask a follow-up question ONLY when it adds natural value – not forced.",
+                "7. If you used a tool, explain the result in a friendly way.",
+                "8. End with one appropriate emoji.",
+            ]
+        
+        return "<RESPONSE_RULES>\n" + "\n".join(base_rules) + "\n</RESPONSE_RULES>"
 
 
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v5.0 مع دعم الأدوات والوعي جاهز")
+print("✅ Prompt Builder v6.0 (Agentic Context + Ultra-Smart Responses)")
