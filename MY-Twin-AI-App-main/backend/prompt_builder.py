@@ -1,10 +1,6 @@
 """
-MyTwin – Dynamic Prompt Builder v4.0 (متوافق مع TwinBrain v5.0)
-- يستقبل message، history، task_type، memory_context
-- بناء منظم (Structured) لتحسين استجابة النماذج
-- Identity مناسبة لتطبيق AI Companion
-- Rules بأولويات واضحة
-- سؤال مفتوح اختياري فقط عندما يضيف قيمة
+MyTwin – Dynamic Prompt Builder v5.0 (متوافق مع TwinBrain + Tool Router)
+- يدعم الوعي (Consciousness Context) والذاكرة والأدوات
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -27,7 +23,6 @@ class PromptBuilder:
         journey_info: Optional[Dict] = None,
         attachment_info: Optional[Dict] = None,
         response_adjustments: Optional[Dict] = None,
-        # ✅ المعاملات الجديدة
         message: str = "",
         memory_context: str = "",
         reasoning_result: Optional[Dict] = None,
@@ -35,9 +30,6 @@ class PromptBuilder:
         history: Optional[List[Dict[str, str]]] = None,
         task_type: str = "general",
     ) -> str:
-        """
-        بناء الـ Prompt النهائي باللغة العربية (أو الإنجليزية حسب dialect)
-        """
         lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
         if lang not in ["ar", "en"]:
             lang = "ar"
@@ -58,16 +50,24 @@ class PromptBuilder:
             relationship, emotion, response_adjustments, lang
         )
 
-        # ── 5. RELEVANT MEMORIES ────────────────────
+        # ── 5. CONSCIOUSNESS (وعي التوأم) ──────────
+        consciousness_section = self._build_consciousness_section(
+            consciousness_context, lang
+        )
+
+        # ── 6. RELEVANT MEMORIES ────────────────────
         memory_section = self._build_memory_section(memory_context, lang)
 
-        # ── 6. RECENT CONVERSATION ──────────────────
+        # ── 7. RECENT CONVERSATION ──────────────────
         history_section = self._build_history_section(history, lang)
 
-        # ── 7. CURRENT USER MESSAGE ────────────────
+        # ── 8. TOOL CONTEXT (الأدوات المقترحة) ─────
+        tool_section = self._build_tool_section(reasoning_result, lang)
+
+        # ── 9. CURRENT USER MESSAGE ────────────────
         message_section = self._build_message_section(message, lang)
 
-        # ── 8. RESPONSE RULES ──────────────────────
+        # ── 10. RESPONSE RULES ─────────────────────
         rules_section = self._build_rules_section(lang)
 
         # ── تجميع الـ Prompt النهائي ────────────────
@@ -80,9 +80,13 @@ class PromptBuilder:
 
 {rel_section}
 
+{consciousness_section}
+
 {memory_section}
 
 {history_section}
+
+{tool_section}
 
 {message_section}
 
@@ -120,6 +124,10 @@ The user's name is {user_name}.
             "coaching": lang == "ar" and "تدريب" or "Coaching",
             "dream": lang == "ar" and "تفسير أحلام" or "Dream analysis",
             "search": lang == "ar" and "بحث عن معلومات" or "Information search",
+            "utility": lang == "ar" and "خدمة عملية" or "Utility task",
+            "news": lang == "ar" and "أخبار" or "News briefing",
+            "music": lang == "ar" and "موسيقى وفيديو" or "Music & video",
+            "smart_home": lang == "ar" and "المنزل الذكي" or "Smart home",
             "agent": lang == "ar" and "تنفيذ مهمة" or "Task execution",
         }
         desc = task_descriptions.get(task_type, task_descriptions["general"])
@@ -171,10 +179,25 @@ The user's name is {user_name}.
             lines.append(f"دفء: {warmth:.1f}, سرعة: {speed}, دعم: {support}" if lang == "ar" else f"Warmth: {warmth:.1f}, Speed: {speed}, Support: {support}")
         return "<RELATIONSHIP_STATE>\n" + "\n".join(lines) + "\n</RELATIONSHIP_STATE>" if lines else ""
 
+    def _build_consciousness_section(self, consciousness_context: Optional[Dict], lang: str) -> str:
+        if not consciousness_context:
+            return ""
+        lines = []
+        thought = consciousness_context.get("last_thought", "")
+        goals = consciousness_context.get("active_goals", [])
+        identity = consciousness_context.get("identity", {})
+        if thought:
+            lines.append(f"آخر فكرة: {thought}" if lang == "ar" else f"Last thought: {thought}")
+        if goals:
+            goals_str = "، ".join(goals)
+            lines.append(f"أهداف نشطة: {goals_str}" if lang == "ar" else f"Active goals: {goals_str}")
+        if identity:
+            lines.append(f"هوية المستخدم: {identity}" if lang == "ar" else f"User identity: {identity}")
+        return "<CONSCIOUSNESS>\n" + "\n".join(lines) + "\n</CONSCIOUSNESS>" if lines else ""
+
     def _build_memory_section(self, memory_context: str, lang: str) -> str:
         if not memory_context or memory_context == "No memories yet.":
             return ""
-        # تحديد عدد الذكريات إلى أقصى 5
         memories = memory_context.split("\n")
         filtered = memories[:5]
         return "<RELEVANT_MEMORIES>\n" + "\n".join(filtered) + "\n</RELEVANT_MEMORIES>"
@@ -182,7 +205,7 @@ The user's name is {user_name}.
     def _build_history_section(self, history: Optional[List[Dict[str, str]]], lang: str) -> str:
         if not history:
             return ""
-        recent = history[-10:]  # آخر 10 رسائل
+        recent = history[-10:]
         lines = []
         for msg in recent:
             role = msg.get("role", "")
@@ -192,6 +215,20 @@ The user's name is {user_name}.
             else:
                 lines.append(f"التوأم: {content}" if lang == "ar" else f"Twin: {content}")
         return "<RECENT_CONVERSATION>\n" + "\n".join(lines) + "\n</RECENT_CONVERSATION>"
+
+    def _build_tool_section(self, reasoning_result: Optional[Dict], lang: str) -> str:
+        if not reasoning_result:
+            return ""
+        selected_tools = reasoning_result.get("selected_tools", [])
+        tool_context = reasoning_result.get("tool_context", "")
+        if not selected_tools:
+            return ""
+        tools_str = "، ".join(selected_tools)
+        base = f"<AVAILABLE_TOOLS>\n{tools_str}\n"
+        if tool_context:
+            base += f"{tool_context}\n"
+        base += "</AVAILABLE_TOOLS>"
+        return base
 
     def _build_message_section(self, message: str, lang: str) -> str:
         if not message:
@@ -223,6 +260,5 @@ The user's name is {user_name}.
 </RESPONSE_RULES>"""
 
 
-# نسخة عالمية
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v4.0 جاهز")
+print("✅ Prompt Builder v5.0 مع دعم الأدوات والوعي جاهز")

@@ -1,6 +1,9 @@
 """
-MyTwin – Unified Limits & Tier Manager v3.1
-يجمع: حدود الرسائل + حدود التوكن + ميزات الباقات + سقف Bond + مكافآت الإحالة
+MyTwin – Unified Limits & Tier Manager v4.0
+- حدود الأدوات مخصصة بالباقة (Tier 1,2,3)
+- طاقة التوأم مرتبطة بعدد الرسائل المتبقية
+- مؤشر الترابط يكافئ التواصل اليومي المتكرر (Streak)
+- سقف Bond ومكافآت الإحالة
 """
 from datetime import datetime, timezone, timedelta
 from typing import Tuple, Optional, Dict
@@ -39,93 +42,64 @@ TIER_MODELS = {
     "yearly":   ["groq", "llama4", "deepseek", "qwen", "minimax", "gemma4", "gptoss", "gemini"],
 }
 
-# ── ميزات مقفولة حسب الباقة (شاملة القيود الجديدة) ──
+# ── حدود الميزات اليومية حسب الباقة ─────────────────
 TIER_FEATURES = {
     "free": {
-        "tts": False,
-        "dreams": False,
-        "coaching": False,
-        "proactive": False,
-        "long_memory": False,
-        "weekly_report": False,
-        "smart_home": False,
-        # قيود الاستخدام اليومي للميزات المسموح بها
+        "tts": False, "dreams": False, "coaching": False,
+        "proactive": False, "long_memory": False, "weekly_report": False, "smart_home": False,
         "daily_limits": {
-            "youtube": 2,      # مرتين يومياً
-            "search": 1,       # مرة واحدة يومياً
-            "weather": 3,      # ثلاث مرات يومياً
-            "spotify": 0,      # معطل
-            "stt": 0,          # معطل
+            "youtube": 2, "search": 1, "weather": 3,
+            "spotify": 0, "calendar": 0, "news": 1, "maps": 1,
+            "currency": 1, "homeassistant": 0, "email": 0, "telegram": 1,
+            "notes": 5, "tasks": 5,
         }
     },
     "plus": {
-        "tts": True,
-        "dreams": False,
-        "coaching": False,
-        "proactive": True,
-        "long_memory": True,
-        "weekly_report": False,
-        "smart_home": False,
+        "tts": True, "dreams": False, "coaching": False,
+        "proactive": True, "long_memory": True, "weekly_report": False, "smart_home": False,
         "daily_limits": {
-            "youtube": 5,
-            "search": 5,
-            "weather": 10,
-            "spotify": 3,
-            "stt": 5,
+            "youtube": 5, "search": 5, "weather": 10,
+            "spotify": 3, "calendar": 3, "news": 5, "maps": 5,
+            "currency": 5, "homeassistant": 0, "email": 2, "telegram": 5,
+            "notes": 20, "tasks": 20,
         }
     },
     "premium": {
-        "tts": True,
-        "dreams": True,
-        "coaching": True,
-        "proactive": True,
-        "long_memory": True,
-        "weekly_report": True,
-        "smart_home": False,
+        "tts": True, "dreams": True, "coaching": True,
+        "proactive": True, "long_memory": True, "weekly_report": True, "smart_home": False,
         "daily_limits": {
-            "youtube": 10,
-            "search": 10,
-            "weather": 20,
-            "spotify": 10,
-            "stt": 10,
+            "youtube": 10, "search": 10, "weather": 20,
+            "spotify": 10, "calendar": 10, "news": 10, "maps": 10,
+            "currency": 10, "homeassistant": 0, "email": 10, "telegram": 20,
+            "notes": 100, "tasks": 100,
         }
     },
     "pro": {
-        "tts": True,
-        "dreams": True,
-        "coaching": True,
-        "proactive": True,
-        "long_memory": True,
-        "weekly_report": True,
-        "smart_home": True,
+        "tts": True, "dreams": True, "coaching": True,
+        "proactive": True, "long_memory": True, "weekly_report": True, "smart_home": True,
         "daily_limits": {
-            "youtube": 30,
-            "search": 30,
-            "weather": 50,
-            "spotify": 30,
-            "stt": 20,
+            "youtube": 30, "search": 30, "weather": 50,
+            "spotify": 30, "calendar": 30, "news": 30, "maps": 30,
+            "currency": 30, "homeassistant": 50, "email": 50, "telegram": 50,
+            "notes": 500, "tasks": 500,
         }
     },
     "yearly": {
-        "tts": True,
-        "dreams": True,
-        "coaching": True,
-        "proactive": True,
-        "long_memory": True,
-        "weekly_report": True,
-        "smart_home": True,
+        "tts": True, "dreams": True, "coaching": True,
+        "proactive": True, "long_memory": True, "weekly_report": True, "smart_home": True,
         "daily_limits": {
-            "youtube": 999,
-            "search": 999,
-            "weather": 999,
-            "spotify": 999,
-            "stt": 999,
+            "youtube": 999, "search": 999, "weather": 999,
+            "spotify": 999, "calendar": 999, "news": 999, "maps": 999,
+            "currency": 999, "homeassistant": 999, "email": 999, "telegram": 999,
+            "notes": 9999, "tasks": 9999,
         }
     },
 }
 
 REFERRAL_BONUS_TOK = 500
 REFERRAL_DAILY_MSG_BONUS = 5
+STREAK_BONUS_INCREMENT = 2  # رسائل إضافية لكل 3 أيام تواصل متتالية
+STREAK_DAYS_THRESHOLD = 3   # عدد الأيام للحصول على مكافأة الاستمرارية
 
 def _get_effective_tier(tier: str, signup_date: Optional[str] = None) -> str:
     if tier == "free" and signup_date:
@@ -172,13 +146,47 @@ def _get_referral_tok_bonus(uid: str) -> int:
             print(f"Referral bonus error: {e}")
     return 0
 
+def _get_streak_bonus(uid: str) -> int:
+    """حساب مكافأة التواصل اليومي المتكرر"""
+    if not db:
+        return 0
+    try:
+        # جلب آخر 10 أيام نشطة
+        res = db.table("profiles").select("last_active").eq("id", uid).single().execute()
+        if not res.data or not res.data.get("last_active"):
+            return 0
+        
+        last_active = datetime.fromisoformat(res.data["last_active"].replace("Z", "+00:00"))
+        today = datetime.now(timezone.utc).date()
+        days_diff = (today - last_active.date()).days
+        
+        if days_diff > 1:  # انقطع اليوم أو أكثر
+            return 0
+        
+        # حساب عدد الأيام المتتالية (من جدول message_log مثلاً)
+        streak_key = f"streak:{uid}"
+        current_streak = get(streak_key) or 0
+        
+        if days_diff == 0:  # نشط اليوم
+            current_streak += 1
+            cache_set(streak_key, current_streak, 86400 * 2)  # يحتفظ به ليومين
+        
+        if current_streak >= STREAK_DAYS_THRESHOLD:
+            bonus = (current_streak // STREAK_DAYS_THRESHOLD) * STREAK_BONUS_INCREMENT
+            return min(bonus, 10)  # أقصى مكافأة 10 رسائل إضافية
+    except:
+        pass
+    return 0
+
 def check_message_limit(uid: str, tier: str, signup_date: Optional[str] = None) -> Tuple[bool, int, str]:
     effective = _get_effective_tier(tier, signup_date)
     today = datetime.now(timezone.utc).date().isoformat()
     key = f"msg:{uid}:{today}"
     used = get(key) or 0
     base = DAILY_MESSAGES.get(effective, 15)
-    limit = base + _get_daily_referral_bonus(uid)
+    referral_bonus = _get_daily_referral_bonus(uid)
+    streak_bonus = _get_streak_bonus(uid)
+    limit = base + referral_bonus + streak_bonus
     if used >= limit: return False, 0, "daily_limit_reached"
     cache_set(key, used + 1, 86400)
     return True, limit - used - 1, "ok"
@@ -209,12 +217,10 @@ def get_tier_features(tier: str) -> dict:
     return TIER_FEATURES.get(base, TIER_FEATURES["free"])
 
 def get_daily_feature_limit(tier: str, feature_name: str) -> int:
-    """الحد اليومي لميزة معينة مثل youtube, search, weather"""
     features = get_tier_features(tier)
     return features.get("daily_limits", {}).get(feature_name, 0)
 
 def check_feature_usage(uid: str, tier: str, feature_name: str) -> Tuple[bool, int]:
-    """التحقق من استهلاك الميزة اليومية (True=مسموح, remaining)"""
     limit = get_daily_feature_limit(tier, feature_name)
     if limit == 0:
         return False, 0
@@ -225,6 +231,26 @@ def check_feature_usage(uid: str, tier: str, feature_name: str) -> Tuple[bool, i
         return False, 0
     cache_set(key, used + 1, 86400)
     return True, limit - used - 1
+
+def get_twin_energy(uid: str, tier: str, signup_date: Optional[str] = None) -> float:
+    """حساب طاقة التوأم بناءً على عدد الرسائل المتبقية"""
+    _, remaining, _ = check_message_limit(uid, tier, signup_date)
+    effective = _get_effective_tier(tier, signup_date)
+    base = DAILY_MESSAGES.get(effective, 15)
+    energy = (remaining / base) * 100 if base > 0 else 0
+    return min(100.0, max(0.0, energy))
+
+def get_bond_streak_multiplier(uid: str) -> float:
+    """مضاعف الترابط عند التواصل اليومي المتكرر"""
+    streak_key = f"streak:{uid}"
+    streak = get(streak_key) or 0
+    if streak >= 7:   # أسبوع تواصل يومي
+        return 1.5
+    elif streak >= 3: # 3 أيام
+        return 1.2
+    elif streak >= 1:
+        return 1.0
+    return 1.0
 
 def activate_referral_bonus(uid: str) -> None:
     cache_set(f"referral:{uid}", {
@@ -241,11 +267,13 @@ def get_usage_summary(uid: str, tier: str, signup_date: Optional[str] = None) ->
     today = datetime.now(timezone.utc).date().isoformat()
     msg_used = get(f"msg:{uid}:{today}") or 0
     tok_used = get(f"tok:{uid}:{today}") or 0
-    msg_limit = DAILY_MESSAGES.get(effective, 15) + _get_daily_referral_bonus(uid)
+    msg_limit = DAILY_MESSAGES.get(effective, 15) + _get_daily_referral_bonus(uid) + _get_streak_bonus(uid)
     tok_limit = BASE_TOK.get(effective, 500) + _get_referral_tok_bonus(uid)
     now = datetime.now(timezone.utc)
     midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     hours = int((midnight - now).total_seconds() / 3600)
+    energy = get_twin_energy(uid, tier, signup_date)
+    streak_multiplier = get_bond_streak_multiplier(uid)
     return {
         "messages": {"used": msg_used, "limit": msg_limit, "remaining": max(0, msg_limit - msg_used)},
         "tokens":   {"used": tok_used, "limit": tok_limit, "remaining": max(0, tok_limit - tok_used)},
@@ -253,6 +281,8 @@ def get_usage_summary(uid: str, tier: str, signup_date: Optional[str] = None) ->
         "hours_until_reset": hours,
         "effective_tier": effective,
         "features": get_tier_features(tier),
+        "energy": energy,
+        "streak_multiplier": streak_multiplier,
     }
 
-print("✅ Unified Limits Manager v3.1 | رسائل + توكن + ميزات + حدود يومية | جاهز")
+print("✅ Unified Limits Manager v4.0 | أدوات + طاقة + Streak | جاهز")

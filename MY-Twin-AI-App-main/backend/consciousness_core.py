@@ -1,11 +1,5 @@
 """
-MyTwin – Consciousness Core v6.0 (Stateless & Isolated)
-- عزل الحالة لكل مستخدم (user_states dict)
-- أهداف طويلة المدى (active_objectives)
-- نموذج مستخدم متطور (user_profile)
-- تطور هوية ذكي بدون تضخم (identity_traits)
-- Memory Ranking للتغذية الراجعة
-- Reflection مشروط وليس كل مرة
+MyTwin – Consciousness Core v6.1 (مع تحديث ملف المستخدم التلقائي)
 """
 import os, logging, asyncio, json, random, time
 from typing import Dict, Any, Optional, List
@@ -18,7 +12,6 @@ logger = logging.getLogger("consciousness_core")
 class ConsciousnessCore:
     def __init__(self, twin_name: str = "MyTwin"):
         self.twin_name = twin_name
-        # قاموس لحالة كل مستخدم (عزل تام)
         self.user_states: Dict[str, Dict[str, Any]] = {}
         self.db = self._init_db()
 
@@ -36,20 +29,16 @@ class ConsciousnessCore:
         except:
             return None
 
-    # ── دوال مساعدة ───────────────────────────────
     def _safe_json_parse(self, raw: str) -> Dict[str, Any]:
-        """استخراج آمن لـ JSON من ردود LLM"""
         if not raw:
             return {}
         raw = raw.strip()
-        # محاولة استخراج JSON بين ```json و ```
         if "```json" in raw:
             start = raw.find("```json") + 7
             end = raw.find("```", start)
             if end != -1:
                 raw = raw[start:end].strip()
         elif raw.startswith("{"):
-            # محاولة إيجاد نهاية الـ JSON
             end = raw.rfind("}")
             if end != -1:
                 raw = raw[:end+1]
@@ -59,7 +48,6 @@ class ConsciousnessCore:
             logger.warning(f"Failed to parse JSON from: {raw[:100]}")
             return {}
 
-    # ─ـ تحميل وحفظ حالة المستخدم ──────────────────
     async def load_state(self, user_id: str) -> Dict[str, Any]:
         if not self.db:
             return {}
@@ -76,7 +64,6 @@ class ConsciousnessCore:
                 return self.user_states[user_id]
         except Exception as e:
             logger.warning(f"Failed to load state for {user_id}: {e}")
-        # حالة افتراضية
         self.user_states[user_id] = {
             "internal_state": self._default_internal_state(),
             "identity": self._default_identity(),
@@ -104,7 +91,6 @@ class ConsciousnessCore:
         except Exception as e:
             logger.warning(f"Failed to save state for {user_id}: {e}")
 
-    # ─ـ قيم افتراضية ──────────────────────────────
     def _default_internal_state(self) -> Dict[str, Any]:
         return {
             "mood": "neutral",
@@ -122,7 +108,6 @@ class ConsciousnessCore:
             "description": f"أنا {self.twin_name}، رفيق ذكي أتعلم من تفاعلاتنا. أسعى لفهمك ومساعدتك.",
         }
 
-    # ─ـ التفكير الداخلي ────────────────────────────
     async def think(self, user_id: str, user_message: str, emotion: Dict[str, Any], lang: str = "ar") -> Dict[str, Any]:
         if not user_message.strip():
             return {"thought": "", "goal": "", "question": ""}
@@ -132,7 +117,6 @@ class ConsciousnessCore:
         user_profile = state.get("user_profile", {})
         objectives = state.get("active_objectives", [])
 
-        # الذكريات ذات الصلة (باستخدام memory ranking بسيط)
         memory_context = await get_memory_context(user_id) if user_id else ""
         recent_memories = memory_context[:500] if isinstance(memory_context, str) else str(memory_context)[:500]
 
@@ -176,12 +160,10 @@ JSON:"""
                 logger.warning(f"Think failed for {user_id}: {e}")
         return {"thought": "", "goal": "", "question": ""}
 
-    # ─ـ التأمل المشروط ────────────────────────────
     async def reflect(self, user_id: str, conversation_summary: str, lang: str = "ar"):
         if not conversation_summary.strip():
             return
         state = self.user_states.get(user_id, await self.load_state(user_id))
-        # شروط التأمل: محادثة طويلة (> 10 تفاعلات) أو مشاعر قوية
         should_reflect = (
             state["internal_state"]["interaction_count"] > 10 or
             "important" in conversation_summary.lower()
@@ -209,29 +191,24 @@ JSON:"""
                 result = await client.get_best_reply(prompt, task="deep_reasoning")
                 data = self._safe_json_parse(result)
                 if data:
-                    # تخزين التأمل مع درجة أهميته
                     reflection = {
                         "data": data,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "importance": 0.7 if state["internal_state"]["interaction_count"] > 20 else 0.3,
                     }
                     state["internal_state"]["reflection_log"].append(reflection)
-                    # تنظيف قديم
                     if len(state["internal_state"]["reflection_log"]) > 10:
                         state["internal_state"]["reflection_log"] = state["internal_state"]["reflection_log"][-10:]
-                    # تطور الهوية (باستخدام traits بدلاً من النص المتراكم)
                     if "how_i_should_change" in data:
                         change = data["how_i_should_change"]
                         if change.strip():
                             current_traits = identity.get("traits", [])
                             if len(current_traits) < 10:
-                                # استخراج صفة واحدة من النص (بسيط)
-                                new_trait = change.split()[-1][:20]  # كلمة أخيرة كصفة جديدة
+                                new_trait = change.split()[-1][:20]
                                 if new_trait not in current_traits:
                                     current_traits.append(new_trait)
                             identity["traits"] = current_traits
                             identity["evolution_stage"] = identity.get("evolution_stage", 0) + 1
-                            # تحديث الوصف المختصر
                             identity["description"] = f"أنا {self.twin_name}، {', '.join(current_traits[-4:])}. أتطور مع كل محادثة."
                     logger.info(f"✅ Reflection completed for {user_id}")
             except Exception as e:
@@ -246,7 +223,25 @@ JSON:"""
             "active_objectives": state.get("active_objectives", []),
         }
 
+    async def update_user_profile(self, user_id: str, data: Dict[str, Any]):
+        """دمج بيانات جديدة في user_profile (العلاقة، الرحلة، التعلق)"""
+        if not user_id:
+            return
+        state = self.user_states.get(user_id, await self.load_state(user_id))
+        profile = state.get("user_profile", {})
+        if "relationship_dims" in data:
+            profile["relationship_dims"] = data["relationship_dims"]
+        if "journey_phase" in data and data["journey_phase"] is not None:
+            profile["journey_phase"] = data["journey_phase"]
+        if "journey_day" in data and data["journey_day"] is not None:
+            profile["journey_day"] = data["journey_day"]
+        if "attachment_style" in data and data["attachment_style"] is not None:
+            profile["attachment_style"] = data["attachment_style"]
+        if "bond_level" in data and data["bond_level"] is not None:
+            profile["bond_level"] = data["bond_level"]
+        profile["last_updated"] = datetime.now(timezone.utc).isoformat()
+        state["user_profile"] = profile
+        await self.save_state(user_id)
 
-# نسخة عالمية
 consciousness_core = ConsciousnessCore()
-logger.info("✅ Consciousness Core v6.0 initialized (Stateless & Isolated)")
+logger.info("✅ Consciousness Core v6.1 initialized (with profile updating)")

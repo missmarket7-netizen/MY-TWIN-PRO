@@ -1,10 +1,10 @@
-import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
 import { router, Href } from 'expo-router';
 import Constants from 'expo-constants';
 import {
   Info, Heart, Zap, Globe, Mic, Brain, Target,
-  Mail, Shield, FileText, Star, MessageCircle, ExternalLink
+  Mail, Shield, FileText, Star, MessageCircle, ExternalLink, Building2
 } from 'lucide-react-native';
 
 export default function About() {
@@ -19,6 +19,8 @@ export default function About() {
   const card = isDark ? '#2A2A2A' : '#FFF';
   const border = isDark ? '#444' : '#F0F0F0';
   const primary = isDark ? '#D8B4FE' : '#6B21A8';
+
+  const companyURL = 'https://sirmarket7-cloud.github.io/Soul-Sync/index.html#product';
 
   const features = [
     { icon: Brain, label_ar: 'ذاكرة طويلة المدى', label_en: 'Long-Term Memory' },
@@ -71,7 +73,7 @@ export default function About() {
           ))}
         </View>
 
-        {/* من نحن */}
+        {/* من نحن + رابط الموقع */}
         <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
           <Text style={[s.cardTitle, { color: txt }]}>{isAr ? 'من نحن' : 'Who We Are'}</Text>
           <Text style={[s.cardBody, { color: sub }]}>
@@ -79,6 +81,18 @@ export default function About() {
               ? 'Soul Sync Ltd. هي شركة ناشئة في مجال الذكاء الاصطناعي، تهدف إلى دمج الذكاء الاصطناعي في الحياة اليومية بشكل أصدق وأعمق، من خلال بناء رفقاء رقميين يفهمون المستخدم ويتطورون معه.'
               : 'Soul Sync Ltd. is an AI startup dedicated to integrating artificial intelligence into everyday life in a more authentic and deeper way, by building digital companions that understand and grow with the user.'}
           </Text>
+          
+          {/* زر موقع الشركة */}
+          <TouchableOpacity 
+            style={[s.companyBtn, { backgroundColor: primary + '15', borderColor: primary }]} 
+            onPress={() => Linking.openURL(companyURL)}
+          >
+            <Building2 size={20} stroke={primary} />
+            <Text style={[s.companyBtnText, { color: primary }]}>
+              {isAr ? 'زيارة موقع الشركة' : 'Visit Company Site'}
+            </Text>
+            <ExternalLink size={16} stroke={primary} />
+          </TouchableOpacity>
         </View>
 
         {/* تواصل معنا */}
@@ -137,7 +151,18 @@ const s = StyleSheet.create({
   techText: { fontSize: 13, fontWeight: '600' },
   card: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  cardBody: { fontSize: 14, lineHeight: 22 },
+  cardBody: { fontSize: 14, lineHeight: 22, marginBottom: 12 },
+  companyBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8, 
+    padding: 12, 
+    borderRadius: 12, 
+    borderWidth: 1,
+    marginTop: 8 
+  },
+  companyBtnText: { fontSize: 14, fontWeight: '600' },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   linkText: { fontSize: 14 },
   rateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, marginTop: 16 },

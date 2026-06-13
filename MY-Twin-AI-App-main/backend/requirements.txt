@@ -1,4 +1,4 @@
-# ========== MyTwin Backend - Requirements v3.0 ==========
+# ========== MyTwin Backend - Requirements v4.0 ==========
 # إطار العمل الرئيسي
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
@@ -26,7 +26,7 @@ edge-tts>=6.1.0
 elevenlabs>=1.0.0
 google-cloud-speech>=2.0.0
 
-# الشبكات والطلبات
+# الشبكات والطلبات (تشمل استدعاءات الأدوات الخارجية)
 httpx>=0.27.0
 requests>=2.31.0
 
@@ -43,6 +43,10 @@ scikit-learn>=1.3.0
 langdetect>=1.0.9
 python-dateutil>=2.8.2
 tenacity>=8.2.0
+
+# خدمات خارجية (تم الاعتماد على httpx في معظمها)
+# SendGrid, Twilio, Telegram Bot API, OpenStreetMap Nominatim
+# Home Assistant, Exchangerate.host, NewsAPI, Spotify, YouTube Data API
 
 # أدوات إضافية
 aiofiles>=23.0.0

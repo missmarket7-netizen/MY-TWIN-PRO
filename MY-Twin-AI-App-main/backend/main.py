@@ -1,5 +1,8 @@
 """
-MyTwin API v10.3 – Final Stable Version with Proactive Support
+MyTwin API v10.4 – كافة الأدوات مفعلة
+Tier 1: YouTube, Spotify, Weather, Google, Memory, Calendar
+Tier 2: News, Maps, Location, Currency, Home Assistant
+Tier 3: Email, Telegram, Notes, Tasks
 """
 import os, asyncio, logging, json
 from datetime import datetime, timezone, timedelta, date
@@ -25,7 +28,10 @@ from message_limits import (
 from external_services import (
     search_youtube, search_spotify, get_weather,
     get_todoist_tasks, get_calendar_events,
-    get_news, get_location_info, get_knowledge
+    get_news, get_location_info, get_knowledge,
+    search_google, get_currency, home_assistant_control,
+    send_email, send_telegram, get_notes, create_note,
+    get_tasks, create_task, get_maps
 )
 from telegram_webhook import router as telegram_router, setup_webhook
 from referral import generate_referral_code, activate_referral
@@ -57,7 +63,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.3.0")
+app = FastAPI(title="MyTwin API", version="10.4.0")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -198,8 +204,6 @@ async def cron_proactive(req: Request):
 async def trigger_proactive_manual(uid: str = Depends(get_user)):
     """تشغيل proactive لمستخدم واحد يدويًا (للاختبار)."""
     p = get_profile(uid)
-    allowed, _, _ = await proactive_engine.run_cron_job() if False else (True, None, None)
-    # للتبسيط، نرسل إشعار "missed_you" إذا كان مؤهلاً
     if proactive_engine.should_send_proactive(uid):
         msg = await proactive_engine.generate_proactive_message(uid, p.get("twin_name", "صديقي"), p.get("lang", "ar"))
         sent = await proactive_engine.send_notification(uid, "MyTwin 💜", msg or "أفتقدك 💜")
@@ -224,7 +228,7 @@ async def analyze_dream_endpoint(body: dict, uid: str = Depends(get_user)):
 async def growth_history(uid: str = Depends(get_user)):
     return await get_growth_history(uid)
 
-# ========== خدمات ==========
+# ========== خدمات Tier 1 ==========
 @app.get("/api/services/youtube")
 async def youtube_endpoint(query: str, lang: str = "ar", uid: str = Depends(get_user)):
     p = get_profile(uid)
@@ -233,6 +237,15 @@ async def youtube_endpoint(query: str, lang: str = "ar", uid: str = Depends(get_
         return JSONResponse(status_code=429, content={"error": "daily_limit_reached"})
     result = await search_youtube(query, lang=lang)
     return {"result": result, "remaining": remaining} if result else {"error": "unavailable"}
+
+@app.get("/api/services/spotify")
+async def spotify_endpoint(query: str, uid: str = Depends(get_user)):
+    p = get_profile(uid)
+    allowed, remaining = check_feature_usage(uid, p.get("tier", "free"), "spotify")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"error": "daily_limit_reached"})
+    result = await search_spotify(query, uid, p.get("tier", "free"))
+    return {"result": result, "remaining": remaining}
 
 @app.get("/api/services/weather")
 async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
@@ -243,14 +256,92 @@ async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
     result = await get_weather(city)
     return {"result": result} if result else {"error": "unavailable"}
 
+@app.get("/api/services/google")
+async def google_endpoint(query: str, uid: str = Depends(get_user)):
+    p = get_profile(uid)
+    allowed, remaining = check_feature_usage(uid, p.get("tier", "free"), "search")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"error": "daily_limit_reached"})
+    result = await search_google(query, user_id=uid, tier=p.get("tier", "free"))
+    return {"result": result, "remaining": remaining}
+
+@app.get("/api/services/calendar")
+async def calendar_endpoint(uid: str = Depends(get_user)):
+    p = get_profile(uid)
+    token = p.get("calendar_token")
+    if not token:
+        return {"error": "calendar_not_connected"}
+    result = await get_calendar_events(token)
+    return {"result": result}
+
+# ========== خدمات Tier 2 ==========
+@app.get("/api/services/news")
+async def news_endpoint(country: str = "sa", uid: str = Depends(get_user)):
+    p = get_profile(uid)
+    allowed, remaining = check_feature_usage(uid, p.get("tier", "free"), "news")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"error": "daily_limit_reached"})
+    result = await get_news(country, user_id=uid, tier=p.get("tier", "free"))
+    return {"result": result}
+
+@app.get("/api/services/maps")
+async def maps_endpoint(query: str, uid: str = Depends(get_user)):
+    result = await get_maps(query)
+    return {"result": result}
+
+@app.get("/api/services/location")
+async def location_endpoint(lat: float, lon: float, uid: str = Depends(get_user)):
+    result = await get_location_info(lat, lon)
+    return {"result": result}
+
+@app.get("/api/services/currency")
+async def currency_endpoint(base: str = "USD", uid: str = Depends(get_user)):
+    result = await get_currency(base)
+    return {"result": result}
+
+@app.post("/api/services/homeassistant")
+async def hass_endpoint(command: str, entity_id: Optional[str] = None, uid: str = Depends(get_user)):
+    result = await home_assistant_control(command, entity_id)
+    return {"result": result}
+
+# ========== خدمات Tier 3 ==========
+@app.post("/api/services/email")
+async def email_endpoint(to: str, subject: str, body: str, uid: str = Depends(get_user)):
+    result = await send_email(to, subject, body)
+    return {"result": result}
+
+@app.post("/api/services/telegram")
+async def telegram_endpoint(chat_id: str, message: str, uid: str = Depends(get_user)):
+    result = await send_telegram(chat_id, message)
+    return {"result": result}
+
+@app.get("/api/services/notes")
+async def notes_endpoint(uid: str = Depends(get_user)):
+    result = await get_notes(uid)
+    return {"notes": result}
+
+@app.post("/api/services/notes")
+async def create_note_endpoint(content: str, uid: str = Depends(get_user)):
+    result = await create_note(uid, content)
+    return {"note": result}
+
+@app.get("/api/services/tasks")
+async def tasks_endpoint(uid: str = Depends(get_user)):
+    result = await get_tasks(uid)
+    return {"tasks": result}
+
+@app.post("/api/services/tasks")
+async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str = Depends(get_user)):
+    result = await create_task(uid, title, due)
+    return {"task": result}
+
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.3.0"}
+    return {"status": "ok", "version": "10.4.0"}
 
 @app.get("/health")
 async def health_check():
-    """Health check for Railway deployment."""
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.get("/api/health/ai")

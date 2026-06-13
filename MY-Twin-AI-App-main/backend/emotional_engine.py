@@ -1,5 +1,5 @@
 """
-MyTwin – Emotional Engine v9.1 (مستقر للإنتاج)
+MyTwin – Emotional Engine v9.2 (مع تخزين متجه المشاعر الكامل والتفاصيل)
 """
 import os, logging, re, hashlib, json, asyncio
 from typing import Dict, Any, Optional, List
@@ -150,7 +150,6 @@ class EmotionalStateTracker:
         }
 
     async def _detect_triggers(self, text: str, user_id: Optional[str] = None) -> Optional[str]:
-        # فقط للرسائل الطويلة لتجنب استنزاف API
         if len(text) < 50:
             return None
         client = self._get_multi_client()
@@ -220,27 +219,48 @@ JSON:"""
                 except Exception as e:
                     logger.warning(f"Emotion backup model failed: {e}")
 
+        # حساب البيانات الإضافية
+        trigger = None
+        trend = "stable"
+        mood = result["primary"]
+        risk_level = "low"
+
         if user_id and db:
             try:
+                trend = await self._compute_trend(user_id, result["valence"])
+                trigger = await self._detect_triggers(text, user_id)
+                mood = await self._get_mood(user_id)
+                risk_level = self._assess_risk(text, result)
+
+                # تخزين جميع البيانات في الجدول العاطفي
                 db.table("emotional_timeline").insert({
                     "user_id": user_id,
                     "primary_emotion": result["primary"],
+                    "secondary_emotion": result["secondary"],
                     "intensity": result["intensity"],
                     "valence": result["valence"],
+                    "arousal": result["arousal"],
+                    "emotion_vector": json.dumps(result["emotion_vector"]),
+                    "trigger": trigger,
+                    "trend": trend,
+                    "mood": mood,
+                    "risk_level": risk_level,
+                    "needs_support": result["needs_support"],
                     "created_at": datetime.now(timezone.utc).isoformat()
                 }).execute()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to store emotional timeline: {e}")
 
-            result["trend"] = await self._compute_trend(user_id, result["valence"])
-            result["trigger"] = await self._detect_triggers(text, user_id)
-            result["mood"] = await self._get_mood(user_id)
+            result["trend"] = trend
+            result["trigger"] = trigger
+            result["mood"] = mood
+            result["risk_level"] = risk_level
         else:
             result["trend"] = "stable"
             result["trigger"] = None
             result["mood"] = result["primary"]
+            result["risk_level"] = self._assess_risk(text, result)
 
-        result["risk_level"] = self._assess_risk(text, result)
         cache_set(cache_key, result, 600)
         return result
 
@@ -262,4 +282,4 @@ JSON:"""
 
 
 emotional_tracker = EmotionalStateTracker()
-print("✅ Emotional Engine v9.1 (stable) initialized")
+print("✅ Emotional Engine v9.2 (with full emotion vector storage) initialized")

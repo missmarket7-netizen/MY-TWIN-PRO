@@ -1,7 +1,8 @@
 """
-MyTwin – External Services v4.1 (مع Open-Meteo للطقس المجاني)
-YouTube + Spotify + Open-Meteo + Google Search + Todoist + Calendar
-يتحقق من حدود الميزات اليومية قبل تنفيذ الخدمات.
+MyTwin – External Services v5.2 (جميع الأدوات - بدون WhatsApp)
+Tier 1: Weather, YouTube, Spotify, Google Search, Calendar
+Tier 2: Home Assistant, News, Maps, Location, Currency
+Tier 3: Email, Telegram, Notes, Tasks
 """
 import os, logging, base64, asyncio
 from typing import Optional, Dict, Any, List
@@ -16,14 +17,54 @@ SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", os.getenv("YOUTUBE_API_KEY", ""))
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID", "")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+HASS_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
+HASS_URL = os.getenv("HOME_ASSISTANT_URL", "")
+EMAIL_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 # ========== حدود الاستخدام ==========
 def _get_limits_manager():
     try:
-        from message_limits import check_feature_usage, get_tier_features
-        return check_feature_usage, get_tier_features
+        from message_limits import check_feature_usage
+        return check_feature_usage
     except:
-        return None, None
+        return None
+
+# ========== عميل Supabase (Lazy) ==========
+_db = None
+
+def get_db():
+    global _db
+    if _db is None:
+        from supabase import create_client
+        SUPABASE_URL = os.getenv("SUPABASE_URL")
+        SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+        if SUPABASE_URL and SUPABASE_KEY:
+            _db = create_client(SUPABASE_URL, SUPABASE_KEY)
+        else:
+            logger.error("Supabase credentials missing")
+    return _db
+
+# ========== Geocoding (OpenStreetMap) ==========
+async def city_to_coordinates(city: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": city, "format": "json", "limit": 1},
+                headers={"User-Agent": "MyTwin/1.0"},
+                timeout=5.0
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data:
+                    lat = float(data[0]["lat"])
+                    lon = float(data[0]["lon"])
+                    return lat, lon
+    except Exception as e:
+        logger.warning(f"Geocoding failed for {city}: {e}")
+    return None, None
 
 # ========== Spotify ==========
 class SpotifyClient:
@@ -80,9 +121,9 @@ class SpotifyClient:
 spotify_client = SpotifyClient()
 
 async def search_spotify(query: str, user_id: Optional[str] = None, tier: str = "free") -> Optional[str]:
-    check_func, _ = _get_limits_manager()
+    check_func = _get_limits_manager()
     if check_func and user_id:
-        allowed, remaining = await asyncio.get_event_loop().run_in_executor(None, check_func, user_id, tier, "spotify")
+        allowed, _ = check_func(user_id, tier, "spotify")
         if not allowed:
             return "🎵 لقد استنفدت استخدام Spotify اليوم. جرب غداً!"
     return await spotify_client.search(query)
@@ -91,9 +132,9 @@ async def search_spotify(query: str, user_id: Optional[str] = None, tier: str = 
 async def search_youtube(query: str, max_results: int = 3, lang: str = "ar", user_id: Optional[str] = None, tier: str = "free") -> Optional[str]:
     if not YOUTUBE_API_KEY:
         return None
-    check_func, _ = _get_limits_manager()
+    check_func = _get_limits_manager()
     if check_func and user_id:
-        allowed, remaining = await asyncio.get_event_loop().run_in_executor(None, check_func, user_id, tier, "youtube")
+        allowed, _ = check_func(user_id, tier, "youtube")
         if not allowed:
             return "📺 لقد استنفدت استخدام YouTube اليوم. عد غداً لمزيد من الفيديوهات."
     try:
@@ -113,8 +154,7 @@ async def search_youtube(query: str, max_results: int = 3, lang: str = "ar", use
                 timeout=5.0
             )
             if resp.status_code == 200:
-                data = resp.json()
-                items = data.get("items", [])
+                items = resp.json().get("items", [])
                 if not items:
                     return None
                 results = []
@@ -127,8 +167,7 @@ async def search_youtube(query: str, max_results: int = 3, lang: str = "ar", use
         logger.error(f"YouTube Error: {e}")
     return None
 
-# ========== Open-Meteo (طقس مجاني بالكامل) ==========
-# قاموس لتحويل أكواد الطقس إلى وصف بالعربية
+# ========== طقس (Open-Meteo مع Geocoding) ==========
 WEATHER_CODES_AR = {
     0: "سماء صافية", 1: "غائم جزئياً", 2: "غائم", 3: "غائم كلياً",
     45: "ضباب", 48: "ضباب متجمد", 51: "رذاذ خفيف", 53: "رذاذ متوسط",
@@ -138,17 +177,16 @@ WEATHER_CODES_AR = {
 }
 
 async def get_weather(city: str = "Cairo", lat: Optional[float] = None, lon: Optional[float] = None, user_id: Optional[str] = None, tier: str = "free") -> Optional[str]:
-    """الحصول على الطقس من Open-Meteo (مجاني، بدون API Key)"""
-    check_func, _ = _get_limits_manager()
+    check_func = _get_limits_manager()
     if check_func and user_id:
-        allowed, remaining = await asyncio.get_event_loop().run_in_executor(None, check_func, user_id, tier, "weather")
+        allowed, _ = check_func(user_id, tier, "weather")
         if not allowed:
-            return "🌤️ لقد استنفدت استعلامات الطقس اليوم. حاول مجدداً غداً!"
+            return "🌤️ لقد استنفدت استعلامات الطقس اليوم."
 
-    # إذا لم تُعطى الإحداثيات، نستخدم إحداثيات القاهرة كافتراضية
     if lat is None or lon is None:
-        # يمكن تحسينها لاحقاً بتحويل اسم المدينة إلى إحداثيات (geocoding)
-        lat, lon = 30.0444, 31.2357  # القاهرة
+        lat, lon = await city_to_coordinates(city)
+        if lat is None:
+            return f"لم أتمكن من تحديد إحداثيات {city}."
 
     try:
         async with httpx.AsyncClient() as client:
@@ -170,10 +208,8 @@ async def get_weather(city: str = "Cairo", lat: Optional[float] = None, lon: Opt
                 wind = current.get("windspeed", 0)
                 code = current.get("weathercode", 0)
                 desc = WEATHER_CODES_AR.get(code, "غير معروف")
-                humidity = "غير متوفر"  # Open-Meteo لا تقدم رطوبة في الخطط المجانية، يمكن إضافتها بطلب آخر
-
                 return (
-                    f"🌤️ الطقس في منطقتك:\n"
+                    f"🌤️ الطقس في {city}:\n"
                     f"{desc}\n"
                     f"🌡️ درجة الحرارة: {temp}°C\n"
                     f"💨 سرعة الرياح: {wind} كم/س"
@@ -187,11 +223,11 @@ async def get_weather(city: str = "Cairo", lat: Optional[float] = None, lon: Opt
 async def search_google(query: str, num: int = 3, user_id: Optional[str] = None, tier: str = "free") -> Optional[str]:
     if not GOOGLE_API_KEY or not GOOGLE_CSE_ID:
         return None
-    check_func, _ = _get_limits_manager()
+    check_func = _get_limits_manager()
     if check_func and user_id:
-        allowed, remaining = await asyncio.get_event_loop().run_in_executor(None, check_func, user_id, tier, "search")
+        allowed, _ = check_func(user_id, tier, "search")
         if not allowed:
-            return "🔍 لقد استنفدت عمليات البحث اليوم. حاول مجدداً غداً!"
+            return "🔍 لقد استنفدت عمليات البحث اليوم."
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -200,8 +236,7 @@ async def search_google(query: str, num: int = 3, user_id: Optional[str] = None,
                 timeout=5.0
             )
             if resp.status_code == 200:
-                data = resp.json()
-                items = data.get("items", [])
+                items = resp.json().get("items", [])
                 if not items:
                     return None
                 results = []
@@ -212,7 +247,7 @@ async def search_google(query: str, num: int = 3, user_id: Optional[str] = None,
         logger.error(f"Google Search Error: {e}")
     return None
 
-# ========== Todoist & Calendar ==========
+# ========== Todoist ==========
 async def get_todoist_tasks(token: str) -> str:
     if not token: return "يحتاج ربط حساب Todoist."
     try:
@@ -230,6 +265,7 @@ async def get_todoist_tasks(token: str) -> str:
         logger.error(f"Todoist Error: {e}")
     return ""
 
+# ========== Calendar (Google) ==========
 async def get_calendar_events(token: str) -> str:
     if not token: return "يحتاج ربط Google Calendar."
     try:
@@ -250,12 +286,152 @@ async def get_calendar_events(token: str) -> str:
         logger.error(f"Calendar Error: {e}")
     return ""
 
-# ========== دوال التوافق ==========
-async def get_news(query: str = "world", lang: str = "ar") -> Optional[str]:
+# ========== Home Assistant ==========
+async def home_assistant_control(command: str, entity_id: Optional[str] = None) -> str:
+    if not HASS_TOKEN or not HASS_URL:
+        return "🏠 Home Assistant غير مهيأ."
+    headers = {"Authorization": f"Bearer {HASS_TOKEN}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient() as client:
+            if "تشغيل" in command and entity_id:
+                await client.post(f"{HASS_URL}/api/services/light/turn_on", headers=headers, json={"entity_id": entity_id})
+                return "💡 تم تشغيل الإضاءة"
+            elif "إطفاء" in command and entity_id:
+                await client.post(f"{HASS_URL}/api/services/light/turn_off", headers=headers, json={"entity_id": entity_id})
+                return "💡 تم إطفاء الإضاءة"
+            else:
+                return "🏠 الأمر غير معروف"
+    except Exception as e:
+        logger.error(f"Home Assistant Error: {e}")
+        return "⚠️ خطأ في الاتصال"
+
+# ========== News ==========
+async def get_news(country: str = "sa", category: str = "general", user_id: Optional[str] = None, tier: str = "free") -> Optional[str]:
+    if not NEWS_API_KEY:
+        return None
+    check_func = _get_limits_manager()
+    if check_func and user_id:
+        allowed, _ = check_func(user_id, tier, "news")
+        if not allowed:
+            return "📰 استنفدت استعلامات الأخبار اليوم."
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://newsapi.org/v2/top-headlines",
+                params={"country": country, "category": category, "apiKey": NEWS_API_KEY, "pageSize": 5},
+                timeout=5.0
+            )
+            if resp.status_code == 200:
+                articles = resp.json().get("articles", [])
+                if not articles:
+                    return "لا توجد أخبار حالياً."
+                return "\n\n".join(f"📰 {a['title']}\n{a['description']}\n{a['url']}" for a in articles[:5])
+    except Exception as e:
+        logger.error(f"News Error: {e}")
     return None
 
-def get_location_info(query: str) -> str:
-    return f"معلومات عن: {query}"
+# ========== Maps / Location ==========
+async def get_maps(query: str) -> Optional[str]:
+    if GOOGLE_API_KEY:
+        return f"🗺️ ابحث عن '{query}' على الخرائط"
+    return None
 
+async def get_location_info(lat: float, lon: float) -> Optional[str]:
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}",
+                headers={"User-Agent": "MyTwin/1.0"},
+                timeout=5.0
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return f"📍 {data.get('display_name', 'موقع غير معروف')}"
+    except:
+        pass
+    return None
+
+# ========== Currency ==========
+async def get_currency(base: str = "USD", symbols: str = "EGP,SAR,AED") -> Optional[str]:
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://api.exchangerate.host/latest",
+                params={"base": base, "symbols": symbols},
+                timeout=5.0
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                rates = data.get("rates", {})
+                return "\n".join(f"💱 {base} → {k}: {v}" for k, v in rates.items())
+    except:
+        pass
+    return None
+
+# ========== Email (SendGrid) ==========
+async def send_email(to: str, subject: str, body: str) -> str:
+    if not EMAIL_API_KEY:
+        return "📧 البريد غير مهيأ"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={"Authorization": f"Bearer {EMAIL_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "personalizations": [{"to": [{"email": to}], "subject": subject}],
+                    "from": {"email": "noreply@mytwin.app"},
+                    "content": [{"type": "text/plain", "value": body}]
+                },
+                timeout=10.0
+            )
+            if resp.status_code == 202:
+                return "📧 تم إرسال البريد بنجاح"
+    except Exception as e:
+        logger.error(f"Email Error: {e}")
+    return "فشل إرسال البريد"
+
+# ========== Telegram ==========
+async def send_telegram(chat_id: str, message: str) -> str:
+    if not TELEGRAM_BOT_TOKEN:
+        return "✈️ تيليجرام غير مهيأ"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": message},
+                timeout=10.0
+            )
+            if resp.status_code == 200:
+                return "✈️ تم إرسال رسالة تيليجرام"
+    except Exception as e:
+        logger.error(f"Telegram Error: {e}")
+    return "فشل إرسال تيليجرام"
+
+# ========== Notes & Tasks (Lazy Supabase) ==========
+async def get_notes(user_id: str) -> List[Dict]:
+    db = get_db()
+    if not db: return []
+    res = db.table("notes").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return res.data or []
+
+async def create_note(user_id: str, content: str) -> Dict:
+    db = get_db()
+    if not db: return {}
+    res = db.table("notes").insert({"user_id": user_id, "content": content}).execute()
+    return res.data[0] if res.data else {}
+
+async def get_tasks(user_id: str) -> List[Dict]:
+    db = get_db()
+    if not db: return []
+    res = db.table("tasks").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return res.data or []
+
+async def create_task(user_id: str, title: str, due: Optional[str] = None) -> Dict:
+    db = get_db()
+    if not db: return {}
+    res = db.table("tasks").insert({"user_id": user_id, "title": title, "due": due}).execute()
+    return res.data[0] if res.data else {}
+
+# ========== دوال التوافق ==========
 async def get_knowledge(query: str) -> Optional[str]:
     return None

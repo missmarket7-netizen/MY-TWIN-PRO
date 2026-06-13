@@ -79,7 +79,12 @@ export const updateStoreFromResponse = (r: TwinResponse) => {
   if (r.journey_phase) s.setJourneyPhase(r.journey_phase as any);
   if (r.attachment_style) s.setAttachmentStyle(r.attachment_style as any);
   if (r.emotion) s.setEmotionState(r.emotion as any);
-  if (r.thinking_stage) s.setThinking(true);
+  if (r.thinking_stage) {
+    s.setThinkingStage(r.thinking_stage);
+    s.setThinking(true);
+  } else {
+    s.setThinking(false);
+  }
   if (r.twin_gender) s.setTwinGender(r.twin_gender);
   s.setTotalMessages(s.totalMessages + 1);
 };
@@ -100,5 +105,88 @@ export const saveVoicePreference = async (gender: 'male'|'female', personality?:
 };
 
 export const saveMemory = async (memory: object) => { try { return await API.post('/api/memory/save', memory); } catch (error) { console.error('saveMemory failed:', error); throw error; } };
+
+// ==================== أدوات Tier 1 ====================
+export const fetchWeather = async (city: string = 'Cairo') => {
+  const { data } = await API.get('/api/services/weather', { params: { city } });
+  return data;
+};
+
+export const fetchYouTube = async (query: string, lang: string = 'ar') => {
+  const { data } = await API.get('/api/services/youtube', { params: { query, lang } });
+  return data;
+};
+
+export const fetchSpotify = async (query: string) => {
+  const { data } = await API.get('/api/services/spotify', { params: { query } });
+  return data;
+};
+
+export const fetchGoogleSearch = async (query: string) => {
+  const { data } = await API.get('/api/services/google', { params: { query } });
+  return data;
+};
+
+export const fetchCalendarEvents = async () => {
+  const { data } = await API.get('/api/services/calendar');
+  return data;
+};
+
+// ==================== أدوات Tier 2 ====================
+export const fetchNews = async (country: string = 'sa') => {
+  const { data } = await API.get('/api/services/news', { params: { country } });
+  return data;
+};
+
+export const fetchMaps = async (query: string) => {
+  const { data } = await API.get('/api/services/maps', { params: { query } });
+  return data;
+};
+
+export const fetchLocationInfo = async (lat: number, lon: number) => {
+  const { data } = await API.get('/api/services/location', { params: { lat, lon } });
+  return data;
+};
+
+export const fetchCurrency = async (base: string = 'USD') => {
+  const { data } = await API.get('/api/services/currency', { params: { base } });
+  return data;
+};
+
+export const sendHomeAssistantCommand = async (command: string, entity_id?: string) => {
+  const { data } = await API.post('/api/services/homeassistant', { command, entity_id });
+  return data;
+};
+
+// ==================== أدوات Tier 3 ====================
+export const sendEmail = async (to: string, subject: string, body: string) => {
+  const { data } = await API.post('/api/services/email', { to, subject, body });
+  return data;
+};
+
+export const sendTelegram = async (chatId: string, message: string) => {
+  const { data } = await API.post('/api/services/telegram', { chat_id: chatId, message });
+  return data;
+};
+
+export const fetchNotes = async () => {
+  const { data } = await API.get('/api/services/notes');
+  return data;
+};
+
+export const createNote = async (content: string) => {
+  const { data } = await API.post('/api/services/notes', { content });
+  return data;
+};
+
+export const fetchTasks = async () => {
+  const { data } = await API.get('/api/services/tasks');
+  return data;
+};
+
+export const createTask = async (title: string, due?: string) => {
+  const { data } = await API.post('/api/services/tasks', { title, due });
+  return data;
+};
 
 export default API;

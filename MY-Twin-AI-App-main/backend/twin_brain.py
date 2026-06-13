@@ -16,6 +16,7 @@ from twin_journey import twin_journey, JourneyPhase
 from attachment_engine import attachment_engine
 from safety_engine import safety_engine
 from product_recommender import product_recommender
+from tool_router import tool_router
 
 logger = logging.getLogger("twin_brain")
 
@@ -70,6 +71,33 @@ class TwinBrain:
         dialect = get_dialect_for_user(country_code, message)
         dialect_prompt = get_dialect_prompt(dialect)
 
+        # ✅ توجيه الأدوات تلقائياً (قبل LLM)
+        if user_id:
+            try:
+                tool_result = await tool_router.route(
+                    message=message,
+                    user_id=user_id,
+                    tier=tier,
+                    emotion=emotion
+                )
+                if tool_result:
+                    logger.info(f"🔧 تم تنفيذ أداة: {tool_result[:100]}...")
+                    return {
+                        "reply": tool_result,
+                        "new_bond": bond_level,
+                        "emotion": emotion,
+                        "provider": "tool",
+                        "latency_ms": 0,
+                        "dialect": dialect,
+                        "journey_phase": "active",
+                        "attachment_style": "unknown",
+                        "relationship_dims": dims or {},
+                        "energy": 80,
+                        "thinking_stage": "completed",
+                    }
+            except Exception as e:
+                logger.warning(f"Tool routing failed: {e}")
+
         memory_context = ""
         if user_id:
             memory_context = await get_memory_context(user_id)
@@ -85,6 +113,19 @@ class TwinBrain:
         journey_info = {}
         if user_id and join_date:
             journey_info = twin_journey.get_daily_activity(user_id, join_date)
+
+        # ✅ تحديث محرك العلاقات (تأثير المشاعر والرحلة على الأبعاد)
+        if user_id:
+            try:
+                self.relationship.update(
+                    emotion=emotion,
+                    message=message,
+                    journey_phase=journey_info.get("phase") if journey_info else None,
+                    attachment_style=attachment_info.get("style") if attachment_info else None,
+                    memory_importance=emotion.get("intensity", 0.5)
+                )
+            except Exception as e:
+                logger.warning(f"Relationship update failed: {e}")
 
         rel_stage = self.relationship.get_stage_instruction()
         if isinstance(rel_stage, dict):
@@ -135,6 +176,19 @@ class TwinBrain:
                 reply = await product_recommender.process_and_attach(user_id=user_id, message=message, reply=reply, tier=tier, lang=dialect[:2] if dialect else "ar")
             except Exception as e:
                 logger.warning(f"Product recommender failed: {e}")
+
+        # ✅ تحديث ملف المستخدم في الوعي
+        if user_id:
+            try:
+                await self.consciousness.update_user_profile(user_id, {
+                    "relationship_dims": self.relationship.dims if hasattr(self.relationship, "dims") else {},
+                    "journey_phase": journey_info.get("phase") if journey_info else None,
+                    "journey_day": journey_info.get("day") if journey_info else None,
+                    "attachment_style": attachment_info.get("style") if attachment_info else None,
+                    "bond_level": self.relationship.bond_level if hasattr(self.relationship, "bond_level") else bond_level,
+                })
+            except Exception as e:
+                logger.warning(f"Failed to update consciousness profile: {e}")
 
         return {"reply": reply, "new_bond": self.relationship.bond_level, "emotion": emotion, "provider": provider, "latency_ms": latency, "dialect": dialect, "journey_phase": journey_info.get("phase"), "journey_day": journey_info.get("day"), "attachment_style": attachment_info.get("style"), "relationship_dims": self.relationship.dims}
 
