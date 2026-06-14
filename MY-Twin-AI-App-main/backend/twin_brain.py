@@ -1,5 +1,5 @@
 import os, random, logging, time, asyncio
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 from multi_ai import MultiAIClient, AIUnavailable
 from emotional_engine import EmotionalStateTracker
@@ -56,7 +56,6 @@ class TwinBrain:
         self.consciousness = ConsciousnessCore(twin_name="MyTwin")
         self.twin_name = "MyTwin"
         self.user_join_dates = {}
-        # ✅ تفعيل المكونات الجديدة
         self.self_critic = SelfCritic()
 
     async def detect_emotion(self, text: str) -> Dict[str, Any]:
@@ -66,11 +65,14 @@ class TwinBrain:
         emojis = self.EMOJI_MAP.get(primary_emotion, self.EMOJI_MAP["neutral"])
         return random.choice(emojis)
 
+    async def health_check_all_providers(self) -> Dict[str, bool]:
+        """يفحص جميع مزودي الذكاء الاصطناعي."""
+        return await self.multi.health_check()
+
     async def respond(self, message, twin_name, bond_level, dims, memories, history,
                       calm=False, personality=None, country_code="SA", user_id=None, tier="free",
                       join_date=None, recent_messages=None, user_profile=None):
 
-        # 1. فحص الأمان
         safety_check = safety_engine.check_safety(message)
         if not safety_check["safe"] and safety_check["severity"] == "critical":
             return {
@@ -79,12 +81,10 @@ class TwinBrain:
                 "latency_ms": 0, "dialect": get_dialect_for_user(country_code, message), "safety_alert": True
             }
 
-        # 2. تحليل المشاعر واللغة
         emotion = await self.detect_emotion(message)
         dialect = get_dialect_for_user(country_code, message)
         dialect_prompt = get_dialect_prompt(dialect)
 
-        # 3. توجيه الأدوات السريع (Pre-LLM)
         if user_id:
             try:
                 tool_result = await tool_router.route(
@@ -105,7 +105,6 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Tool routing failed: {e}")
 
-        # 4. بناء السياق الكامل (Context Manager)
         full_context = {}
         context_summary = ""
         if user_id:
@@ -118,7 +117,6 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Context building failed: {e}")
 
-        # 5. تحديث محرك العلاقات
         journey_info = {}
         attachment_info = {}
         if user_id:
@@ -144,7 +142,6 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Relationship update failed: {e}")
 
-        # 6. التخطيط (Reasoning Engine)
         plan = {}
         if user_id:
             try:
@@ -156,10 +153,10 @@ class TwinBrain:
                 logger.warning(f"Planning failed: {e}")
                 plan = {"needs_tool": False, "goal": "general_chat"}
 
-        # 7. تنفيذ الـ Agent Loop (ReAct مع Model Router)
         final_reply = None
         provider = "multi_ai"
         tool_results = []
+        latency = 0
 
         if plan.get("needs_tool") and plan.get("tool_confidence", 0) >= 0.6:
             try:
@@ -183,7 +180,6 @@ class TwinBrain:
             except Exception as e:
                 logger.error(f"Agent loop failed: {e}")
 
-        # 8. إذا لم يتم توليد رد، استخدم LLM مع Model Router
         if not final_reply:
             rel_stage = self.relationship.get_stage_instruction()
             if isinstance(rel_stage, dict):
@@ -222,17 +218,16 @@ class TwinBrain:
                 consciousness_context=full_context.get("consciousness", {}),
             )
 
-            # ✅ استخدام Model Router بدلاً من multi_ai مباشرة
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
-                reply = await model_router.get_best_reply(
+                # ✅ استخدام Model Router الجديد الذي يرجع (reply, provider_name)
+                reply, provider = await model_router.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
                     multi_client=self.multi,
                     emotion_primary=emotion.get("primary", "neutral")
                 )
-                provider = "model_router"
             except AIUnavailable:
                 reply = random.choice(self.FALLBACK_REPLIES)
                 provider = "fallback"
@@ -247,7 +242,6 @@ class TwinBrain:
 
             final_reply = reply
 
-        # 9. ✅ Self-Critic: فحص الرد وإصلاحه قبل Response Validator
         try:
             if final_reply and len(final_reply) > 10:
                 final_reply = await self.self_critic.evaluate_and_repair(
@@ -258,7 +252,6 @@ class TwinBrain:
         except Exception as e:
             logger.warning(f"Self-critic failed: {e}")
 
-        # 10. Response Validator
         validation = response_validator.validate(
             reply=final_reply,
             context=full_context,
@@ -272,22 +265,18 @@ class TwinBrain:
             final_reply = "أنا هنا لدعمك، لكن لا يمكنني الرد على هذا. 💜"
             provider = "safety_validator"
 
-        # 11. Post-processing (متوازي)
         if user_id:
             asyncio.create_task(store_mem(user_id, message, emotion.get("intensity", 0.5), emotion.get("primary", "neutral")))
             asyncio.create_task(extract_entities(user_id, message))
             asyncio.create_task(track_growth(user_id, {"journey_phase": journey_info.get("phase", "unknown"), "attachment_style": attachment_info.get("style", "unknown"), "emotion": emotion.get("primary", "neutral")}))
 
-            # ✅ Memory Summarizer
             await memory_summarizer.increment_counter(user_id)
             if await memory_summarizer.should_summarize(user_id):
                 asyncio.create_task(memory_summarizer.summarize_and_store(user_id=user_id, messages=history or [], twin_brain_instance=self))
 
-            # ✅ Profile Extractor: استخراج الشخصية كل 50 رسالة
             await profile_extractor.increment_counter(user_id)
             if await profile_extractor.should_extract(user_id):
                 logger.info(f"📝 استخراج شخصية المستخدم {user_id}")
-                # جمع آخر 30 رسالة من المستخدم
                 user_messages = [h.get("content", "") for h in (history or [])[-30:] if h.get("role") == "user"]
                 if user_messages:
                     asyncio.create_task(
@@ -299,7 +288,6 @@ class TwinBrain:
                     )
                 await profile_extractor.reset_counter(user_id)
 
-            # تحديث الوعي
             asyncio.create_task(self.consciousness.update_user_profile(user_id, {
                 "relationship_dims": self.relationship.dims,
                 "journey_phase": journey_info.get("phase"),
@@ -316,7 +304,7 @@ class TwinBrain:
             "new_bond": self.relationship.bond_level,
             "emotion": emotion,
             "provider": provider,
-            "latency_ms": latency if 'latency' in dir() else 0,
+            "latency_ms": latency,
             "dialect": dialect,
             "journey_phase": journey_info.get("phase", "unknown"),
             "journey_day": journey_info.get("day", 1),

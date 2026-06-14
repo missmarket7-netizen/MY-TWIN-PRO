@@ -405,3 +405,15 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/health/ai")
+async def health_ai_check():
+    """فحص عميق لجميع مزودي الذكاء الاصطناعي"""
+    brain = get_brain()
+    results = await brain.health_check_all_providers()
+    all_ok = all(results.values())
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "providers": results,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
