@@ -1,11 +1,8 @@
 """
-MyTwin – Memory Retriever v4.0 (Agent-Ready + Persistent Embeddings)
-- hard_memories (core type) always included
-- query_embedding None? → fallback keyword retrieval
-- type_priority as independent weight (not multiplier)
-- MMR uses _embedding stored during scoring
-- Agent-ready: retrieve_for_agent() for loop integration
-- Persistent embeddings: stores embedding in DB after calculation
+MyTwin – Memory Retriever v4.1 (Production-Ready)
+- Fixed syntax error in retrieve_relevant (try block)
+- Optional twin_brain_instance for reranker
+- Robust fallback for missing reranker/twin
 """
 import os, logging, asyncio, math
 from typing import List, Dict, Any, Optional
@@ -120,7 +117,6 @@ class MemoryRetriever:
         return len(overlap) / len(query_words)
 
     async def _store_embedding_in_db(self, memory_id: str, embedding: List[float]):
-        """تخزين الـ embedding في Supabase للاستخدام المستقبلي."""
         try:
             from supabase import create_client
             url = os.getenv("SUPABASE_URL", ""); key = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -140,7 +136,6 @@ class MemoryRetriever:
         memory_embedding = memory.get("embedding")
         if not memory_embedding and query_embedding:
             memory_embedding = await self._get_embedding(content, "retrieval_document")
-            # تخزين الـ embedding في DB إن أمكن
             if memory_embedding and memory.get("id"):
                 await self._store_embedding_in_db(memory["id"], memory_embedding)
 
@@ -204,14 +199,15 @@ class MemoryRetriever:
         user_id: str,
         top_k: int = 5,
         min_score: float = 0.1,
-        use_mmr: bool = True
+        use_mmr: bool = True,
+        twin_brain_instance: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         try:
             from memory_graph import retrieve_memories
-            
+
             hard_memories = await retrieve_memories(uid=user_id, query="", days=365, lim=20, memory_type="core")
             all_memories = await retrieve_memories(uid=user_id, query="", days=180, lim=100)
-            
+
             hard_ids = {m.get("id") for m in hard_memories}
             all_memories = [m for m in all_memories if m.get("id") not in hard_ids]
 
@@ -222,7 +218,7 @@ class MemoryRetriever:
 
             scored = []
             all_candidates = hard_memories + all_memories
-            
+
             for memory in all_candidates:
                 scores = await self.score_memory(memory, query_embedding, query_text=query)
                 if scores["final"] >= min_score:
@@ -232,28 +228,28 @@ class MemoryRetriever:
             scored.sort(key=lambda x: x[0], reverse=True)
 
             if use_mmr and len(scored) > 1:
-                return self._mmr(scored, lambda_param=0.7)[:top_k]
+                selected = self._mmr(scored, lambda_param=0.7)[:top_k]
+            else:
+                selected = [mem for score, mem in scored[:top_k]]
 
-        # ✅ Reranker: إعادة ترتيب الذكريات
-        try:
-            from reranker import MemoryReranker
-            reranker = MemoryReranker()
-            if twin_brain_instance and hasattr(twin_brain_instance, "multi"):
-                reranked = await reranker.rerank(query, [mem for score, mem in scored[:top_k]], twin_brain_instance.multi)
-                if reranked:
-                    return reranked[:top_k]
-        except:
-            pass
-            return [mem for score, mem in scored[:top_k]]
+            # Reranker (اختياري)
+            try:
+                from reranker import MemoryReranker
+                if twin_brain_instance and hasattr(twin_brain_instance, "multi"):
+                    reranker = MemoryReranker()
+                    reranked = await reranker.rerank(query, selected, twin_brain_instance.multi)
+                    if reranked:
+                        return reranked[:top_k]
+            except Exception as e:
+                logger.debug(f"Reranker not applied: {e}")
+
+            return selected
 
         except Exception as e:
             logger.error(f"Memory retrieval failed: {e}")
             return []
 
     async def retrieve_for_agent(self, plan: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-        """
-        استرجاع مخصص لـ Agent Loop: يستخدم goal و needs_memory من الخطة.
-        """
         if not plan.get("needs_memory"):
             return {"memories": [], "count": 0}
         
@@ -269,4 +265,4 @@ class MemoryRetriever:
 
 
 memory_retriever = MemoryRetriever()
-print("✅ Memory Retriever v4.0 (Agent-Ready + Persistent Embeddings)")
+print("✅ Memory Retriever v4.1 (Production Ready)")
