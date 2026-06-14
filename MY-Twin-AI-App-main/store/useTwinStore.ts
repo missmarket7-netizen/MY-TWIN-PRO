@@ -17,11 +17,13 @@ export interface ConsciousnessState {
 export interface ChatMessage {
   id: string; role: 'user' | 'twin'; content: string; image?: string; timestamp: number;
   failed?: boolean; emotion?: string; journeyPhase?: string; relationshipStage?: string;
-  memoryRecall?: boolean; thinkingStage?: string; youtubeVideo?: string;
+  memoryRecall?: boolean; thinkingStage?: string;
+  youtubeVideo?: string;
+  provider?: string;
 }
 
 export interface RelationshipDims {
-  trust?: number; attachment?: number; comfort?: number; openness?: number;
+  trust: number; attachment: number; comfort: number; openness: number;
   romantic: number; humor: number; attStyle: number;
   empathy?: number; support?: number; communication?: number;
   affection?: number; dependency?: number;
@@ -85,7 +87,6 @@ export interface TwinStore {
   twinEnergy: number; setTwinEnergy: (val: number) => void;
   personalityTraits: { dominant: string; secondary: string } | null; setPersonalityTraits: (traits: any) => void;
 
-  // ✅ تفضيلات جديدة لـ Preference Engine 100%
   favoriteTopics: string[]; setFavoriteTopics: (topics: string[]) => void;
   preferredResponseLength: 'short' | 'medium' | 'long'; setPreferredResponseLength: (len: 'short' | 'medium' | 'long') => void;
   tonePreference: 'casual' | 'formal' | 'emotional' | 'humorous'; setTonePreference: (tone: 'casual' | 'formal' | 'emotional' | 'humorous') => void;
@@ -137,12 +138,13 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setThinking: (val) => set({ isThinking: val }),
   setThinkingStage: (stage) => set({ thinkingStage: stage }),
 
-  addMessage: async (msg) => set((state) => ({ chatHistory: [...state.chatHistory, {
+  addMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, {
     id: msg.id || generateId(), role: msg.role || 'user', content: msg.content || '',
     image: msg.image || undefined, timestamp: msg.timestamp || Date.now(),
     failed: msg.failed || false, emotion: msg.emotion || undefined,
     journeyPhase: msg.journeyPhase || undefined, relationshipStage: msg.relationshipStage || undefined,
     memoryRecall: msg.memoryRecall || undefined, thinkingStage: msg.thinkingStage || undefined,
+    youtubeVideo: msg.youtubeVideo || undefined, provider: msg.provider || undefined,
   }].slice(-200) })),
 
   clearHistory: () => set({ chatHistory: [] }),
@@ -176,7 +178,6 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setTwinEnergy: (val) => set({ twinEnergy: val }),
   setPersonalityTraits: (traits) => set({ personalityTraits: traits }),
 
-  // ✅ دوال تفضيلات جديدة
   setFavoriteTopics: (topics) => set({ favoriteTopics: topics }),
   setPreferredResponseLength: (len) => set({ preferredResponseLength: len }),
   setTonePreference: (tone) => set({ tonePreference: tone }),

@@ -16,10 +16,8 @@ import { registerForPushNotifications, setupNotificationHandlers, setupAndroidCh
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || "",
   tracesSampleRate: 1.0,
-  profilesSampleRate: 0.1,
   environment: process.env.EXPO_PUBLIC_ENVIRONMENT || 'production',
   enableNative: true,
-  enableAutoPerformanceTracing: true,
 });
 
 function BackButton() {

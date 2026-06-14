@@ -9,7 +9,8 @@ import { useTwinStore } from '../store/useTwinStore';
 import { router } from 'expo-router';
 import {
   User, Mail, Phone, Crown, Zap, MessageSquare, Edit, LogOut, Trash2,
-  Heart, Brain, TrendingUp, ArrowLeft, Plus, X, Smile
+  Heart, Brain, TrendingUp, ArrowLeft, Plus, X, Smile, Sparkles,
+  Lightbulb, Target, Star
 } from 'lucide-react-native';
 
 const MOOD_OPTIONS = [
@@ -31,6 +32,8 @@ const TEXTS: Record<string, Record<string,string>> = {
     bond:'مستوى الرابطة', phase:'مرحلة الرحلة', attachment:'نمط التعلق', energy:'طاقة التوأم',
     recentMood:'آخر المشاعر', addMood:'تسجيل مشاعر', noMoodData:'لا توجد بيانات بعد',
     howFeel:'كيف تشعر؟', saveMood:'تسجيل', moodRecorded:'تم تسجيل المشاعر',
+    discoveredTraits:'الصفات المكتشفة', personalityTraits:'سمات الشخصية',
+    preferences:'تفضيلات', beliefs:'معتقدات', interests:'اهتمامات', communicationStyle:'أسلوب التواصل',
   },
   en: {
     title:'Profile', name:'Name', email:'Email', phone:'Phone',
@@ -40,6 +43,8 @@ const TEXTS: Record<string, Record<string,string>> = {
     bond:'Bond Level', phase:'Journey Phase', attachment:'Attachment Style', energy:'Twin Energy',
     recentMood:'Recent Moods', addMood:'Log Mood', noMoodData:'No data yet',
     howFeel:'How do you feel?', saveMood:'Log', moodRecorded:'Mood recorded',
+    discoveredTraits:'Discovered Traits', personalityTraits:'Personality Traits',
+    preferences:'Preferences', beliefs:'Beliefs', interests:'Interests', communicationStyle:'Communication Style',
   }
 };
 
@@ -63,18 +68,14 @@ export default function Profile() {
   const [moodsRefreshing, setMoodsRefreshing] = useState(false);
   const cancelledRef = useRef(false);
 
+  const [discoveredProfile, setDiscoveredProfile] = useState<any>(null);
+
   const texts = TEXTS[lang] || TEXTS.ar;
   const t = (key: string) => texts[key] || key;
-
-  const isAr = lang === 'ar';
-  const isDark = theme === 'dark';
-
-  const bg = isDark ? '#1A1A1A' : '#F8F6F2';
-  const card = isDark ? '#2A2A2A' : '#FFF';
-  const border = isDark ? '#444' : '#F0F0F0';
-  const txt = isDark ? '#FFF' : '#1A1A1A';
-  const sub = isDark ? '#CCC' : '#666';
-  const primary = isDark ? '#D8B4FE' : '#6B21A8';
+  const isAr = lang === 'ar'; const isDark = theme === 'dark';
+  const bg = isDark ? '#1A1A1A' : '#F8F6F2'; const card = isDark ? '#2A2A2A' : '#FFF';
+  const border = isDark ? '#444' : '#F0F0F0'; const txt = isDark ? '#FFF' : '#1A1A1A';
+  const sub = isDark ? '#CCC' : '#666'; const primary = isDark ? '#D8B4FE' : '#6B21A8';
 
   useEffect(() => {
     if (!userId) return;
@@ -93,6 +94,16 @@ export default function Profile() {
     };
     load();
     return () => { cancelled = true; };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      const { data } = await supabase.from('personality_profiles')
+        .select('analyzed_traits').eq('user_id', userId)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (data?.analyzed_traits) setDiscoveredProfile(data.analyzed_traits);
+    })();
   }, [userId]);
 
   const fetchMoods = useCallback(async (showRefresh = false) => {
@@ -127,13 +138,11 @@ export default function Profile() {
     try {
       await supabase.from('profiles').update({ full_name: name.trim(), phone: phone.trim() }).eq('id', userId);
       setProfile((p: any) => ({ ...p, full_name: name.trim(), phone: phone.trim() }));
-      setEditing(false);
-      Alert.alert('✅', t('save'));
+      setEditing(false); Alert.alert('✅', t('save'));
     } catch { Alert.alert('❌', isAr ? 'فشل الحفظ' : 'Save failed'); }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); storeLogout(); router.replace('/login'); };
-  
   const handleDelete = () => {
     Alert.alert(t('deleteAccount'), isAr ? 'لا يمكن التراجع.' : 'This cannot be undone.', [
       { text: t('cancel'), style: 'cancel' },
@@ -154,7 +163,6 @@ export default function Profile() {
       </SafeAreaView>
     );
   }
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <View style={[styles.header, { borderBottomColor: border }]}>
@@ -177,6 +185,73 @@ export default function Profile() {
           <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Brain size={18} stroke="#8B5CF6" /><Text style={[styles.statValue, { color: txt }]}>{attachmentLabels[attachmentStyle] || attachmentStyle}</Text><Text style={[styles.statLabel, { color: sub }]}>{t('attachment')}</Text></View>
           <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Zap size={18} stroke="#F59E0B" /><Text style={[styles.statValue, { color: txt }]}>{Math.round(energy)}%</Text><Text style={[styles.statLabel, { color: sub }]}>{t('energy')}</Text></View>
         </View>
+
+        {discoveredProfile && (
+          <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Sparkles size={20} stroke={primary} />
+                <Text style={[styles.sectionTitle, { color: txt, marginBottom: 0 }]}>{t('discoveredTraits')}</Text>
+              </View>
+            </View>
+            {discoveredProfile.personality_traits && discoveredProfile.personality_traits.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={[styles.subLabel, { color: sub }]}>{t('personalityTraits')}</Text>
+                <View style={styles.tagsRow}>
+                  {discoveredProfile.personality_traits.map((trait: string, i: number) => (
+                    <View key={i} style={[styles.tag, { backgroundColor: primary + '20', borderColor: primary + '40' }]}>
+                      <Text style={[styles.tagText, { color: primary }]}>{trait}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            {discoveredProfile.preferences && discoveredProfile.preferences.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={[styles.subLabel, { color: sub }]}>{t('preferences')}</Text>
+                <View style={styles.tagsRow}>
+                  {discoveredProfile.preferences.map((pref: string, i: number) => (
+                    <View key={i} style={[styles.tag, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                      <Star size={12} stroke="#10B981" /><Text style={[styles.tagText, { color: '#10B981' }]}>{pref}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            {discoveredProfile.interests && discoveredProfile.interests.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={[styles.subLabel, { color: sub }]}>{t('interests')}</Text>
+                <View style={styles.tagsRow}>
+                  {discoveredProfile.interests.map((interest: string, i: number) => (
+                    <View key={i} style={[styles.tag, { backgroundColor: '#F59E0B20', borderColor: '#F59E0B40' }]}>
+                      <Lightbulb size={12} stroke="#F59E0B" /><Text style={[styles.tagText, { color: '#F59E0B' }]}>{interest}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            {discoveredProfile.beliefs && discoveredProfile.beliefs.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={[styles.subLabel, { color: sub }]}>{t('beliefs')}</Text>
+                <View style={styles.tagsRow}>
+                  {discoveredProfile.beliefs.map((belief: string, i: number) => (
+                    <View key={i} style={[styles.tag, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF640' }]}>
+                      <Target size={12} stroke="#8B5CF6" /><Text style={[styles.tagText, { color: '#8B5CF6' }]}>{belief}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            {discoveredProfile.communication_style && (
+              <View>
+                <Text style={[styles.subLabel, { color: sub }]}>{t('communicationStyle')}</Text>
+                <View style={[styles.tag, { backgroundColor: '#EC489920', borderColor: '#EC489940', alignSelf: 'flex-start' }]}>
+                  <Text style={[styles.tagText, { color: '#EC4899' }]}>{discoveredProfile.communication_style}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionTitle, { color: txt }]}>{t('contactInfo')}</Text>
@@ -264,6 +339,10 @@ const styles = StyleSheet.create({
   section: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
+  subLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1 },
+  tagText: { fontSize: 12, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   label: { fontSize: 13, flex: 1 },
   value: { fontSize: 14, fontWeight: '500', flex: 2 },

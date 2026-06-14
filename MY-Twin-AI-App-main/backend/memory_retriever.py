@@ -234,6 +234,16 @@ class MemoryRetriever:
             if use_mmr and len(scored) > 1:
                 return self._mmr(scored, lambda_param=0.7)[:top_k]
 
+        # ✅ Reranker: إعادة ترتيب الذكريات
+        try:
+            from reranker import MemoryReranker
+            reranker = MemoryReranker()
+            if twin_brain_instance and hasattr(twin_brain_instance, "multi"):
+                reranked = await reranker.rerank(query, [mem for score, mem in scored[:top_k]], twin_brain_instance.multi)
+                if reranked:
+                    return reranked[:top_k]
+        except:
+            pass
             return [mem for score, mem in scored[:top_k]]
 
         except Exception as e:
