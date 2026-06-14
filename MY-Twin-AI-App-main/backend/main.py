@@ -87,13 +87,12 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.6.1")
+app = FastAPI(title="MyTwin API", version="10.7.1")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
 async def startup_event():
     await setup_webhook()
-    # تسخين اختياري: نستدعي get_brain مرة واحدة
     get_brain()
     get_consciousness()
 
@@ -118,8 +117,9 @@ def get_profile(uid: str) -> dict:
     k = f"p:{uid}"
     if c := cache_get(k): return c
     try:
-        r = db.table("profiles").select("*").eq("id", uid).maybeSingle().execute()
-        p = r.data or {}
+        # ✅ إصلاح توافق Supabase: استخدام execute() بدلاً من maybeSingle()
+        r = db.table("profiles").select("*").eq("id", uid).execute()
+        p = r.data[0] if r.data else {}
         cache_set(k, p, 600)
         return p
     except Exception as e:
@@ -165,7 +165,7 @@ async def chat(
 
     res = {}
     try:
-        brain = get_brain()  # Lazy init
+        brain = get_brain()
         res = await brain.respond(
             message=body.message, twin_name=body.twin_name, bond_level=body.bond_level,
             dims=body.relationship_dims, memories=[], history=body.history[-10:],
@@ -221,6 +221,18 @@ async def activate_referral_endpoint(body: ReferralCodeReq, uid: str = Depends(g
             activate_referral_bonus(uid)
         return {"success": True, "bonus": 500}
     raise HTTPException(400, result.get("error", "invalid_code"))
+
+# ========== فحص صحة الذكاء الاصطناعي ==========
+@app.get("/api/health/ai")
+async def health_ai_check():
+    brain = get_brain()
+    results = await brain.health_check_all_providers()
+    all_ok = all(results.values())
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "providers": results,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 # ========== Proactive ==========
 @app.post("/cron/proactive")
@@ -368,7 +380,7 @@ async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str =
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.6.1"}
+    return {"status": "ok", "version": "10.7.1"}
 
 @app.get("/health")
 async def health_check():
@@ -391,12 +403,12 @@ async def check_limits(uid: str = Depends(get_user), feature: str = ""):
 async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(get_user)):
     try:
         from google import genai
-        image_key = os.getenv("GEMINI_IMAGE_API_KEY")
+        image_key = os.getenv("GEMINI_IMAGE_API_KEY", GEMINI_KEY)
         if not image_key:
             return {"status": "error", "message": "Image API key not configured"}
         client = genai.Client(api_key=image_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash-image",
+            model="gemini-2.5-flash-preview-image",
             contents=prompt,
         )
         if response.parts and hasattr(response.parts[0], 'inline_data'):
@@ -404,16 +416,7 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
         return {"status": "error", "message": "No image generated"}
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
-        return {"status": "error", "message": str(e)}
-
-@app.get("/api/health/ai")
-async def health_ai_check():
-    """فحص عميق لجميع مزودي الذكاء الاصطناعي"""
-    brain = get_brain()
-    results = await brain.health_check_all_providers()
-    all_ok = all(results.values())
-    return {
-        "status": "ok" if all_ok else "degraded",
-        "providers": results,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+        error_msg = str(e)
+        if "quota" in error_msg.lower() or "resource_exhausted" in error_msg.lower():
+            return JSONResponse(status_code=429, content={"status": "quota_exceeded", "message": "طاقة الصور استنفدت، جرب لاحقاً 💜"})
+        return {"status": "error", "message": error_msg}

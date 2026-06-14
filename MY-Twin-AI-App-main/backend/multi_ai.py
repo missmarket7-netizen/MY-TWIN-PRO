@@ -52,7 +52,13 @@ class MultiAIClient:
     async def health_check(self) -> Dict[str, bool]:
         test_prompt = "Say 'ok'"
         results = {}
-        for name, func, _ in [("groq", self._try_groq), ("openrouter", self._try_openrouter), ("gemini", self._try_gemini)]:
+        # ✅ تم الإصلاح: نمرر 3 عناصر لكل مزود
+        providers = [
+            ("groq", self._try_groq, "llama-3.3-70b-versatile"),
+            ("openrouter", self._try_openrouter, "meta-llama/llama-4-maverick"),
+            ("gemini", self._try_gemini, "gemini-2.5-flash"),
+        ]
+        for name, func, _ in providers:
             try:
                 res = await asyncio.wait_for(func(test_prompt), timeout=5)
                 results[name] = bool(res and len(res) > 1)

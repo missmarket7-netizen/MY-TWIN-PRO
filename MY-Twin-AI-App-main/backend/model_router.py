@@ -30,7 +30,7 @@ class ModelRouter:
     @classmethod
     async def get_best_reply(cls, prompt: str, task_type: str, multi_client, emotion_primary: Optional[str] = None):
         preferred = cls.get_preferred_providers(task_type, emotion_primary)
-        logger.info(f"Model Router -> {preferred}")
+        logger.info(f"🧠 Model Router -> {preferred}")
         try:
             text, provider = await multi_client.get_best(prompt, preferred_providers=preferred, task=task_type)
             return text, provider

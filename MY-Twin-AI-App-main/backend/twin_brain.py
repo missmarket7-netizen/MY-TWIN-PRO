@@ -1,5 +1,5 @@
 import os, random, logging, time, asyncio
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from multi_ai import MultiAIClient, AIUnavailable
 from emotional_engine import EmotionalStateTracker
@@ -58,16 +58,15 @@ class TwinBrain:
         self.user_join_dates = {}
         self.self_critic = SelfCritic()
 
+    async def health_check_all_providers(self) -> Dict[str, bool]:
+        return await self.multi.health_check()
+
     async def detect_emotion(self, text: str) -> Dict[str, Any]:
         return await self.emotion_tracker.analyze(text)
 
     def _pick_emoji(self, primary_emotion: str) -> str:
         emojis = self.EMOJI_MAP.get(primary_emotion, self.EMOJI_MAP["neutral"])
         return random.choice(emojis)
-
-    async def health_check_all_providers(self) -> Dict[str, bool]:
-        """يفحص جميع مزودي الذكاء الاصطناعي."""
-        return await self.multi.health_check()
 
     async def respond(self, message, twin_name, bond_level, dims, memories, history,
                       calm=False, personality=None, country_code="SA", user_id=None, tier="free",
@@ -221,7 +220,7 @@ class TwinBrain:
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
-                # ✅ استخدام Model Router الجديد الذي يرجع (reply, provider_name)
+                # ✅ استخدام Model Router الجديد الذي يرجع (reply, provider)
                 reply, provider = await model_router.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
