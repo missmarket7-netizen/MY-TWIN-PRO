@@ -24,11 +24,9 @@ from dotenv import load_dotenv
 from slowapi.errors import RateLimitExceeded
 from supabase import create_client, Client
 
-from twin_brain import TwinBrain
 from rate_limiter import limiter, rate_limit_exceeded_handler
 from cache import get as cache_get, set as cache_set
 from multi_ai import AIUnavailable
-from consciousness_core import ConsciousnessCore
 from message_limits import (
     check_message_limit, check_tok, check_feature_usage,
     get_usage_summary, get_tier_features, activate_referral_bonus,
@@ -62,8 +60,24 @@ if not all([SUPABASE_URL, SUPABASE_KEY]):
     raise RuntimeError("Missing required env vars")
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-brain = TwinBrain(GEMINI_KEY)
-consciousness = ConsciousnessCore(twin_name="MyTwin")
+
+# --- Lazy initialization لكسر الاستيراد الدائري ---
+_brain_instance = None
+_consciousness_instance = None
+
+def get_brain():
+    global _brain_instance
+    if _brain_instance is None:
+        from twin_brain import TwinBrain
+        _brain_instance = TwinBrain(GEMINI_KEY)
+    return _brain_instance
+
+def get_consciousness():
+    global _consciousness_instance
+    if _consciousness_instance is None:
+        from consciousness_core import ConsciousnessCore
+        _consciousness_instance = ConsciousnessCore(twin_name="MyTwin")
+    return _consciousness_instance
 
 ALLOWED_ORIGINS = [
     "https://mytwin.app",
@@ -73,12 +87,15 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.6.0")
+app = FastAPI(title="MyTwin API", version="10.6.1")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
 async def startup_event():
     await setup_webhook()
+    # تسخين اختياري: نستدعي get_brain مرة واحدة
+    get_brain()
+    get_consciousness()
 
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 app.state.limiter = limiter
@@ -148,6 +165,7 @@ async def chat(
 
     res = {}
     try:
+        brain = get_brain()  # Lazy init
         res = await brain.respond(
             message=body.message, twin_name=body.twin_name, bond_level=body.bond_level,
             dims=body.relationship_dims, memories=[], history=body.history[-10:],
@@ -350,7 +368,7 @@ async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str =
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.6.0"}
+    return {"status": "ok", "version": "10.6.1"}
 
 @app.get("/health")
 async def health_check():
