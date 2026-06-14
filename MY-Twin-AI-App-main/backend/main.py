@@ -6,7 +6,6 @@ from typing import Optional, Dict, List, Any
 try:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
-
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN", ""),
         integrations=[FastApiIntegration(transaction_style="endpoint")],
@@ -61,7 +60,7 @@ if not all([SUPABASE_URL, SUPABASE_KEY]):
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- Lazy initialization لكسر الاستيراد الدائري ---
+# --- Lazy initialization ---
 _brain_instance = None
 _consciousness_instance = None
 
@@ -87,7 +86,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.7.1")
+app = FastAPI(title="MyTwin API", version="10.7.2")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -117,7 +116,6 @@ def get_profile(uid: str) -> dict:
     k = f"p:{uid}"
     if c := cache_get(k): return c
     try:
-        # ✅ إصلاح توافق Supabase: استخدام execute() بدلاً من maybeSingle()
         r = db.table("profiles").select("*").eq("id", uid).execute()
         p = r.data[0] if r.data else {}
         cache_set(k, p, 600)
@@ -380,7 +378,7 @@ async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str =
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.7.1"}
+    return {"status": "ok", "version": "10.7.2"}
 
 @app.get("/health")
 async def health_check():
@@ -407,8 +405,9 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
         if not image_key:
             return {"status": "error", "message": "Image API key not configured"}
         client = genai.Client(api_key=image_key)
+        # ✅ تم التصحيح: استخدم gemini-2.0-flash-exp-image بدلاً من 2.5 غير الموجود
         response = client.models.generate_content(
-            model="gemini-2.5-flash-preview-image",
+            model="gemini-2.0-flash-exp-image",
             contents=prompt,
         )
         if response.parts and hasattr(response.parts[0], 'inline_data'):

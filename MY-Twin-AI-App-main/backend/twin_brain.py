@@ -121,7 +121,7 @@ class TwinBrain:
         if user_id:
             try:
                 if join_date:
-                    journey_info = twin_journey.get_daily_activity(user_id, join_date)
+                    journey_info = await twin_journey.get_daily_activity(user_id, join_date)  # ✅ تمت إضافة await
                 if recent_messages:
                     emotion_history = [emotion] if emotion else []
                     memory_context_data = {"memories": full_context.get("memories", [])}
@@ -220,7 +220,6 @@ class TwinBrain:
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
-                # ✅ استخدام Model Router الجديد الذي يرجع (reply, provider)
                 reply, provider = await model_router.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
