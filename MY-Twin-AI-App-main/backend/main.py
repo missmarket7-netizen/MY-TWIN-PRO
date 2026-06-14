@@ -60,7 +60,7 @@ if not all([SUPABASE_URL, SUPABASE_KEY]):
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- Lazy initialization ---
+# --- Lazy initialization لكسر الاستيراد الدائري ---
 _brain_instance = None
 _consciousness_instance = None
 
@@ -86,7 +86,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.7.2")
+app = FastAPI(title="MyTwin API", version="10.7.3")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -378,7 +378,7 @@ async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str =
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.7.2"}
+    return {"status": "ok", "version": "10.7.3"}
 
 @app.get("/health")
 async def health_check():
@@ -405,9 +405,8 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
         if not image_key:
             return {"status": "error", "message": "Image API key not configured"}
         client = genai.Client(api_key=image_key)
-        # ✅ تم التصحيح: استخدم gemini-2.0-flash-exp-image بدلاً من 2.5 غير الموجود
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp-image",
+            model="gemini-2.5-flash-image",
             contents=prompt,
         )
         if response.parts and hasattr(response.parts[0], 'inline_data'):

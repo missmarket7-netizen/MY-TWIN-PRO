@@ -52,7 +52,6 @@ class MultiAIClient:
     async def health_check(self) -> Dict[str, bool]:
         test_prompt = "Say 'ok'"
         results = {}
-        # ✅ تم الإصلاح: نمرر 3 عناصر لكل مزود
         providers = [
             ("groq", self._try_groq, "llama-3.3-70b-versatile"),
             ("openrouter", self._try_openrouter, "meta-llama/llama-4-maverick"),
@@ -75,7 +74,10 @@ class MultiAIClient:
                 self._groq_client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
             for model in ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]:
                 try:
-                    resp = self._groq_client.chat.completions.create(model=model, messages=[{"role":"user","content":prompt}], max_tokens=500, temperature=0.7, timeout=10)
+                    resp = self._groq_client.chat.completions.create(
+                        model=model, messages=[{"role":"user","content":prompt}],
+                        max_tokens=500, temperature=0.7, timeout=10
+                    )
                     return resp.choices[0].message.content
                 except Exception: continue
         except Exception: pass
@@ -90,7 +92,10 @@ class MultiAIClient:
                 self._openai_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key)
             for model in ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]:
                 try:
-                    resp = self._openai_client.chat.completions.create(model=model, messages=[{"role":"user","content":prompt}], max_tokens=500, temperature=0.7, timeout=10)
+                    resp = self._openai_client.chat.completions.create(
+                        model=model, messages=[{"role":"user","content":prompt}],
+                        max_tokens=500, temperature=0.7, timeout=10
+                    )
                     return resp.choices[0].message.content
                 except Exception: continue
         except Exception: pass
@@ -104,7 +109,16 @@ class MultiAIClient:
             if not self._genai_client:
                 self._genai_client = genai.Client(api_key=key)
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(None, lambda: self._genai_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config={"max_output_tokens":500,"temperature":0.7}))
-            if response and response.text: return response.text
-        except Exception as e: logger.warning(f"Gemini error: {e}")
+            response = await loop.run_in_executor(
+                None,
+                lambda: self._genai_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config={"max_output_tokens": 500, "temperature": 0.7}
+                )
+            )
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            logger.warning(f"Gemini error: {e}")
         return None

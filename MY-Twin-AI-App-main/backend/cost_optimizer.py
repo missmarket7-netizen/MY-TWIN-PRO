@@ -17,8 +17,8 @@ MODEL_COST_PER_1K_TOKENS = {
     "groq/llama-3.3-70b": 0.0,           # مجاني ضمن حد معين
     "openrouter/deepseek-v4-flash": 0.0, # مجاني
     "openrouter/llama-4-maverick": 0.0,  # مجاني
-    "openrouter/gemini-2.5-flash": 0.0,  # مجاني
-    "gemini-2.0-flash": 0.0,             # مجاني ضمن حد
+    "gemini/gemini-2.5-flash": 0.0,  # مجاني
+    "gemini-2.5-flash": 0.0,             # مجاني ضمن حد
     "elevenlabs-tts": 0.001,             # تقديري
 }
 
@@ -87,12 +87,12 @@ class CostOptimizer:
         """
         # الأولوية للنماذج المجانية أولاً
         free_models = {
-            "general": "openrouter/gemini-2.5-flash",
+            "general": "gemini/gemini-2.5-flash",
             "coding": "openrouter/deepseek-v4-flash",
             "reasoning": "openrouter/llama-4-maverick",
             "emotional": "openrouter/llama-4-maverick",
         }
-        return free_models.get(task, "openrouter/gemini-2.5-flash")
+        return free_models.get(task, "gemini/gemini-2.5-flash")
 
     def get_daily_cost(self, user_id: str) -> float:
         """حساب التكلفة التقديرية لليوم الحالي لمستخدم"""
