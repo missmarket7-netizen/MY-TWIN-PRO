@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MyTwin",
-    "slug": "my-twin-final",
+    "slug": "my-twin",
     "scheme": "mytwin",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -85,7 +85,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "88b920cd-0f02-4dac-85a9-724ea9282879"
+        "projectId": "c9787bf0-70d2-4783-8889-0836752489cd"
       }
     },
     "runtimeVersion": {
@@ -94,6 +94,6 @@
     "updates": {
       "url": "https://u.expo.dev/b5e2baa3-6015-40a5-9f31-115298d3b0c9"
     },
-    "owner": "soulsync.co"
+    "owner": "mytwin"
   }
 }
