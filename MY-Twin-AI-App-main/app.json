@@ -37,12 +37,7 @@
         "POST_NOTIFICATIONS",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "com.android.vending.BILLING"
-      ],
-      "notification": {
-        "icon": "./assets/notification-icon.png",
-        "color": "#6B21A8",
-        "channel": "mytwin_default"
-      }
+      ]
     },
     "plugins": [
       "expo-router",
