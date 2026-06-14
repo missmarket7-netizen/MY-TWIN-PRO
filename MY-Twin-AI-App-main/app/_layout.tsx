@@ -10,7 +10,9 @@ import { initAnalytics } from "../lib/analytics";
 import SideMenu from "../components/SideMenu";
 import { ToastProvider } from "../components/Toast";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { registerForPushNotifications, setupNotificationHandlers, setupAndroidChannels } from "../lib/notifications";
 
+// زر الرجوع الموحد
 function BackButton() {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,10 +43,24 @@ export default function RootLayout() {
   const theme = useTwinStore(s => s.theme);
   const menuVisible = useTwinStore(s => s.menuVisible);
   const closeMenu = useTwinStore(s => s.closeMenu);
+  const userId = useTwinStore(s => s.userId);
   const isDark = theme === 'dark';
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const { width } = useWindowDimensions();
   const drawerWidth = width * 0.8;
+
+  // تهيئة الإشعارات
+  useEffect(() => {
+    setupNotificationHandlers();
+    setupAndroidChannels();
+  }, []);
+
+  // تسجيل Push Token عند تسجيل الدخول
+  useEffect(() => {
+    if (userId) {
+      registerForPushNotifications();
+    }
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,10 +80,11 @@ export default function RootLayout() {
     }).start();
   }, [menuVisible, drawerWidth]);
 
+  // إعدادات الشاشة (متوافقة تماماً)
   const screenOptions = useMemo(() => ({
     headerShown: true,
     headerStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },
-    headerTitleStyle: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 18, fontWeight: '600' },
+    headerTitleStyle: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 18, fontWeight: 'bold' as const },
     headerLeft: () => <BackButton />,
     headerShadowVisible: false,
     contentStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },

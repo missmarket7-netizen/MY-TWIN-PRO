@@ -42,6 +42,7 @@ const TEXTS: Record<string, Record<string,string>> = {
     howFeel:'How do you feel?', saveMood:'Log', moodRecorded:'Mood recorded',
   }
 };
+
 export default function Profile() {
   const {
     userId, tier, lang, theme, logout: storeLogout,
@@ -62,7 +63,9 @@ export default function Profile() {
   const [moodsRefreshing, setMoodsRefreshing] = useState(false);
   const cancelledRef = useRef(false);
 
-  const t = TEXTS[lang] || TEXTS.ar;
+  const texts = TEXTS[lang] || TEXTS.ar;
+  const t = (key: string) => texts[key] || key;
+
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -115,7 +118,7 @@ export default function Profile() {
       if (error) throw error;
       setShowAddMoodModal(false);
       fetchMoods(true);
-    } catch (e: any) { Alert.alert(t('خطأ', 'Error'), e.message || t('فشل تسجيل المشاعر', 'Failed to log mood')); }
+    } catch (e: any) { Alert.alert(t('خطأ'), e.message || t('فشل تسجيل المشاعر')); }
     finally { setSavingMood(false); }
   };
 
@@ -125,16 +128,16 @@ export default function Profile() {
       await supabase.from('profiles').update({ full_name: name.trim(), phone: phone.trim() }).eq('id', userId);
       setProfile((p: any) => ({ ...p, full_name: name.trim(), phone: phone.trim() }));
       setEditing(false);
-      Alert.alert('✅', t('save', 'Save'));
+      Alert.alert('✅', t('save'));
     } catch { Alert.alert('❌', isAr ? 'فشل الحفظ' : 'Save failed'); }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); storeLogout(); router.replace('/login'); };
   
   const handleDelete = () => {
-    Alert.alert(t('deleteAccount', 'Delete Account'), isAr ? 'لا يمكن التراجع.' : 'This cannot be undone.', [
-      { text: t('cancel', 'Cancel'), style: 'cancel' },
-      { text: t('deleteAccount', 'Delete Account'), style: 'destructive', onPress: async () => {
+    Alert.alert(t('deleteAccount'), isAr ? 'لا يمكن التراجع.' : 'This cannot be undone.', [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('deleteAccount'), style: 'destructive', onPress: async () => {
         try { await supabase.rpc('delete_user', { user_id: userId }); storeLogout(); router.replace('/login'); }
         catch { Alert.alert('❌', isAr ? 'فشل الحذف' : 'Delete failed'); }
       }}
@@ -156,7 +159,7 @@ export default function Profile() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <View style={[styles.header, { borderBottomColor: border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><ArrowLeft size={24} stroke={txt} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>{t('title', 'Profile')}</Text>
+        <Text style={[styles.headerTitle, { color: txt }]}>{t('title')}</Text>
         <TouchableOpacity onPress={() => setEditing(!editing)} style={styles.editHeaderBtn}><Edit size={20} stroke={primary} /></TouchableOpacity>
       </View>
 
@@ -169,19 +172,19 @@ export default function Profile() {
         </View>
 
         <View style={[styles.statsGrid, { marginBottom: 14 }]}>
-          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Heart size={18} stroke="#EC4899" /><Text style={[styles.statValue, { color: txt }]}>{Math.round(bondLevel)}%</Text><Text style={[styles.statLabel, { color: sub }]}>{t('bond', 'Bond')}</Text></View>
-          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><TrendingUp size={18} stroke="#10B981" /><Text style={[styles.statValue, { color: txt }]}>{phaseLabels[journeyPhase] || journeyPhase}</Text><Text style={[styles.statLabel, { color: sub }]}>{t('phase', 'Phase')}</Text></View>
-          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Brain size={18} stroke="#8B5CF6" /><Text style={[styles.statValue, { color: txt }]}>{attachmentLabels[attachmentStyle] || attachmentStyle}</Text><Text style={[styles.statLabel, { color: sub }]}>{t('attachment', 'Attachment')}</Text></View>
-          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Zap size={18} stroke="#F59E0B" /><Text style={[styles.statValue, { color: txt }]}>{Math.round(energy)}%</Text><Text style={[styles.statLabel, { color: sub }]}>{t('energy', 'Energy')}</Text></View>
+          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Heart size={18} stroke="#EC4899" /><Text style={[styles.statValue, { color: txt }]}>{Math.round(bondLevel)}%</Text><Text style={[styles.statLabel, { color: sub }]}>{t('bond')}</Text></View>
+          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><TrendingUp size={18} stroke="#10B981" /><Text style={[styles.statValue, { color: txt }]}>{phaseLabels[journeyPhase] || journeyPhase}</Text><Text style={[styles.statLabel, { color: sub }]}>{t('phase')}</Text></View>
+          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Brain size={18} stroke="#8B5CF6" /><Text style={[styles.statValue, { color: txt }]}>{attachmentLabels[attachmentStyle] || attachmentStyle}</Text><Text style={[styles.statLabel, { color: sub }]}>{t('attachment')}</Text></View>
+          <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}><Zap size={18} stroke="#F59E0B" /><Text style={[styles.statValue, { color: txt }]}>{Math.round(energy)}%</Text><Text style={[styles.statLabel, { color: sub }]}>{t('energy')}</Text></View>
         </View>
 
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
-          <Text style={[styles.sectionTitle, { color: txt }]}>{t('contactInfo', 'Contact Info')}</Text>
+          <Text style={[styles.sectionTitle, { color: txt }]}>{t('contactInfo')}</Text>
           {editing ? (
             <>
-              <TextInput style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt }]} placeholder={t('name', 'Name')} value={name} onChangeText={setName} />
-              <TextInput style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt }]} placeholder={t('phone', 'Phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-              <View style={styles.btnRow}><TouchableOpacity style={[styles.smallBtn, { backgroundColor: primary }]} onPress={handleSave}><Text style={styles.smallBtnText}>{t('save', 'Save')}</Text></TouchableOpacity><TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#F0F0F0' }]} onPress={() => setEditing(false)}><Text style={[styles.smallBtnText, { color: '#666' }]}>{t('cancel', 'Cancel')}</Text></TouchableOpacity></View>
+              <TextInput style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt }]} placeholder={t('name')} value={name} onChangeText={setName} />
+              <TextInput style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt }]} placeholder={t('phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+              <View style={styles.btnRow}><TouchableOpacity style={[styles.smallBtn, { backgroundColor: primary }]} onPress={handleSave}><Text style={styles.smallBtnText}>{t('save')}</Text></TouchableOpacity><TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#F0F0F0' }]} onPress={() => setEditing(false)}><Text style={[styles.smallBtnText, { color: '#666' }]}>{t('cancel')}</Text></TouchableOpacity></View>
             </>
           ) : (
             <>
@@ -193,18 +196,18 @@ export default function Profile() {
         </View>
 
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
-          <Text style={[styles.sectionTitle, { color: txt }]}>{t('usageInfo', 'Usage')}</Text>
-          <View style={styles.row}><Crown size={16} stroke={primary} /><Text style={styles.label}>{t('tier', 'Tier')}</Text><Text style={[styles.value, { color: txt }]}>{tier}</Text></View>
-          <View style={styles.row}><Zap size={16} stroke={primary} /><Text style={styles.label}>{t('messagesLeft', 'Messages')}</Text><Text style={[styles.value, { color: txt }]}>{usage.messages || 0}</Text></View>
-          <View style={styles.row}><MessageSquare size={16} stroke={primary} /><Text style={styles.label}>{t('totalMessages', 'Total')}</Text><Text style={[styles.value, { color: txt }]}>{totalMessages || 0}</Text></View>
+          <Text style={[styles.sectionTitle, { color: txt }]}>{t('usageInfo')}</Text>
+          <View style={styles.row}><Crown size={16} stroke={primary} /><Text style={styles.label}>{t('tier')}</Text><Text style={[styles.value, { color: txt }]}>{tier}</Text></View>
+          <View style={styles.row}><Zap size={16} stroke={primary} /><Text style={styles.label}>{t('messagesLeft')}</Text><Text style={[styles.value, { color: txt }]}>{usage.messages || 0}</Text></View>
+          <View style={styles.row}><MessageSquare size={16} stroke={primary} /><Text style={styles.label}>{t('totalMessages')}</Text><Text style={[styles.value, { color: txt }]}>{totalMessages || 0}</Text></View>
         </View>
 
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <View style={[styles.sectionHeader, isAr && { flexDirection: 'row-reverse' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Smile size={20} stroke={primary} /><Text style={[styles.sectionTitle, { color: txt, marginBottom: 0 }]}>{t('recentMood', 'Recent Moods')}</Text></View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Smile size={20} stroke={primary} /><Text style={[styles.sectionTitle, { color: txt, marginBottom: 0 }]}>{t('recentMood')}</Text></View>
             <TouchableOpacity style={[styles.addMoodBtn, { backgroundColor: primary }]} onPress={() => setShowAddMoodModal(true)}><Plus size={18} stroke="#FFF" /></TouchableOpacity>
           </View>
-          {recentMoods.length === 0 ? <Text style={[styles.emptyMood, { color: sub }]}>{t('noMoodData', 'No data yet')}</Text> : recentMoods.map((entry, i) => {
+          {recentMoods.length === 0 ? <Text style={[styles.emptyMood, { color: sub }]}>{t('noMoodData')}</Text> : recentMoods.map((entry, i) => {
             const moodInfo = MOOD_OPTIONS.find(m => m.value === entry.primary_emotion) || MOOD_OPTIONS[1];
             return (
               <View key={i} style={[styles.moodRow, { borderColor: border }]}>
@@ -216,15 +219,15 @@ export default function Profile() {
           })}
         </View>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: primary }]} onPress={() => router.push('/subscription')}><Crown size={16} stroke="#FFF" /><Text style={styles.btnText}>{t('upgrade', 'Upgrade')}</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.outlineBtn, { borderColor: primary }]} onPress={handleLogout}><LogOut size={16} stroke={primary} /><Text style={[styles.btnText, { color: primary }]}>{t('logout', 'Logout')}</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.dangerBtn]} onPress={handleDelete}><Trash2 size={16} stroke="#EF4444" /><Text style={[styles.btnText, { color: '#EF4444' }]}>{t('deleteAccount', 'Delete')}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.btn, { backgroundColor: primary }]} onPress={() => router.push('/subscription')}><Crown size={16} stroke="#FFF" /><Text style={styles.btnText}>{t('upgrade')}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.btn, styles.outlineBtn, { borderColor: primary }]} onPress={handleLogout}><LogOut size={16} stroke={primary} /><Text style={[styles.btnText, { color: primary }]}>{t('logout')}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.btn, styles.dangerBtn]} onPress={handleDelete}><Trash2 size={16} stroke="#EF4444" /><Text style={[styles.btnText, { color: '#EF4444' }]}>{t('deleteAccount')}</Text></TouchableOpacity>
       </ScrollView>
 
       <Modal visible={showAddMoodModal} transparent animationType="fade" onRequestClose={() => setShowAddMoodModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDark && { backgroundColor: '#2A2A2A' }]}>
-            <View style={[styles.modalHeader, isAr && { flexDirection: 'row-reverse' }]}><Text style={[styles.modalTitle, { color: txt }]}>{t('howFeel', 'How do you feel?')}</Text><TouchableOpacity onPress={() => setShowAddMoodModal(false)}><X size={22} stroke={sub} /></TouchableOpacity></View>
+            <View style={[styles.modalHeader, isAr && { flexDirection: 'row-reverse' }]}><Text style={[styles.modalTitle, { color: txt }]}>{t('howFeel')}</Text><TouchableOpacity onPress={() => setShowAddMoodModal(false)}><X size={22} stroke={sub} /></TouchableOpacity></View>
             <View style={styles.moodGrid}>
               {MOOD_OPTIONS.map((mood) => (
                 <TouchableOpacity key={mood.value} style={[styles.moodOption, { borderColor: selectedMood === mood.value ? mood.color : border, backgroundColor: selectedMood === mood.value ? mood.color + '20' : 'transparent' }]} onPress={() => setSelectedMood(mood.value)}>
@@ -234,7 +237,7 @@ export default function Profile() {
               ))}
             </View>
             <TouchableOpacity style={[styles.saveMoodBtn, { backgroundColor: primary, opacity: savingMood ? 0.6 : 1 }]} onPress={handleAddMood} disabled={savingMood}>
-              {savingMood ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveMoodBtnText}>{t('saveMood', 'Log')}</Text>}
+              {savingMood ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveMoodBtnText}>{t('saveMood')}</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -242,6 +245,7 @@ export default function Profile() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },

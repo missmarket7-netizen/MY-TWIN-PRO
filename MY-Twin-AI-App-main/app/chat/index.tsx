@@ -1,6 +1,7 @@
 import {
   View, Text, FlatList, StyleSheet, StatusBar, KeyboardAvoidingView, Platform, Image, Animated, TouchableOpacity
 } from 'react-native';
+import { Alert } from 'react-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';

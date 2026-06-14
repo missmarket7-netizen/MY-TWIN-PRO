@@ -28,14 +28,21 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECORD_AUDIO",
         "VIBRATE",
         "ACCESS_FINE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "com.android.vending.BILLING"
-      ]
+      ],
+      "notification": {
+        "icon": "./assets/notification-icon.png",
+        "color": "#6B21A8",
+        "channel": "mytwin_default"
+      }
     },
     "plugins": [
       "expo-router",
@@ -51,7 +58,8 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#6B21A8"
+          "color": "#6B21A8",
+          "defaultChannel": "mytwin_default"
         }
       ],
       [

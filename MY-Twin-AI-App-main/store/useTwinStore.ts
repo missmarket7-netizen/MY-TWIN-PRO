@@ -18,6 +18,7 @@ export interface ChatMessage {
   id: string; role: 'user' | 'twin'; content: string; image?: string; timestamp: number;
   failed?: boolean; emotion?: string; journeyPhase?: string; relationshipStage?: string;
   memoryRecall?: boolean; thinkingStage?: string;
+  youtubeVideo?: string;
 }
 
 export interface RelationshipDims {
