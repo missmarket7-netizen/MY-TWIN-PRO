@@ -1,80 +1,270 @@
-import { SafeAreaView, View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import {
+  SafeAreaView, View, Text, StyleSheet, FlatList, ActivityIndicator,
+  RefreshControl, TouchableOpacity, Alert
+} from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
 import { supabase } from '../lib/supabase';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { BrainCircuit, Heart, Star, Lightbulb, Trash2 } from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { router } from 'expo-router';
+import {
+  BrainCircuit, Heart, Star, Target, MessageCircle,
+  Sparkles, Trophy, Smile, Moon, ArrowLeft, Trash2,
+  Clock, Layers
+} from 'lucide-react-native';
 
-interface Memory { id: string; user_id: string; content: string; created_at: string; category?: string; importance_score?: number; emotional_tag?: string; }
+// ── أنواع الأحداث ──────────────────────────────
+const EVENT_CONFIG: Record<string, { icon: any; color: string; label_ar: string; label_en: string }> = {
+  memory: { icon: BrainCircuit, color: '#3B82F6', label_ar: 'ذكرى', label_en: 'Memory' },
+  dream: { icon: Moon, color: '#8B5CF6', label_ar: 'حلم', label_en: 'Dream' },
+  goal: { icon: Target, color: '#F59E0B', label_ar: 'هدف', label_en: 'Goal' },
+  relationship: { icon: Heart, color: '#EC4899', label_ar: 'علاقة', label_en: 'Relationship' },
+  achievement: { icon: Trophy, color: '#10B981', label_ar: 'إنجاز', label_en: 'Achievement' },
+  emotion: { icon: Smile, color: '#F59E0B', label_ar: 'مشاعر', label_en: 'Emotion' },
+  chat: { icon: MessageCircle, color: '#6B21A8', label_ar: 'محادثة', label_en: 'Chat' },
+};
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = { pref: Heart, dream: Star, fact: Lightbulb, default: BrainCircuit };
-const CATEGORY_COLORS: Record<string, string> = { pref: '#EC4899', dream: '#F59E0B', fact: '#3B82F6', default: '#6B21A8' };
+// ─ـ تصنيف الذكريات ─────────────────────────────
+const MEMORY_CATEGORIES: Record<string, { icon: any; color: string; label_ar: string; label_en: string }> = {
+  core: { icon: Sparkles, color: '#F59E0B', label_ar: 'أساسية', label_en: 'Core' },
+  goal: { icon: Target, color: '#10B981', label_ar: 'هدف', label_en: 'Goal' },
+  emotional: { icon: Heart, color: '#EC4899', label_ar: 'عاطفية', label_en: 'Emotional' },
+  fact: { icon: BrainCircuit, color: '#3B82F6', label_ar: 'معلومة', label_en: 'Fact' },
+  preference: { icon: Star, color: '#8B5CF6', label_ar: 'تفضيل', label_en: 'Preference' },
+  daily: { icon: MessageCircle, color: '#6366F1', label_ar: 'يومية', label_en: 'Daily' },
+};
 
-export default function Memories() {
+export default function MemoriesScreen() {
   const { lang, theme, userId } = useTwinStore();
-  const isAr = lang==='ar'; const isDark = theme==='dark';
-  const t = (ar:string,en:string)=>isAr?ar:en;
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const isAr = lang === 'ar';
+  const isDark = theme === 'dark';
+  const t = (ar: string, en: string) => isAr ? ar : en;
+
+  const [activeTab, setActiveTab] = useState<'memories' | 'timeline'>('memories');
+  const [memories, setMemories] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string|null>(null);
+  const [error, setError] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
-  const fetchMemories = useCallback(async (showRefresh=false)=>{
-    if(!userId){ setLoading(false); return; }
-    if(showRefresh) setRefreshing(true); else setLoading(true);
+  // ─ـ جلب البيانات ──────────────────────────────
+  const fetchData = useCallback(async (showRefresh = false) => {
+    if (!userId) { setLoading(false); return; }
+    if (showRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
-      const { data, error:fetchError } = await supabase.from('memories').select('*').eq('user_id',userId).order('created_at',{ascending:false});
-      if(cancelledRef.current) return;
-      if(fetchError) throw fetchError;
-      setMemories(data||[]);
-    } catch(e){ if(!cancelledRef.current) setError(t('فشل تحميل الذكريات','Failed to load memories')); }
-    finally { if(!cancelledRef.current){ setLoading(false); setRefreshing(false); } }
-  },[userId,isAr]);
+      const [memoriesRes, dreamsRes, goalsRes, emotionsRes, twinRes] = await Promise.all([
+        supabase.from('memories').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('dreams').select('*').eq('user_id', userId).limit(10),
+        supabase.from('goals').select('*').eq('user_id', userId).limit(10),
+        supabase.from('emotional_timeline').select('*').eq('user_id', userId).limit(15),
+        supabase.from('twin_states').select('bond_level,updated_at').eq('user_id', userId).single(),
+      ]);
+      if (cancelledRef.current) return;
 
-  useEffect(()=>{ cancelledRef.current=false; fetchMemories(); return ()=>{cancelledRef.current=true;}; },[fetchMemories]);
+      // ذكريات
+      setMemories(memoriesRes.data || []);
 
-  const handleDelete = (memoryId:string)=>{ Alert.alert(t('حذف','Delete'),t('هل أنت متأكد؟','Are you sure?'),[ {text:t('إلغاء','Cancel'),style:'cancel'}, {text:t('حذف','Delete'),style:'destructive',onPress:async()=>{ await supabase.from('memories').delete().eq('id',memoryId); setMemories(prev=>prev.filter(m=>m.id!==memoryId)); }} ]); };
+      // خط زمني
+      const all: any[] = [];
+      (memoriesRes.data || []).forEach((m: any) => all.push({ id: `mem-${m.id}`, type: 'memory', title: m.content?.slice(0, 60), timestamp: m.created_at }));
+      (dreamsRes.data || []).forEach((d: any) => all.push({ id: `dream-${d.id}`, type: 'dream', title: d.content?.slice(0, 60), timestamp: d.created_at }));
+      (goalsRes.data || []).forEach((g: any) => all.push({ id: `goal-${g.id}`, type: 'goal', title: g.title, timestamp: g.created_at }));
+      (emotionsRes.data || []).forEach((e: any) => { if (e.intensity > 0.6) all.push({ id: `emo-${e.id}`, type: 'emotion', title: e.primary_emotion, timestamp: e.created_at }); });
+      const twinData = twinRes.data;
+      if (twinData?.bond_level) {
+        const b = twinData.bond_level;
+        if (b >= 20) all.push({ id: 'rel-familiar', type: 'relationship', title: t('أصبحتما مألوفين', 'Became familiar'), timestamp: twinData.updated_at });
+        if (b >= 50) all.push({ id: 'rel-friend', type: 'relationship', title: t('أصبحتما صديقين', 'Became friends'), timestamp: twinData.updated_at });
+        if (b >= 80) all.push({ id: 'rel-soulmate', type: 'relationship', title: t('توأم روح', 'Soulmate'), timestamp: twinData.updated_at });
+      }
+      all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setEvents(all);
+    } catch (e) {
+      if (!cancelledRef.current) setError(t('فشل تحميل البيانات', 'Failed to load data'));
+    } finally {
+      if (!cancelledRef.current) { setLoading(false); setRefreshing(false); }
+    }
+  }, [userId, isAr]);
 
-  const bg = isDark?'#1A1A1A':'#F8F6F2', card = isDark?'#2A2A2A':'#FFF', border = isDark?'#444':'#F0F0F0', txt = isDark?'#FFF':'#1A1A1A', sub = isDark?'#888':'#666';
-  if(loading) return <SafeAreaView style={[s.safe,{backgroundColor:bg}]}><ActivityIndicator size="large" color="#6B21A8" style={{marginTop:80}}/></SafeAreaView>;
+  useEffect(() => { cancelledRef.current = false; fetchData(); return () => { cancelledRef.current = true; }; }, [fetchData]);
+
+  // ─ـ حذف ذكرى ──────────────────────────────────
+  const handleDeleteMemory = (id: string) => {
+    Alert.alert(t('حذف', 'Delete'), t('هل أنت متأكد؟', 'Are you sure?'), [
+      { text: t('إلغاء', 'Cancel'), style: 'cancel' },
+      { text: t('حذف', 'Delete'), style: 'destructive', onPress: async () => { await supabase.from('memories').delete().eq('id', id); setMemories(prev => prev.filter(m => m.id !== id)); } }
+    ]);
+  };
+
+  // ─ـ ألوان الثيم ───────────────────────────────
+  const bg = isDark ? '#1A1A1A' : '#F8F6F2';
+  const card = isDark ? '#2A2A2A' : '#FFF';
+  const border = isDark ? '#444' : '#F0F0F0';
+  const txt = isDark ? '#FFF' : '#1A1A1A';
+  const sub = isDark ? '#888' : '#666';
+  const primary = isDark ? '#D8B4FE' : '#6B21A8';
+
+  // ─ـ شاشة التحميل ──────────────────────────────
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+        <ActivityIndicator size="large" color={primary} style={{ marginTop: 80 }} />
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={[s.safe,{backgroundColor:bg}]}>
-      <View style={[s.container,{backgroundColor:bg}]}>
-        <Text style={[s.title,{color:txt}]}>{t('ذكرياتي 🧠','My Memories 🧠')}</Text>
-        {error&&<Text style={{color:'#EF4444',textAlign:'center',marginBottom:12}}>{error}</Text>}
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} stroke={txt} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: txt }]}>
+          {t('ذكرياتنا', 'Our Memories')}
+        </Text>
+        <View style={styles.backBtn} />
+      </View>
+
+      {/* تبويبات */}
+      <View style={[styles.tabs, { borderBottomColor: border }]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'memories' && { borderBottomColor: primary, borderBottomWidth: 2 }]}
+          onPress={() => setActiveTab('memories')}
+        >
+          <BrainCircuit size={18} stroke={activeTab === 'memories' ? primary : sub} />
+          <Text style={[styles.tabText, { color: activeTab === 'memories' ? primary : sub }]}>
+            {t('الذكريات', 'Memories')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'timeline' && { borderBottomColor: primary, borderBottomWidth: 2 }]}
+          onPress={() => setActiveTab('timeline')}
+        >
+          <Clock size={18} stroke={activeTab === 'timeline' ? primary : sub} />
+          <Text style={[styles.tabText, { color: activeTab === 'timeline' ? primary : sub }]}>
+            {t('الخط الزمني', 'Timeline')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* المحتوى */}
+      {activeTab === 'memories' ? (
         <FlatList
-          data={memories} keyExtractor={(item)=>item.id}
-          contentContainerStyle={{paddingBottom:40}}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>fetchMemories(true)} colors={['#6B21A8']}/>}
-          ListEmptyComponent={<View style={{alignItems:'center',marginTop:60}}><BrainCircuit size={48} stroke={sub}/><Text style={{color:sub,fontSize:17,fontWeight:'600',marginTop:16}}>{t('لا توجد ذكريات','No memories')}</Text><Text style={{color:sub,fontSize:14,marginTop:6,textAlign:'center'}}>{t('تحدث مع توأمك لإنشاء ذكريات','Chat with your Twin to create memories')}</Text></View>}
-          renderItem={({item})=>{
-            const cat = item.category||'default'; const Icon = CATEGORY_ICONS[cat]||BrainCircuit; const color = CATEGORY_COLORS[cat]||'#6B21A8';
+          data={memories}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} colors={[primary]} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <BrainCircuit size={48} stroke={sub} />
+              <Text style={[styles.emptyText, { color: sub }]}>{t('لا توجد ذكريات', 'No memories yet')}</Text>
+              <Text style={[styles.emptySub, { color: sub }]}>{t('تحدث مع توأمك لإنشاء ذكريات', 'Chat with your Twin to create memories')}</Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const cat = MEMORY_CATEGORIES[item.memory_type] || MEMORY_CATEGORIES.daily;
+            const Icon = cat.icon;
+            const color = cat.color;
             return (
-              <TouchableOpacity onLongPress={()=>handleDelete(item.id)} style={[s.card,{backgroundColor:card,borderColor:border}]}>
-                <View style={s.cardRow}>
-                  <View style={[s.iconWrap,{backgroundColor:color+'20'}]}><Icon size={16} color={color}/></View>
-                  <View style={{flex:1}}>
-                    <Text style={[s.cardText,{color:txt}]}>{item.content}</Text>
-                    <Text style={[s.date,{color:sub}]}>{new Date(item.created_at).toLocaleDateString(isAr?'ar-EG':'en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</Text>
+              <TouchableOpacity
+                onLongPress={() => handleDeleteMemory(item.id)}
+                style={[styles.memoryCard, { backgroundColor: card, borderColor: border }]}
+              >
+                <View style={[styles.memoryIcon, { backgroundColor: color + '20' }]}>
+                  <Icon size={16} color={color} />
+                </View>
+                <View style={styles.memoryBody}>
+                  <Text style={[styles.memoryContent, { color: txt }]}>{item.content}</Text>
+                  <View style={styles.memoryMeta}>
+                    <Text style={[styles.memoryCategory, { color }]}>
+                      {isAr ? cat.label_ar : cat.label_en}
+                    </Text>
+                    <Text style={[styles.memoryDate, { color: sub }]}>
+                      {new Date(item.created_at).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
             );
           }}
         />
-      </View>
+      ) : (
+        <FlatList
+          data={events}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} colors={[primary]} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Clock size={48} stroke={sub} />
+              <Text style={[styles.emptyText, { color: sub }]}>{t('لا توجد أحداث', 'No events yet')}</Text>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const config = EVENT_CONFIG[item.type] || EVENT_CONFIG.chat;
+            const Icon = config.icon;
+            const color = config.color;
+            const isLast = index === events.length - 1;
+            return (
+              <View style={[styles.timelineRow, isAr && { flexDirection: 'row-reverse' }]}>
+                <View style={styles.timelineLineCol}>
+                  <View style={[styles.timelineDot, { backgroundColor: color }]} />
+                  {!isLast && <View style={[styles.timelineConnector, { backgroundColor: isDark ? '#444' : '#E0D9F5' }]} />}
+                </View>
+                <View style={[styles.timelineCard, { backgroundColor: card, borderColor: border }]}>
+                  <View style={[styles.timelineCardHeader, isAr && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.timelineIcon, { backgroundColor: color + '20' }]}>
+                      <Icon size={16} color={color} />
+                    </View>
+                    <Text style={[styles.timelineTitle, { color: txt }]}>{item.title}</Text>
+                    <Text style={[styles.timelineTime, { color: sub }]}>
+                      {new Date(item.timestamp).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  safe:{flex:1}, container:{flex:1,padding:20}, title:{fontSize:24,fontWeight:'800',marginBottom:20},
-  card:{padding:14,borderRadius:14,borderWidth:1,marginBottom:10},
-  cardRow:{flexDirection:'row',alignItems:'center',gap:10},
-  iconWrap:{width:32,height:32,borderRadius:10,justifyContent:'center',alignItems:'center'},
-  cardText:{fontSize:15,lineHeight:22,marginBottom:4},
-  date:{fontSize:12},
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
+  tabs: { flexDirection: 'row', borderBottomWidth: 1 },
+  tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, gap: 8 },
+  tabText: { fontSize: 15, fontWeight: '600' },
+  listContent: { padding: 16, paddingBottom: 40 },
+  empty: { alignItems: 'center', marginTop: 60 },
+  emptyText: { fontSize: 17, fontWeight: '600', marginTop: 16 },
+  emptySub: { fontSize: 14, marginTop: 6, textAlign: 'center' },
+  // ذكريات
+  memoryCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 10, gap: 12 },
+  memoryIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  memoryBody: { flex: 1 },
+  memoryContent: { fontSize: 15, lineHeight: 22, marginBottom: 6 },
+  memoryMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  memoryCategory: { fontSize: 12, fontWeight: '600' },
+  memoryDate: { fontSize: 11 },
+  // خط زمني
+  timelineRow: { flexDirection: 'row', marginBottom: 0 },
+  timelineLineCol: { alignItems: 'center', width: 32, marginRight: 10 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+  timelineConnector: { width: 2, flex: 1, marginVertical: 4 },
+  timelineCard: { flex: 1, padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
+  timelineCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timelineIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  timelineTitle: { fontSize: 14, fontWeight: '600', flex: 1 },
+  timelineTime: { fontSize: 11 },
 });

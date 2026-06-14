@@ -1,8 +1,9 @@
-import { SafeAreaView, ScrollView, Text, StyleSheet, View } from 'react-native';
+import { SafeAreaView, ScrollView, Text, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
+import { router } from 'expo-router';
 import {
   Shield, Lock, Brain, UserCheck, Trash2, AlertTriangle,
-  Download, Mail, FileText, Cloud, Smartphone, Eye
+  Download, Mail, FileText, Cloud, Smartphone, Eye, ArrowLeft
 } from 'lucide-react-native';
 
 export default function Privacy() {
@@ -44,21 +45,32 @@ export default function Privacy() {
   ];
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      {/* Header احترافي */}
+      <View style={[styles.header, { borderBottomColor: border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} stroke={txt} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: txt }]}>
+          {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+        </Text>
+        <View style={styles.backBtn} />
+      </View>
+
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <Shield size={48} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />
-        <Text style={[s.title, { color: txt }]}>{isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}</Text>
-        <Text style={[s.updated, { color: sub }]}>{isAr ? 'آخر تحديث: يونيو 2026' : 'Last updated: June 2026'}</Text>
+        <Text style={[styles.title, { color: txt }]}>{isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}</Text>
+        <Text style={[styles.updated, { color: sub }]}>{isAr ? 'آخر تحديث: يونيو 2026' : 'Last updated: June 2026'}</Text>
 
         {sections.map((section, i) => {
           const Icon = section.icon;
           return (
-            <View key={i} style={[s.card, { backgroundColor: card, borderColor: border }]}>
-              <View style={s.cardHeader}>
+            <View key={i} style={[styles.card, { backgroundColor: card, borderColor: border }]}>
+              <View style={[styles.cardHeader, isAr && { flexDirection: 'row-reverse' }]}>
                 <Icon size={22} stroke={primary} />
-                <Text style={[s.cardTitle, { color: txt }]}>{section.title}</Text>
+                <Text style={[styles.cardTitle, { color: txt }]}>{section.title}</Text>
               </View>
-              <Text style={[s.cardBody, { color: sub }]}>{section.body}</Text>
+              <Text style={[styles.cardBody, { color: sub }]}>{section.body}</Text>
             </View>
           );
         })}
@@ -67,8 +79,11 @@ export default function Privacy() {
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   safe: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
   updated: { fontSize: 13, textAlign: 'center', marginBottom: 24 },
   card: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },

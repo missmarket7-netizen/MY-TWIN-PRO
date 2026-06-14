@@ -6,9 +6,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTwinStore } from '../store/useTwinStore';
 import { API } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { router } from 'expo-router';
 import {
   Gift, Copy, Share2, Users, Zap, Crown, CheckCircle2,
-  UserPlus, Sparkles, TrendingUp, ArrowRight, Ticket
+  UserPlus, Sparkles, TrendingUp, ArrowRight, Ticket, ArrowLeft
 } from 'lucide-react-native';
 
 interface ReferralStats {
@@ -17,9 +18,9 @@ interface ReferralStats {
 }
 
 const REWARD_TIERS = [
-  { count: 5, reward: 'Premium Week', icon: Zap, color: '#F59E0B' },
-  { count: 10, reward: 'Premium Month', icon: Crown, color: '#8B5CF6' },
-  { count: 25, reward: 'Pro Access', icon: Sparkles, color: '#EC4899' },
+  { count: 5, reward_ar: 'أسبوع Premium', reward_en: 'Premium Week', icon: Zap, color: '#F59E0B' },
+  { count: 10, reward_ar: 'شهر Premium', reward_en: 'Premium Month', icon: Crown, color: '#8B5CF6' },
+  { count: 25, reward_ar: 'Pro Access', reward_en: 'Pro Access', icon: Sparkles, color: '#EC4899' },
 ];
 
 export default function Referral() {
@@ -27,7 +28,6 @@ export default function Referral() {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
   const t = (ar: string, en: string) => (isAr ? ar : en);
-  const colors = isDark ? darkColors : lightColors;
 
   const [code, setCode] = useState('');
   const [myCode, setMyCode] = useState('');
@@ -38,30 +38,23 @@ export default function Referral() {
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // جلب بيانات الإحالة عند التحميل
+  const bg = isDark ? '#1A1A1A' : '#F8F6F2';
+  const card = isDark ? '#2A2A2A' : '#FFF';
+  const border = isDark ? '#444' : '#F0F0F0';
+  const txt = isDark ? '#FFF' : '#1A1A1A';
+  const sub = isDark ? '#888' : '#666';
+  const primary = isDark ? '#D8B4FE' : '#6B21A8';
+
   const fetchReferralData = useCallback(async (showRefresh = false) => {
     if (!userId) return;
     if (showRefresh) setRefreshing(true);
-
     try {
-      // جلب كود الإحالة الحالي من Supabase
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('referral_code')
-        .eq('id', userId)
-        .single();
-
+      const { data: profile } = await supabase.from('profiles').select('referral_code').eq('id', userId).single();
       if (profile?.referral_code) {
         setMyCode(profile.referral_code);
         setMyLink(`https://mytwin.app/join?ref=${profile.referral_code}`);
       }
-
-      // جلب إحصائيات الدعوات
-      const { data: referrals, error } = await supabase
-        .from('referral_usage')
-        .select('id, activated_at')
-        .eq('inviter_id', userId);
-
+      const { data: referrals, error } = await supabase.from('referral_usage').select('id, activated_at').eq('inviter_id', userId);
       if (!error && referrals) {
         setStats({
           invitedCount: referrals.length,
@@ -137,7 +130,6 @@ export default function Referral() {
   const handleCopy = () => {
     if (!myCode) return;
     try {
-      // استخدام Clipboard API
       const Clipboard = require('expo-clipboard');
       Clipboard.setStringAsync(myCode);
       setCopied(true);
@@ -150,58 +142,68 @@ export default function Referral() {
   const onRefresh = () => fetchReferralData(true);
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      {/* Header احترافي */}
+      <View style={[styles.header, { borderBottomColor: border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} stroke={txt} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: txt }]}>
+          {t('نظام الدعوات', 'Referral System')}
+        </Text>
+        <View style={styles.backBtn} />
+      </View>
+
       <ScrollView
-        contentContainerStyle={s.container}
+        contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6B21A8']} />}
       >
-        {/* العنوان */}
-        <Text style={[s.title, { color: colors.text }]}>{t('نظام الدعوات', 'Referral System')}</Text>
-        <Text style={[s.subtitle, { color: colors.subtext }]}>
+        <Text style={[styles.title, { color: txt }]}>{t('نظام الدعوات', 'Referral System')}</Text>
+        <Text style={[styles.subtitle, { color: sub }]}>
           {t('ادعُ أصدقاءك واربح مكافآت!', 'Invite friends and earn rewards!')}
         </Text>
 
         {/* بطاقة الإحصائيات */}
-        <View style={[s.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.statItem}>
+        <View style={[styles.statsCard, { backgroundColor: card, borderColor: border }]}>
+          <View style={styles.statItem}>
             <Users size={24} stroke="#6B21A8" />
-            <Text style={[s.statValue, { color: colors.text }]}>{stats.invitedCount}</Text>
-            <Text style={[s.statLabel, { color: colors.subtext }]}>{t('صديق مدعو', 'Friends Invited')}</Text>
+            <Text style={[styles.statValue, { color: txt }]}>{stats.invitedCount}</Text>
+            <Text style={[styles.statLabel, { color: sub }]}>{t('صديق مدعو', 'Friends Invited')}</Text>
           </View>
-          <View style={[s.statDivider, { backgroundColor: colors.border }]} />
-          <View style={s.statItem}>
+          <View style={[styles.statDivider, { backgroundColor: border }]} />
+          <View style={styles.statItem}>
             <Zap size={24} stroke="#F59E0B" />
-            <Text style={[s.statValue, { color: colors.text }]}>{stats.earnedTokens}</Text>
-            <Text style={[s.statLabel, { color: colors.subtext }]}>{t('توكن مكتسب', 'Earned Tokens')}</Text>
+            <Text style={[styles.statValue, { color: txt }]}>{stats.earnedTokens}</Text>
+            <Text style={[styles.statLabel, { color: sub }]}>{t('توكن مكتسب', 'Earned Tokens')}</Text>
           </View>
         </View>
 
         {/* كودي */}
-        <View style={[s.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('كود الدعوة الخاص بي', 'My Referral Code')}</Text>
+        <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+          <Text style={[styles.sectionTitle, { color: txt }]}>{t('كود الدعوة الخاص بي', 'My Referral Code')}</Text>
           {myCode ? (
             <>
-              <View style={[s.codeBox, { backgroundColor: isDark ? '#333' : '#F3F0FF' }]}>
-                <Text style={[s.codeText, { color: colors.primary }]}>{myCode}</Text>
+              <View style={[styles.codeBox, { backgroundColor: isDark ? '#333' : '#F3F0FF' }]}>
+                <Text style={[styles.codeText, { color: primary }]}>{myCode}</Text>
               </View>
-              <View style={[s.codeActions, isAr && { flexDirection: 'row-reverse' }]}>
-                <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.primary }]} onPress={handleCopy}>
+              <View style={[styles.codeActions, isAr && { flexDirection: 'row-reverse' }]}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: primary }]} onPress={handleCopy}>
                   {copied ? <CheckCircle2 size={18} stroke="#FFF" /> : <Copy size={18} stroke="#FFF" />}
-                  <Text style={s.actionBtnText}>{copied ? t('تم النسخ', 'Copied') : t('نسخ', 'Copy')}</Text>
+                  <Text style={styles.actionBtnText}>{copied ? t('تم النسخ', 'Copied') : t('نسخ', 'Copy')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#10B981' }]} onPress={handleShare}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10B981' }]} onPress={handleShare}>
                   <Share2 size={18} stroke="#FFF" />
-                  <Text style={s.actionBtnText}>{t('مشاركة', 'Share')}</Text>
+                  <Text style={styles.actionBtnText}>{t('مشاركة', 'Share')}</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={[s.link, { color: colors.subtext }]} numberOfLines={1}>{myLink}</Text>
+              <Text style={[styles.link, { color: sub }]} numberOfLines={1}>{myLink}</Text>
             </>
           ) : (
-            <TouchableOpacity style={[s.generateBtn, { backgroundColor: colors.primary }]} onPress={generateCode} disabled={loadingGenerate}>
+            <TouchableOpacity style={[styles.generateBtn, { backgroundColor: primary }]} onPress={generateCode} disabled={loadingGenerate}>
               {loadingGenerate ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <Ticket size={20} stroke="#FFF" />
-                  <Text style={s.generateBtnText}>{t('إنشاء كود الدعوة', 'Generate Referral Code')}</Text>
+                  <Text style={styles.generateBtnText}>{t('إنشاء كود الدعوة', 'Generate Referral Code')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -209,27 +211,27 @@ export default function Referral() {
         </View>
 
         {/* تفعيل كود */}
-        <View style={[s.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('تفعيل كود صديق', 'Activate a Friend Code')}</Text>
-          <View style={[s.activateRow, isAr && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+          <Text style={[styles.sectionTitle, { color: txt }]}>{t('تفعيل كود صديق', 'Activate a Friend Code')}</Text>
+          <View style={[styles.activateRow, isAr && { flexDirection: 'row-reverse' }]}>
             <TextInput
-              style={[s.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: colors.text, borderColor: colors.border }]}
+              style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt, borderColor: border }]}
               placeholder="MTXXXXXX"
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={sub}
               value={code}
               onChangeText={setCode}
               autoCapitalize="characters"
               maxLength={10}
             />
             <TouchableOpacity
-              style={[s.activateBtn, { backgroundColor: code.trim().length >= 6 ? '#6B21A8' : colors.border }]}
+              style={[styles.activateBtn, { backgroundColor: code.trim().length >= 6 ? '#6B21A8' : border }]}
               onPress={activateCode}
               disabled={loadingActivate || code.trim().length < 6}
             >
               {loadingActivate ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <ArrowRight size={18} stroke="#FFF" />
-                  <Text style={s.activateBtnText}>{t('تفعيل', 'Activate')}</Text>
+                  <Text style={styles.activateBtnText}>{t('تفعيل', 'Activate')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -237,28 +239,28 @@ export default function Referral() {
         </View>
 
         {/* مستويات المكافآت */}
-        <View style={[s.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('مستويات المكافآت', 'Reward Tiers')}</Text>
+        <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+          <Text style={[styles.sectionTitle, { color: txt }]}>{t('مستويات المكافآت', 'Reward Tiers')}</Text>
           {REWARD_TIERS.map((tier, i) => {
             const Icon = tier.icon;
             const achieved = stats.invitedCount >= tier.count;
             return (
-              <View key={i} style={[s.tierRow, { borderColor: colors.border }]}>
-                <View style={[s.tierIcon, { backgroundColor: tier.color + '20' }]}>
+              <View key={i} style={[styles.tierRow, { borderColor: border }]}>
+                <View style={[styles.tierIcon, { backgroundColor: tier.color + '20' }]}>
                   <Icon size={20} stroke={tier.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.tierReward, { color: colors.text }]}>
+                  <Text style={[styles.tierReward, { color: txt }]}>
                     {t(`ادعُ ${tier.count} أصدقاء`, `Invite ${tier.count} Friends`)}
                   </Text>
-                  <Text style={[s.tierDesc, { color: colors.subtext }]}>
-                    {t(`احصل على ${tier.reward}`, `Get ${tier.reward}`)}
+                  <Text style={[styles.tierDesc, { color: sub }]}>
+                    {t(`احصل على ${tier.reward_ar}`, `Get ${tier.reward_en}`)}
                   </Text>
                 </View>
                 {achieved ? (
                   <CheckCircle2 size={22} stroke="#10B981" />
                 ) : (
-                  <Text style={[s.tierProgress, { color: colors.subtext }]}>
+                  <Text style={[styles.tierProgress, { color: sub }]}>
                     {stats.invitedCount}/{tier.count}
                   </Text>
                 )}
@@ -271,26 +273,11 @@ export default function Referral() {
   );
 }
 
-const lightColors = {
-  bg: '#F8F6F2',
-  card: '#FFFFFF',
-  border: '#F0F0F0',
-  text: '#1A1A1A',
-  subtext: '#666',
-  primary: '#6B21A8',
-};
-
-const darkColors = {
-  bg: '#1A1A1A',
-  card: '#2A2A2A',
-  border: '#444',
-  text: '#FFFFFF',
-  subtext: '#888',
-  primary: '#D8B4FE',
-};
-
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   safe: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   container: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 24 },

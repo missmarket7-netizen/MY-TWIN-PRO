@@ -80,6 +80,12 @@ export interface TwinStore {
   totalMinutes: number; setTotalMinutes: (val: number) => void;
   streakDays: number; setStreakDays: (val: number) => void;
 
+  // ✅ حقول جديدة للطاقة والرسائل
+  dailyMessagesUsed: number; setDailyMessagesUsed: (val: number) => void;
+  dailyMessagesLimit: number; setDailyMessagesLimit: (val: number) => void;
+  twinEnergy: number; setTwinEnergy: (val: number) => void;
+  personalityTraits: { dominant: string; secondary: string } | null; setPersonalityTraits: (traits: any) => void;
+
   triggerHaptic: () => void; logout: () => void;
 }
 
@@ -97,6 +103,7 @@ const initialState = {
   voiceDialect: 'modern_arabic', voiceSpeed: 0.9, voicePitch: 1.0, voicePersonality: 'friend' as VoicePersonality,
   menuVisible: false, hasUsedTrial: false, twinTraits: [] as string[],
   totalMessages: 0, totalMinutes: 0, streakDays: 0,
+  dailyMessagesUsed: 0, dailyMessagesLimit: 15, twinEnergy: 100, personalityTraits: null,
 };
 
 export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
@@ -117,10 +124,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     return { bondLevel: safeBond, badges };
   }),
 
-  updateRelationshipDims: (dims) => set((state) => ({
-    relationshipDims: { ...state.relationshipDims, ...dims }
-  })),
-
+  updateRelationshipDims: (dims) => set((state) => ({ relationshipDims: { ...state.relationshipDims, ...dims } })),
   setEmotionState: (emotion) => set({ emotionState: emotion }),
   setJourneyPhase: (phase) => set({ journeyPhase: phase }),
   setAttachmentStyle: (style) => set({ attachmentStyle: style }),
@@ -162,6 +166,12 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setTotalMinutes: (val) => set({ totalMinutes: val }),
   setStreakDays: (val) => set({ streakDays: val }),
 
+  // ✅ دوال جديدة
+  setDailyMessagesUsed: (val) => set({ dailyMessagesUsed: val }),
+  setDailyMessagesLimit: (val) => set({ dailyMessagesLimit: val }),
+  setTwinEnergy: (val) => set({ twinEnergy: val }),
+  setPersonalityTraits: (traits) => set({ personalityTraits: traits }),
+
   triggerHaptic: () => { if (!get().calmMode) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); },
   logout: () => set({ ...initialState, chatHistory: [] }),
 }), {
@@ -180,5 +190,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     voicePersonality: state.voicePersonality,
     hasUsedTrial: state.hasUsedTrial, twinTraits: state.twinTraits,
     totalMessages: state.totalMessages, totalMinutes: state.totalMinutes, streakDays: state.streakDays,
+    dailyMessagesUsed: state.dailyMessagesUsed, dailyMessagesLimit: state.dailyMessagesLimit,
+    twinEnergy: state.twinEnergy, personalityTraits: state.personalityTraits,
   }),
 }));

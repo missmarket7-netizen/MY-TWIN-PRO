@@ -1,7 +1,10 @@
 import { Stack, useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useMemo } from "react";
-import { Pressable, StyleSheet, Animated, Modal, useWindowDimensions, TouchableOpacity, Text } from "react-native";
+import {
+  Pressable, StyleSheet, Animated, Modal,
+  useWindowDimensions, TouchableOpacity, Text
+} from "react-native";
 import { useTwinStore } from "../store/useTwinStore";
 import { initAnalytics } from "../lib/analytics";
 import SideMenu from "../components/SideMenu";
@@ -14,22 +17,30 @@ function BackButton() {
   const { theme } = useTwinStore();
   const isDark = theme === 'dark';
 
-  if (pathname === '/chat' || pathname === '/splash' || pathname === '/login' || pathname === '/onboarding' || pathname === '/') {
-    return null;
-  }
+  const hiddenRoutes = ['/chat', '/splash', '/login', '/onboarding', '/', '/chat/index'];
+  if (hiddenRoutes.includes(pathname)) return null;
 
   return (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Text style={{ color: isDark ? '#FFF' : '#1A1A1A', fontSize: 16, fontWeight: '600' }}>← رجوع</Text>
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+    >
+      <Text style={{
+        color: isDark ? '#D8B4FE' : '#6B21A8',
+        fontSize: 28,
+        fontWeight: '300',
+        lineHeight: 32,
+      }}>
+        ‹
+      </Text>
     </TouchableOpacity>
   );
 }
 
-export default function Layout() {
+export default function RootLayout() {
   const theme = useTwinStore(s => s.theme);
   const menuVisible = useTwinStore(s => s.menuVisible);
   const closeMenu = useTwinStore(s => s.closeMenu);
-  const lang = useTwinStore(s => s.lang);
   const isDark = theme === 'dark';
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const { width } = useWindowDimensions();
@@ -53,19 +64,17 @@ export default function Layout() {
     }).start();
   }, [menuVisible, drawerWidth]);
 
-  // إعدادات الشاشة مع تجنب الخيارات غير المتوافقة
   const screenOptions = useMemo(() => ({
     headerShown: true,
     headerStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },
-    headerTitleStyle: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 18, fontWeight: 'bold' as const },
+    headerTitleStyle: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 18, fontWeight: '600' },
     headerLeft: () => <BackButton />,
     headerShadowVisible: false,
     contentStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },
-    // إزالة animation لتفادي خطأ النوع
   }), [isDark]);
 
   return (
-    <ErrorBoundary lang={lang}>
+    <ErrorBoundary>
       <ToastProvider>
         <StatusBar style={isDark ? "light" : "dark"} />
         <Stack screenOptions={screenOptions}>
@@ -80,7 +89,14 @@ export default function Layout() {
           <Modal visible transparent animationType="none" onRequestClose={closeMenu}>
             <Pressable style={styles.overlay} onPress={closeMenu}>
               <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
-                <Animated.View style={[styles.sidebar, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', width: drawerWidth, transform: [{ translateX: slideAnim }] }]}>
+                <Animated.View style={[
+                  styles.sidebar,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    width: drawerWidth,
+                    transform: [{ translateX: slideAnim }]
+                  }
+                ]}>
                   <SideMenu onClose={closeMenu} />
                 </Animated.View>
               </Pressable>
