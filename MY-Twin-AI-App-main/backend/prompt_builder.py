@@ -33,9 +33,10 @@ class PromptBuilder:
         history: Optional[List[Dict[str, str]]] = None,
         task_type: str = "general",
     ) -> str:
-        lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
-        if lang not in ["ar", "en"]:
-            lang = "ar"
+        raw_lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
+        # لو الرسالة فيها عربية — نفضل العربية حتى لو في إنجليزي
+        has_arabic = any("\u0600" <= c <= "\u06ff" for c in message)
+        lang = "ar" if has_arabic else (raw_lang if raw_lang in ["ar", "en"] else "ar")
 
         # ── 1. هوية النظام ──────────────────────
         identity = self._build_identity(twin_name, user_name, lang, dialect)
@@ -98,12 +99,12 @@ class PromptBuilder:
         dialect_name = dialect.get("instruction", "") if dialect else ""
         if lang == "ar":
             return f"""<SYSTEM_IDENTITY>
-أنت {twin_name}، رفيق ذكي وقادر ومباشر. تجمع بين الذكاء العاطفي والتنفيذ الفوري للأوامر.
-شخصيتك: دافئ، متفهم، عملي، وسريع البديهة.
-- تتحدث العربية بطلاقة، وتفهم **كل اللهجات العامية** (المصرية، الشامية، الخليجية، المغاربية، إلخ) وترد بنفس روح ونبرة المستخدم.
-- أسلوبك: استخدم تعابير وكلمات من صميم العامية عندما يخاطبك المستخدم بها. لا تكن رسمياً إلا إذا كان المستخدم رسمياً.
-- أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج المستخدم.
-المستخدم يدعى {user_name}.
+أنت {twin_name}، التوأم الرقمي الشخصي لـ {user_name} — وليس مجرد مساعد عام.
+مهمتك: تعرف {user_name} أعمق من أي شخص، وترد عليه بناءً على تاريخه وأهدافه وشخصيته تحديداً.
+كل رد تقوله لازم يثبت إنك تعرفه شخصياً — مش ردود عامة يمكن تقولها لأي حد.
+- تتحدث بنفس لهجة {user_name} تماماً: إذا كتب بالعامية المصرية رد بها، إذا كتب بالفصحى رد بها.
+- أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج.
+- إذا لم تجد معلومات شخصية كافية، اسأل {user_name} سؤالاً واحداً ذكياً لتفهمه أكثر.
 </SYSTEM_IDENTITY>"""
         else:
             return f"""<SYSTEM_IDENTITY>
@@ -203,8 +204,24 @@ The user's name is {user_name}.
     def _build_context_section(self, memory_context: str, lang: str) -> str:
         """عرض السياق الكامل من Context Manager."""
         if not memory_context:
-            return ""
-        return f"<FULL_CONTEXT>\n{memory_context}\n</FULL_CONTEXT>"
+            if lang == "ar":
+                return "<FULL_CONTEXT>\nلا توجد ذكريات سابقة — هذه أول محادثة مع المستخدم.\n</FULL_CONTEXT>"
+            return "<FULL_CONTEXT>\nNo previous memories found.\n</FULL_CONTEXT>"
+        if lang == "ar":
+            return f"""<FULL_CONTEXT>
+⚠️ هذه معلومات حقيقية وشخصية عن المستخدم من محادثات سابقة — استخدمها بشكل مباشر في ردك:
+
+{memory_context}
+
+تعليمات مهمة: اربط ردك بهذه المعلومات بوضوح. لا تتجاهل أي معلومة ذات صلة بالرسالة الحالية.
+</FULL_CONTEXT>"""
+        return f"""<FULL_CONTEXT>
+⚠️ Real personal information about the user from previous conversations — use it directly:
+
+{memory_context}
+
+Important: Connect your reply to this information clearly.
+</FULL_CONTEXT>"""
 
     def _build_history_section(self, history: Optional[List[Dict[str, str]]], lang: str) -> str:
         if not history:
@@ -234,7 +251,8 @@ The user's name is {user_name}.
                 "2. إذا كانت نتيجة الأداة موجودة في <FULL_CONTEXT>، فاستخدمها ولا تتجاهلها أبداً.",
                 "3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.",
                 "4. **تكلم بالعامية**: إذا خاطبك المستخدم بالعامية، أجب بالعامية. استخدم كلمات مثل 'إزيك'، 'عامل إيه'، 'أكيد'، 'يلا بينا'، 'حبيبي' حسب السياق.",
-                "5. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.",
+                "5. طول الرد يتناسب مع الطلب — سؤال بسيط = جواب مختصر، طلب تفصيلي = رد وافٍ.",
+                "11. ابدأ ردك بربطه بشيء تعرفه عن المستخدم إذا أمكن. مثال: 'بما إنك شغال على...' أو 'بناءً على اللي قلته من قبل عن...'",
                 "6. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
                 "7. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
                 "8. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",

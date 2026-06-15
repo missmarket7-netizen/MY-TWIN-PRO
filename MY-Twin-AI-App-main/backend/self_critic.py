@@ -14,17 +14,30 @@ class SelfCritic:
         if not reply or len(reply) < 5:
             return reply
 
-        # فحص سريع للتكرار
+        # فحص التكرار فقط — بدون API call للهلوسة
         if self._has_excessive_repetition(reply):
             logger.warning("⚠️ تكرار مفرط في الرد")
             reply = await self._repair_repetition(reply, multi_client) or reply
 
-        # فحص الهلوسة ضد السياق
-        if context and self._has_potential_hallucination(reply, context):
-            logger.warning("⚠️ هلوسة محتملة في الرد")
-            reply = await self._repair_hallucination(reply, context, multi_client) or reply
+        # فحص الردود الفارغة أو العامة جداً
+        if self._is_too_generic(reply):
+            logger.warning("⚠️ رد عام جداً — تم تسجيله للمراجعة")
+            # لا نصلحه تلقائياً — نسجله بس
 
         return reply
+
+    def _is_too_generic(self, reply: str) -> bool:
+        """يكتشف الردود العامة جداً."""
+        generic_phrases = [
+            "كيف يمكنني مساعدتك",
+            "أنا هنا للمساعدة",
+            "هل يمكنني مساعدتك",
+            "كيف حالك اليوم",
+            "How can I help you",
+            "I'm here to help",
+        ]
+        reply_lower = reply.lower()
+        return any(phrase.lower() in reply_lower for phrase in generic_phrases)
 
     def _has_excessive_repetition(self, text: str) -> bool:
         words = text.split()
@@ -34,10 +47,7 @@ class SelfCritic:
         return unique_ratio < 0.4
 
     def _has_potential_hallucination(self, reply: str, context: str) -> bool:
-        reply_numbers = set(re.findall(r'\d+', reply))
-        context_numbers = set(re.findall(r'\d+', context))
-        if reply_numbers and context_numbers:
-            return not reply_numbers.issubset(context_numbers)
+        # معطل — كان يسبب false positives كثيرة
         return False
 
     async def _repair_repetition(self, text: str, multi_client) -> Optional[str]:

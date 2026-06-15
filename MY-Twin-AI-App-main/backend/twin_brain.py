@@ -116,6 +116,20 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Context building failed: {e}")
 
+        # Feedback Loop: لو المستخدم عمل dislike آخر رد — نضيفه للسياق
+        last_feedback = ""
+        if user_id:
+            try:
+                from supabase import create_client
+                import os
+                _db = create_client(os.getenv("SUPABASE_URL",""), os.getenv("SUPABASE_SERVICE_KEY",""))
+                fb = _db.table("message_feedback").select("rating").eq("user_id", user_id).eq("rating","dislike").order("created_at", desc=True).limit(1).execute()
+                if fb.data:
+                    last_feedback = "\n⚠️ تنبيه: المستخدم لم يُعجبه آخر رد — تجنب نفس الأسلوب والطول والنبرة."
+                    logger.info("📊 Feedback Loop: dislike detected")
+            except Exception as e:
+                logger.warning(f"Feedback fetch failed: {e}")
+
         journey_info = {}
         attachment_info = {}
         if user_id:
@@ -200,7 +214,7 @@ class TwinBrain:
                     relationship_for_prompt["attachment_style"] = att_style
                     relationship_for_prompt["attachment_guidance"] = att_adjustments
 
-            formatted_context = context_manager.format_context_for_prompt(full_context)
+            formatted_context = context_manager.format_context_for_prompt(full_context) + last_feedback
             if tool_results:
                 formatted_context = "<TOOL_RESULTS>\n" + "\n".join(tool_results) + "\n</TOOL_RESULTS>\n\n" + formatted_context
 
@@ -215,6 +229,7 @@ class TwinBrain:
                 memory_context=formatted_context,
                 reasoning_result=plan,
                 consciousness_context=full_context.get("consciousness", {}),
+                history=history,
             )
 
             task_type = plan.get("response_style", "general")

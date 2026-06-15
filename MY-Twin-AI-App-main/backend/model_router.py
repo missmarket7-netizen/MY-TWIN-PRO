@@ -32,9 +32,11 @@ class ModelRouter:
     EMOTION_PROVIDERS = {
         "sadness": ["gemini"],
         "fear": ["gemini"],
-        "anger": ["groq"],
-        "joy": ["openrouter", "gemini"],
+        "anger": ["gemini", "groq"],   # Gemini أكثر تعاطفاً حتى مع الغضب
+        "joy": ["gemini", "openrouter"],
         "love": ["gemini"],
+        "support": ["gemini"],
+        "anxiety": ["gemini"],
     }
 
     @classmethod

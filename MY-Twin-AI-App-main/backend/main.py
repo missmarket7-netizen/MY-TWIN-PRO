@@ -166,8 +166,8 @@ async def chat(
         brain = get_brain()
         res = await brain.respond(
             message=body.message, twin_name=body.twin_name, bond_level=body.bond_level,
-            dims=body.relationship_dims, memories=[], history=body.history[-10:],
-            calm=is_calm, personality=None, country_code=country_code,
+            dims=body.relationship_dims, memories=p.get("memories", []), history=body.history[-10:],
+            calm=is_calm, personality=p.get("personality_analysis"), country_code=country_code,
             user_id=uid, tier=tier, join_date=signup_date,
             recent_messages=[h.get("content", "") for h in body.history[-20:] if isinstance(h, dict)],
             user_profile=p

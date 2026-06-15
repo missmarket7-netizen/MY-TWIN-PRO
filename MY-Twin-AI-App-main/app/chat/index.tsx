@@ -30,7 +30,7 @@ import SideMenu from '../../components/SideMenu';
 import TypingIndicator from '../../components/TypingIndicator';
 import { Menu, Volume2, VolumeX } from 'lucide-react-native';
 import { speakResponse } from '../../utils/voice_engine';
-import { COLORS, UserBubble, TwinBubble, EnergyCircle } from './ChatBubbles';
+import { COLORS, UserBubble, TwinBubble } from './ChatBubbles';
 import { ChatInput } from './ChatInput';
 
 const APP_ICON = require('../../assets/icon.png');
