@@ -11,7 +11,7 @@ const PLATFORM = Platform.OS;
 let requestCounter = 0;
 function generateRequestId(): string { requestCounter++; return `${Date.now().toString(36)}-${requestCounter.toString(36)}-${Math.random().toString(36).substring(2, 7)}`; }
 
-export const API = axios.create({ baseURL: BASE_URL, timeout: 25000, headers: { 'Content-Type': 'application/json' } });
+export const API = axios.create({ baseURL: BASE_URL, timeout: 30000, headers: { 'Content-Type': 'application/json' } });
 
 let _token = '';
 let _tokenRefreshing = false;
@@ -58,7 +58,7 @@ API.interceptors.response.use((r) => r, async (error: AxiosError) => {
       }
     } catch (refreshError) { console.error('Token refresh failed:', refreshError); }
   }
-  const shouldRetry = !error.response || error.response.status >= 502;
+  const shouldRetry = !error.response || error.response.status >= 502 || error.code === 'ECONNABORTED';
   if (shouldRetry) {
     config._retryCount = config._retryCount ?? 0;
     if (config._retryCount < 3) {
@@ -102,15 +102,6 @@ export const askTwin = async (req: TwinRequest): Promise<TwinResponse> => {
   return { reply: data.reply, new_bond: data.new_bond, emotion: data.emotion, relationship_dims: data.relationship_dims, relationship_stage: data.relationship_stage, journey_phase: data.journey_phase, journey_day: data.journey_day, attachment_style: data.attachment_style, consciousness: data.consciousness, memory_used: data.memory_used, thinking_stage: data.thinking_stage, dialect: data.dialect, latency_ms: data.latency_ms, energy: data.energy, provider: data.provider, twin_gender: data.twin_gender||g, voice_personality: data.voice_personality };
 };
 
-export const askTwinStream = async function* (req: TwinRequest): AsyncGenerator<string, void, unknown> {
-  const store = useTwinStore.getState(); const g = req.twinGender || store.twinGender || 'female';
-  const safeDims = toSafeRecord(req.relationshipDims || {});
-  const payload = { message: req.message, twin_name: req.twinName||'توأمك', bond_level: req.bondLevel||0, relationship_dims: safeDims, history: req.chatHistory?.slice(-10)||[], journey_phase: req.journeyPhase||'introduction', attachment_style: req.attachmentStyle||'unknown', twin_style: req.twinStyle||'supportive', reply_style: req.replyStyle||'medium', lang: req.lang||'ar', image: req.image, calm_mode: req.calmMode||false, twin_gender: g };
-  const response = await API.post('/api/chat/stream', payload, { responseType: 'stream', headers: { 'X-Calm-Mode': String(req.calmMode||false), 'X-Twin-Gender': g } });
-  const stream = response.data; const reader = stream.getReader(); const decoder = new TextDecoder();
-  while (true) { const { done, value } = await reader.read(); if (done) break; yield decoder.decode(value, { stream: true }); }
-};
-
 export const sendChatFromStore = async (message: string, image?: string): Promise<TwinResponse> => {
   const s = useTwinStore.getState();
   return askTwin({ message, twinName: s.twinName, bondLevel: s.bondLevel, relationshipDims: s.relationshipDims, chatHistory: s.chatHistory.slice(-10), journeyPhase: s.journeyPhase, attachmentStyle: s.attachmentStyle, twinStyle: s.twinStyle, replyStyle: s.replyStyle, lang: s.lang, image, calmMode: s.calmMode, twinGender: s.twinGender });
@@ -127,25 +118,6 @@ export const updateStoreFromResponse = (r: TwinResponse) => {
   if (r.thinking_stage) { s.setThinkingStage(r.thinking_stage); s.setThinking(true); } else { s.setThinking(false); }
   if (r.twin_gender) s.setTwinGender(r.twin_gender);
   s.setTotalMessages(s.totalMessages + 1);
-};
-
-export const speakWithTwinVoice = async (text: string): Promise<void> => {
-  const store = useTwinStore.getState(); const gender = store.twinGender || 'female';
-  try {
-    if (store.tier && ['premium','pro','yearly'].includes(store.tier)) {
-      const response = await API.post('/api/voice/speak', { text, tier: store.tier, gender, emotion: store.emotionState?.primary || 'neutral' }, { responseType: 'arraybuffer' });
-      if (response.data) return;
-    }
-    const { speakResponse } = require('../utils/voice_engine'); await speakResponse(text);
-  } catch { const Speech = require('expo-speech'); Speech.speak(text, { language: 'ar', pitch: gender==='male'?0.9:1.1, rate: 0.95 }); }
-};
-
-export const saveVoicePreference = async (gender: 'male'|'female', personality?: string): Promise<void> => {
-  try { await API.post('/api/voice/preferences', { gender, personality: personality||'friend' }); } catch {}
-};
-
-export const saveMemory = async (memory: object) => {
-  try { return await API.post('/api/memory/save', memory); } catch (err) { throw err; }
 };
 
 export const fetchWeather = async (city: string = 'Cairo') => { const { data } = await API.get('/api/services/weather', { params: { city } }); return data; };

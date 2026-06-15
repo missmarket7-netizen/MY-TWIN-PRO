@@ -85,6 +85,7 @@ export default function Chat() {
   const [messageQueue, setMessageQueue] = useState<Array<{ msg?: string; image?: string }>>([]);
   const [twinEnergy, setTwinEnergy] = useState(100);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [activeToolsList, setActiveToolsList] = useState<any[]>([]);
   const [editingContent, setEditingContent] = useState('');
   const [feedbackMap, setFeedbackMap] = useState<Record<string, 'like' | 'dislike' | null>>({});
 
@@ -318,6 +319,14 @@ export default function Chat() {
   );
 
   // الأدوات السريعة (طقس، يوتيوب...)
+  const handleAddTool = (toolDef: any) => {
+    setActiveToolsList((prev: any[]) => [...prev, { id: Date.now().toString(), ...toolDef }]);
+  };
+
+  const handleRemoveTool = (toolId: string) => {
+    setActiveToolsList((prev: any[]) => prev.filter(t => t.id !== toolId));
+  };
+
   const handleQuickTool = async (tool: string) => {
     let result = '';
     setLoading(true);
@@ -494,8 +503,8 @@ export default function Chat() {
           onCamera={() => {}}
           onGallery={() => {}}
           onFile={() => {}}
-          activeTools={[]}
-          onRemoveTool={() => {}}
+          activeTools={activeToolsList}
+          onRemoveTool={handleRemoveTool}
           showAttach={showAttach}
           setShowAttach={setShowAttach}
           attachAnim={attachAnim}

@@ -29,7 +29,7 @@ function BackButton() {
   if (hiddenRoutes.includes(pathname)) return null;
   return (
     <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
-      <Text style={{ color: isDark ? '#D8B4FE' : '#6B21A8', fontSize: 28, fontWeight: '300', lineHeight: 32 }}>‹</Text>
+      <Text style={{ color: isDark ? '#D8B4FE' : '#7C3AED', fontSize: 28, fontWeight: '300', lineHeight: 32 }}>‹</Text>
     </TouchableOpacity>
   );
 }
@@ -53,11 +53,7 @@ export default function RootLayout() {
   }, [menuVisible, drawerWidth]);
 
   const screenOptions = useMemo(() => ({
-    headerShown: true,
-    headerStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },
-    headerTitleStyle: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 18, fontWeight: "bold" as const },
-    headerLeft: () => <BackButton />,
-    headerShadowVisible: false,
+    headerShown: false,
     contentStyle: { backgroundColor: isDark ? '#1A1A1A' : '#F8F6F2' },
   }), [isDark]);
 
@@ -66,11 +62,11 @@ export default function RootLayout() {
       <ToastProvider>
         <StatusBar style={isDark ? "light" : "dark"} />
         <Stack screenOptions={screenOptions}>
-          <Stack.Screen name="chat" options={{ headerShown: false }} />
-          <Stack.Screen name="splash" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="chat" />
+          <Stack.Screen name="splash" />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="onboarding" />
         </Stack>
 
         {menuVisible && (

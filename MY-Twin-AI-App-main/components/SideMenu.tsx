@@ -4,7 +4,7 @@ import { useTwinStore } from '../store/useTwinStore';
 import { router, usePathname } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useMemo } from 'react';
-import { Home, Heart, History, User, BrainCircuit, Palette, Diamond, Settings, LogOut, X, PlusCircle, Gift, Sparkles, BatteryFull, BatteryMedium, BatteryLow, ArrowRight } from 'lucide-react-native';
+import { Home, Heart, History, User, BrainCircuit, Palette, Diamond, Settings, LogOut, X, PlusCircle, Gift, Sparkles, BatteryFull, BatteryMedium, BatteryLow, ArrowRight, Clock } from 'lucide-react-native';
 
 const TIER_LABELS: Record<string,{ar:string;en:string}> = {
   free:{ar:'مجاني',en:'Free'}, free_trial_14d:{ar:'تجربة مجانية',en:'Free Trial'}, premium_trial:{ar:'تجربة مميزة',en:'Premium Trial'},
@@ -38,6 +38,7 @@ export default function SideMenu({ onClose }:{ onClose:()=>void }) {
     {icon:Home,label:t('الرئيسية','Home'),route:'/chat'},
     {icon:PlusCircle,label:t('دردشة جديدة','New Chat'),onPress:startNewChat},
     {icon:Heart,label:t('علاقتي','My Relationship'),route:'/relationship'},
+    {icon:Clock,label:t('سجل المحادثات','Chat History'),route:'/history'},
     {icon:History,label:t('ذكرياتنا','Memories'),route:'/memories'},
     {icon:User,label:t('الملف الشخصي','Profile'),route:'/profile'},
     {icon:Palette,label:t('تخصيص','Customize'),route:'/customize'},

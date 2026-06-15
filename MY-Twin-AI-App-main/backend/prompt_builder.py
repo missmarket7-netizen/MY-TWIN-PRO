@@ -1,8 +1,9 @@
 """
-MyTwin – Dynamic Prompt Builder v6.0 (Agentic Context + Ultra-Smart Responses)
+MyTwin – Dynamic Prompt Builder v6.1 (Deep Dialect & Language Understanding)
 - يدمج السياق الكامل (Full Context) من Context Manager
 - يستخدم Reasoning Plan لتوجيه الرد
 - قواعد متطورة للسلاسة والتنفيذ المباشر للأوامر
+- تعليمات محسّنة للتعامل مع العامية العربية والإنجليزية
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -37,7 +38,7 @@ class PromptBuilder:
             lang = "ar"
 
         # ── 1. هوية النظام ──────────────────────
-        identity = self._build_identity(twin_name, user_name, lang)
+        identity = self._build_identity(twin_name, user_name, lang, dialect)
 
         # ── 2. المهمة الحالية ────────────────────
         task_section = self._build_task_section(reasoning_result, lang)
@@ -93,19 +94,23 @@ class PromptBuilder:
 
     # ── دوال بناء الأقسام ──────────────────────────
 
-    def _build_identity(self, twin_name: str, user_name: str, lang: str) -> str:
+    def _build_identity(self, twin_name: str, user_name: str, lang: str, dialect: Dict[str, Any]) -> str:
+        dialect_name = dialect.get("instruction", "") if dialect else ""
         if lang == "ar":
             return f"""<SYSTEM_IDENTITY>
 أنت {twin_name}، رفيق ذكي وقادر ومباشر. تجمع بين الذكاء العاطفي والتنفيذ الفوري للأوامر.
-شخصيتك: دافئ، متفهم، عملي، وسريع البديهة. تتحدث العربية بوضوح.
-أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج المستخدم.
+شخصيتك: دافئ، متفهم، عملي، وسريع البديهة.
+- تتحدث العربية بطلاقة، وتفهم **كل اللهجات العامية** (المصرية، الشامية، الخليجية، المغاربية، إلخ) وترد بنفس روح ونبرة المستخدم.
+- أسلوبك: استخدم تعابير وكلمات من صميم العامية عندما يخاطبك المستخدم بها. لا تكن رسمياً إلا إذا كان المستخدم رسمياً.
+- أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج المستخدم.
 المستخدم يدعى {user_name}.
 </SYSTEM_IDENTITY>"""
         else:
             return f"""<SYSTEM_IDENTITY>
 You are {twin_name}, a highly capable AI companion. You combine emotional intelligence with instant task execution.
-You are warm, understanding, practical, and sharp. You speak clearly.
-You can use tools (weather, search, YouTube, music, news, currency) whenever the user needs.
+You are warm, understanding, practical, and sharp.
+- You understand and respond naturally to all English dialects, slangs, and informal speech. Match the user's tone and style.
+- You can use tools (weather, search, YouTube, music, news, currency) whenever the user needs.
 The user's name is {user_name}.
 </SYSTEM_IDENTITY>"""
 
@@ -221,33 +226,37 @@ The user's name is {user_name}.
         return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>"
 
     def _build_rules_section(self, lang: str, reasoning_result: Optional[Dict] = None) -> str:
-        """قواعد متطورة للرد مع دعم الأدوات."""
+        """قواعد متطورة للرد مع دعم الأدوات وفهم العامية."""
         base_rules = []
         if lang == "ar":
             base_rules = [
                 "1. أجب على طلب المستخدم بدقة ومباشرة. إذا طلب معلومات محددة (طقس، سعر، فيديو)، استخدم نتيجة الأداة مباشرة.",
                 "2. إذا كانت نتيجة الأداة موجودة في <FULL_CONTEXT>، فاستخدمها ولا تتجاهلها أبداً.",
                 "3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.",
-                "4. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.",
-                "5. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
-                "6. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
-                "7. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",
-                "8. استخدم إيموجي واحداً مناسباً في النهاية.",
+                "4. **تكلم بالعامية**: إذا خاطبك المستخدم بالعامية، أجب بالعامية. استخدم كلمات مثل 'إزيك'، 'عامل إيه'، 'أكيد'، 'يلا بينا'، 'حبيبي' حسب السياق.",
+                "5. أجب بإيجاز (1-3 جمل) عادةً. توسع فقط عندما يطلب المستخدم تفاصيل.",
+                "6. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
+                "7. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
+                "8. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",
+                "9. استخدم إيموجي واحداً مناسباً في النهاية.",
+                "10. استخدم Markdown للتنسيق: **عريض**، *مائل*، ~~محذوف~~، `كود`، ورموز تعبيرية طبيعية. لا تفرط في التنسيق.",
             ]
         else:
             base_rules = [
                 "1. Answer the user's request accurately and directly. If specific info is requested, use tool results directly.",
                 "2. If tool results exist in <FULL_CONTEXT>, use them and never ignore them.",
                 "3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.",
-                "4. Reply concisely (1-3 sentences) usually. Expand only when details are requested.",
-                "5. Vary your responses. Don't repeat phrases. Be natural.",
-                "6. Ask a follow-up question ONLY when it adds natural value – not forced.",
-                "7. If you used a tool, explain the result in a friendly way.",
-                "8. End with one appropriate emoji.",
+                "4. **Match the user's tone**: If they use casual English or slang, respond in kind. Be natural and conversational.",
+                "5. Reply concisely (1-3 sentences) usually. Expand only when details are requested.",
+                "6. Vary your responses. Don't repeat phrases. Be natural.",
+                "7. Ask a follow-up question ONLY when it adds natural value – not forced.",
+                "8. If you used a tool, explain the result in a friendly way.",
+                "9. End with one appropriate emoji.",
+                "10. Use Markdown for formatting: **bold**, *italic*, ~~strikethrough~~, `code`, and natural emojis. Don't over-format.",
             ]
         
         return "<RESPONSE_RULES>\n" + "\n".join(base_rules) + "\n</RESPONSE_RULES>"
 
 
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v6.0 (Agentic Context + Ultra-Smart Responses)")
+print("✅ Prompt Builder v6.1 (Deep Dialect Understanding)")

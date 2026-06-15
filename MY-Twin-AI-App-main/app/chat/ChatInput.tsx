@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Animated, Platform, Alert, ActivityIndicator, ScrollView } from 'react-native';
-import { Send, X, Camera, Image as ImageIcon, FileText, Search, Cloud, Music, Film, DollarSign, TrendingUp, Mic } from 'lucide-react-native';
+import { Send, X, Camera, Image as ImageIcon, FileText, Search, Cloud, Music, Film, DollarSign, TrendingUp, Mic, Wand2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
@@ -27,7 +27,6 @@ export const ChatInput = memo(({
           Audio.RecordingOptionsPresets.HIGH_QUALITY
         );
         setRecording(true);
-        // بعد فترة قصيرة، توقف وأرسل للتحويل
         setTimeout(async () => {
           try {
             await recording.stopAndUnloadAsync();
@@ -53,9 +52,10 @@ export const ChatInput = memo(({
     { icon: Camera, label_ar: 'كاميرا', label_en: 'Camera', color: '#8B5CF6', onPress: onCamera },
     { icon: ImageIcon, label_ar: 'معرض', label_en: 'Gallery', color: '#EC4899', onPress: onGallery },
     { icon: FileText, label_ar: 'ملف', label_en: 'File', color: '#F59E0B', onPress: onFile },
-    { icon: Cloud, label_ar: 'طقس', label_en: 'Weather', color: '#06B6D4', tool: 'weather' },
-    { icon: Music, label_ar: 'موسيقى', label_en: 'Music', color: '#EC4899', tool: 'spotify' },
+    { icon: Wand2, label_ar: 'صورة AI', label_en: 'AI Image', color: '#A855F7', tool: 'image' },
     { icon: Film, label_ar: 'يوتيوب', label_en: 'YouTube', color: '#EF4444', tool: 'youtube' },
+    { icon: Music, label_ar: 'موسيقى', label_en: 'Music', color: '#EC4899', tool: 'spotify' },
+    { icon: Cloud, label_ar: 'طقس', label_en: 'Weather', color: '#06B6D4', tool: 'weather' },
     { icon: DollarSign, label_ar: 'عملات', label_en: 'Currency', color: '#10B981', tool: 'currency' },
     { icon: TrendingUp, label_ar: 'أخبار', label_en: 'News', color: '#8B5CF6', tool: 'news' },
     { icon: Search, label_ar: 'بحث', label_en: 'Search', color: '#6366F1', tool: 'search' },
@@ -81,14 +81,13 @@ export const ChatInput = memo(({
           placeholderTextColor={colors.subtext} multiline maxLength={2000} editable={!loading}
           onSubmitEditing={() => onSend()} />
 
-        {/* زر الميكروفون */}
         <TouchableOpacity onPress={startRecording} style={[styles.micBtn, recording && { backgroundColor: '#EF4444' }]} disabled={sttLoading}>
           {sttLoading ? <ActivityIndicator size="small" color="#FFF" /> : <Mic size={20} stroke={recording ? '#FFF' : colors.subtext} />}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => onSend()} disabled={loading || (input.trim().length === 0 && !loading)}
-          style={[styles.sendBtn, { backgroundColor: (input.trim().length > 0 && !loading) ? colors.sendActive : colors.sendInactive }]}>
-          {loading ? <ActivityIndicator size="small" color={colors.subtext} /> : <Send size={22} stroke={isDark ? '#FFF' : '#FFF'} />}
+          style={[styles.sendBtn, { backgroundColor: '#7C3AED' }]}>
+          {loading ? <ActivityIndicator size="small" color="#FFF" /> : <Send size={22} stroke="#FFF" />}
         </TouchableOpacity>
       </View>
 

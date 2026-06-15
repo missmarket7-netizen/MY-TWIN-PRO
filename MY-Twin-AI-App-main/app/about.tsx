@@ -1,10 +1,10 @@
 import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
-import { router, Href } from 'expo-router';
+import { router, Href, Stack } from 'expo-router';
 import Constants from 'expo-constants';
 import {
   Info, Heart, Zap, Globe, Mic, Brain, Target,
-  Mail, Shield, FileText, Star, MessageCircle, ExternalLink, Building2
+  Mail, Shield, FileText, Star, MessageCircle, ExternalLink, Building2, ChevronLeft
 } from 'lucide-react-native';
 
 export default function About() {
@@ -34,6 +34,19 @@ export default function About() {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Header مع زر الرجوع */}
+      <View style={[s.header, { borderBottomColor: border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <ChevronLeft size={24} stroke={primary} />
+        </TouchableOpacity>
+        <Text style={[s.headerTitle, { color: txt }]}>
+          {isAr ? 'حول التطبيق' : 'About'}
+        </Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {/* الشعار والإصدار */}
         <Info size={48} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />
@@ -139,6 +152,9 @@ export default function About() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
   title: { fontSize: 30, fontWeight: '800', textAlign: 'center', marginBottom: 2 },
   version: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
   description: { fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 28, paddingHorizontal: 10 },

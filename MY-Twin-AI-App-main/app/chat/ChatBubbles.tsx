@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Animated, Share, Linking, TextInput } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Share, Linking, TextInput } from 'react-native';
 import { ChatMessage } from '../../store/useTwinStore';
-import { Copy, Share2, RotateCcw, Zap, Edit3, Check, ThumbsUp, ThumbsDown, ExternalLink, Film, X, Cpu } from 'lucide-react-native';
+import { Copy, Share2, RotateCcw, Edit3, Check, ThumbsUp, ThumbsDown, ExternalLink, Film, X, Cpu } from 'lucide-react-native';
 import Markdown from 'react-native-markdown-display';
 
 const APP_ICON = require('../../assets/icon.png');
@@ -9,14 +9,14 @@ const APP_ICON = require('../../assets/icon.png');
 export const COLORS = {
   light: {
     bg: '#FFFFFF', headerBg: '#FFFFFF', border: '#E5E5E5', text: '#1A1A1A',
-    subtext: '#999', bubbleUser: '#F0F0F0', userText: '#1A1A1A',
-    inputBg: '#F5F5F5', inputBorder: '#E5E5E5', sendActive: '#1A1A1A',
+    subtext: '#999', bubbleUser: '#7C3AED', userText: '#FFFFFF',
+    inputBg: '#F5F5F5', inputBorder: '#E5E5E5', sendActive: '#7C3AED',
     sendInactive: '#CCC', retryColor: '#EF4444', likeActive: '#10B981', dislikeActive: '#EF4444',
   },
   dark: {
     bg: '#1A1A1A', headerBg: '#1A1A1A', border: '#333', text: '#FFF',
-    subtext: '#999', bubbleUser: '#2A2A2A', userText: '#FFF',
-    inputBg: '#2A2A2A', inputBorder: '#444', sendActive: '#FFF',
+    subtext: '#999', bubbleUser: '#7C3AED', userText: '#FFF',
+    inputBg: '#2A2A2A', inputBorder: '#444', sendActive: '#7C3AED',
     sendInactive: '#555', retryColor: '#EF4444', likeActive: '#10B981', dislikeActive: '#EF4444',
   },
 };
@@ -35,10 +35,10 @@ export const MarkdownRenderer = memo(({ content, isDark }: { content: string; is
     td: { padding: 8, borderTopWidth: 1, borderColor: isDark ? '#444' : '#E0E0E0' },
     code_inline: { backgroundColor: isDark ? '#333' : '#F0F0F0', color: isDark ? '#FFF' : '#333', paddingHorizontal: 6, borderRadius: 4 },
     code_block: { backgroundColor: isDark ? '#222' : '#F0F0F0', padding: 12, borderRadius: 8, marginBottom: 8 },
-    blockquote: { borderLeftWidth: 3, borderLeftColor: '#6B21A8', paddingLeft: 12, marginBottom: 8, backgroundColor: isDark ? '#2A2A2A' : '#F9F9F9' },
+    blockquote: { borderLeftWidth: 3, borderLeftColor: '#7C3AED', paddingLeft: 12, marginBottom: 8, backgroundColor: isDark ? '#2A2A2A' : '#F9F9F9' },
     strong: { fontWeight: 'bold' },
     em: { fontStyle: 'italic' },
-    link: { color: '#6B21A8', textDecorationLine: 'underline' },
+    link: { color: '#7C3AED', textDecorationLine: 'underline' },
   };
   return <Markdown style={markdownStyles} onLinkPress={(url: string) => { Linking.openURL(url).catch(() => {}); return false; }}>{content}</Markdown>;
 });
@@ -49,44 +49,32 @@ export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditi
       {item.image && <Image source={{ uri: item.image?.startsWith('data:') ? item.image : `data:image/jpeg;base64,${item.image}` }} style={styles.chatImage} />}
       {isEditing ? (
         <View style={{ gap: 8 }}>
-          <TextInput style={[styles.editInput, { color: isDark ? COLORS.dark.userText : COLORS.light.userText }]} value={editContent} onChangeText={setEditContent} multiline autoFocus />
+          <TextInput style={[styles.editInput, { color: '#FFF' }]} value={editContent} onChangeText={setEditContent} multiline autoFocus />
           <TouchableOpacity onPress={() => onSaveEdit(item, editContent)} style={styles.editSaveBtn}><Check size={16} stroke="#FFF" /></TouchableOpacity>
         </View>
       ) : (
-        <Text style={[styles.userText, { color: isDark ? COLORS.dark.userText : COLORS.light.userText }]}>{item.content}</Text>
+        <Text style={[styles.userText, { color: '#FFF' }]}>{item.content}</Text>
       )}
       {!isEditing && (
-        <TouchableOpacity onPress={() => onStartEdit(item)} style={styles.editBtn}><Edit3 size={14} stroke={isDark ? '#999' : '#666'} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => onStartEdit(item)} style={styles.editBtn}><Edit3 size={14} stroke="#FFF" /></TouchableOpacity>
       )}
     </View>
   </View>
 ));
 
-// ✅ مكون شارة النموذج المستخدم (Provider Badge)
 const ProviderBadge = memo(({ provider, isDark }: { provider: string; isDark: boolean }) => {
   const labelMap: Record<string, string> = {
-    groq: 'Groq',
-    gemini: 'Gemini',
-    openrouter: 'Llama 4',
-    model_router: 'AI',
-    agent_loop: 'Agent',
-    multi_ai: 'Multi-AI',
-    fallback: 'AI',
-    tool: 'Tool',
+    groq: 'Groq', gemini: 'Gemini', openrouter: 'Llama 4',
+    model_router: 'AI', agent_loop: 'Agent', multi_ai: 'Multi-AI',
+    fallback: 'AI', tool: 'Tool',
   };
   const colorMap: Record<string, string> = {
-    groq: '#F59E0B',
-    gemini: '#10B981',
-    openrouter: '#3B82F6',
-    model_router: '#8B5CF6',
-    agent_loop: '#EC4899',
-    multi_ai: '#6B21A8',
-    fallback: '#EF4444',
-    tool: '#6366F1',
+    groq: '#F59E0B', gemini: '#10B981', openrouter: '#3B82F6',
+    model_router: '#8B5CF6', agent_loop: '#EC4899', multi_ai: '#7C3AED',
+    fallback: '#EF4444', tool: '#6366F1',
   };
   const label = labelMap[provider] || provider;
   const color = colorMap[provider] || '#666';
-  
   return (
     <View style={[styles.providerBadge, { backgroundColor: color + '15', borderColor: color + '30' }]}>
       <Cpu size={10} stroke={color} />
@@ -114,7 +102,6 @@ export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, o
         <TouchableOpacity onPress={() => onLike(item)} style={[styles.actionBtn, liked && { backgroundColor: '#10B98120', borderRadius: 8 }]}><ThumbsUp size={16} stroke={liked ? '#10B981' : isDark ? '#999' : '#666'} fill={liked ? '#10B981' : 'transparent'} /></TouchableOpacity>
         <TouchableOpacity onPress={() => onDislike(item)} style={[styles.actionBtn, disliked && { backgroundColor: '#EF444420', borderRadius: 8 }]}><ThumbsDown size={16} stroke={disliked ? '#EF4444' : isDark ? '#999' : '#666'} fill={disliked ? '#EF4444' : 'transparent'} /></TouchableOpacity>
       </View>
-      {/* ✅ شارة النموذج المستخدم */}
       {provider && <ProviderBadge provider={provider} isDark={isDark} />}
       {item.failed && (
         <TouchableOpacity onPress={() => onRetry(item)} style={styles.retryBtn}><RotateCcw size={14} stroke="#EF4444" /><Text style={styles.retryText}>إعادة المحاولة</Text></TouchableOpacity>
@@ -122,22 +109,6 @@ export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, o
     </View>
   </View>
 ));
-
-export const EnergyCircle = memo(({ energy, isDark }: { energy: number; isDark: boolean }) => {
-  const color = energy > 60 ? '#10B981' : energy > 25 ? '#F59E0B' : '#EF4444';
-  const size = 40; const strokeWidth = 4; const progress = Math.max(0, Math.min(energy, 100)) / 100;
-  return (
-    <View style={{ alignItems: 'center' }}>
-      <View style={{ width: size, height: size }}>
-        <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: isDark ? '#333' : '#E5E7EB' }} />
-        <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: 'transparent', borderTopColor: color, borderRightColor: color, transform: [{ rotate: `${progress * 360}deg` }] }} />
-        <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: 'transparent', borderBottomColor: color, borderLeftColor: color, transform: [{ rotate: `${progress * 360}deg` }] }} />
-        <View style={{ position: 'absolute', width: size, height: size, alignItems: 'center', justifyContent: 'center' }}><Zap size={14} stroke={color} /></View>
-      </View>
-      <Text style={{ fontSize: 9, fontWeight: '700', color: isDark ? '#CCC' : '#666', marginTop: 2 }}>{energy}%</Text>
-    </View>
-  );
-});
 
 export const ToolChip = memo(({ label, icon: Icon, color, onClose }: any) => (
   <View style={[styles.toolChip, { backgroundColor: color + '15', borderColor: color + '30' }]}>
@@ -151,9 +122,9 @@ const styles = StyleSheet.create({
   userBubble: { maxWidth: '80%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomRightRadius: 4 },
   userText: { fontSize: 16, lineHeight: 24 },
   chatImage: { width: 220, height: 220, borderRadius: 14, marginBottom: 8 },
-  editBtn: { position: 'absolute', bottom: -12, right: 8, backgroundColor: '#E5E5E5', borderRadius: 10, padding: 4 },
-  editInput: { fontSize: 16, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#6B21A8' },
-  editSaveBtn: { backgroundColor: '#6B21A8', borderRadius: 14, padding: 6 },
+  editBtn: { position: 'absolute', bottom: -12, right: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 10, padding: 4 },
+  editInput: { fontSize: 16, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FFF' },
+  editSaveBtn: { backgroundColor: '#10B981', borderRadius: 14, padding: 6 },
   twinRow: { flexDirection: 'row', justifyContent: 'flex-start', marginBottom: 24, gap: 10 },
   twinAvatar: { width: 30, height: 30, borderRadius: 15, marginTop: 2 },
   twinContent: { flex: 1 },
@@ -165,7 +136,6 @@ const styles = StyleSheet.create({
   toolChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   toolChipText: { fontSize: 13, fontWeight: '500' },
   toolChipClose: { marginLeft: 4, padding: 2 },
-  // ✅ شارة النموذج
   providerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, alignSelf: 'flex-start', marginTop: 8 },
   providerText: { fontSize: 10, fontWeight: '600' },
 });
