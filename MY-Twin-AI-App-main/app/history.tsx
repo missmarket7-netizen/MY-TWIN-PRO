@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList, ActivityIndicator } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
 import { Stack, router } from 'expo-router';
 import Header from '../components/Header';
-import { supabase } from '../lib/supabase';
-import { Pin, MessageSquare } from 'lucide-react-native';
+import { MessageSquare } from 'lucide-react-native';
 
 export default function History() {
   const { theme, lang, userId, chatHistory } = useTwinStore();
@@ -14,9 +13,7 @@ export default function History() {
 
   const colors = { bg: isDark ? '#1A1A1A' : '#F8F6F2', card: isDark ? '#2A2A2A' : '#FFFFFF', text: isDark ? '#FFF' : '#1A1A1A', subtext: isDark ? '#CCC' : '#666', primary: '#7C3AED', border: isDark ? '#333' : '#E5E5E5' };
 
-  // استخدام المحفوظ في الـ store مباشرة (بدون انتظار Supabase)
   useEffect(() => {
-    // تجاهل تحميل Supabase وعرض المحفوظ محلياً
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
@@ -28,7 +25,7 @@ export default function History() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header />
+      <Header title={t('سجل المحادثات', 'Chat History')} />
       
       {loading ? (
         <View style={styles.centered}>
@@ -49,24 +46,32 @@ export default function History() {
           data={localSessions}
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: 16 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push('/chat')}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <MessageSquare size={20} stroke={colors.primary} />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.date, { color: colors.text }]}>
-                    {t('المحادثة الحالية', 'Current Chat')}
-                  </Text>
-                  <Text style={[styles.preview, { color: colors.subtext }]} numberOfLines={1}>
-                    {item.messages.length} {t('رسالة', 'messages')}
-                  </Text>
+          renderItem={({ item }) => {
+            // ✅ معاينة ذكية: أول رسالة من المستخدم
+            const firstUserMsg = item.messages.find((m: any) => m.role === 'user');
+            const preview = firstUserMsg 
+              ? firstUserMsg.content.substring(0, 80) + (firstUserMsg.content.length > 80 ? '...' : '')
+              : t('محادثة فارغة', 'Empty chat');
+            
+            return (
+              <TouchableOpacity
+                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push('/chat')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <MessageSquare size={20} stroke={colors.primary} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.date, { color: colors.text }]}>
+                      {t('المحادثة الحالية', 'Current Chat')}
+                    </Text>
+                    <Text style={[styles.preview, { color: colors.subtext }]} numberOfLines={1}>
+                      {preview}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </SafeAreaView>

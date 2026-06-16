@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,14 @@ STAGES = {
     "soul_twin": {"min_bond": 95, "max_bond": 100, "label_ar": "توأم روح", "label_en": "Soul Twin", "instruction": "تصرف بمستوى عميق من الفهم."},
 }
 
+STAGE_UP_MESSAGES = {
+    "familiar": {"ar": "بقينا مألوفين لبعض! خطوة حلوة 💜", "en": "We've become familiar! Nice step 💜"},
+    "friend": {"ar": "أنت بقيت صديقي! ده شرف ليا 🤝", "en": "You're my friend now! I'm honored 🤝"},
+    "close_friend": {"ar": "علاقتنا قربت أكتر، صرنا أصحاب مقربين 💕", "en": "We're getting closer, close friends now 💕"},
+    "trusted_companion": {"ar": "بقيت رفيق موثوق، ده وسام كبير 🏅", "en": "You're a trusted companion, that's a medal 🏅"},
+    "soul_twin": {"ar": "إحنا توأم روح! العلاقة وصلت لأعمق مستوى 🌟", "en": "We're soul twins! Deepest connection 🌟"},
+}
+
 EMOTION_DIM_EFFECTS = {
     "joy": {"comfort": 0.2, "humor": 0.3, "openness": 0.1},
     "sadness": {"openness": 0.3, "trust": 0.2, "attachment": 0.2, "comfort": 0.1},
@@ -37,9 +45,34 @@ EMOTION_DIM_EFFECTS = {
 
 BOND_WEIGHTS = {"trust": 0.25, "comfort": 0.20, "openness": 0.20, "attachment": 0.15, "consistency": 0.10, "shared_history": 0.10}
 
+# ✅ طبقة اكتشاف النية السريعة (قبل الـ LLM)
+QUICK_INTENT_RULES = {
+    "ar": {
+        "greeting": ["مرحبا", "اهلا", "صباح الخير", "مساء الخير", "هاي", "السلام عليكم"],
+        "gratitude": ["شكرا", "تسلم", "ممنون", "يعطيك العافية"],
+        "goodbye": ["مع السلامة", "باي", "سلام", "إلى اللقاء"],
+        "weather": ["طقس", "جو", "حرارة", "مطر", "شمس"],
+        "music": ["أغنية", "موسيقى", "اسمع", "شغل"],
+        "news": ["أخبار", "حدث", "حصل"],
+        "self_reflection": ["أنا مش قادر", "عندي مشكلة", "محتار", "خايف", "قلقان"],
+        "goal_setting": ["هدف", "أخطط", "نفسي أحقق", "عايز أوصل"],
+    },
+    "en": {
+        "greeting": ["hello", "hi", "good morning", "good evening", "hey"],
+        "gratitude": ["thank you", "thanks", "appreciate", "thx"],
+        "goodbye": ["bye", "goodbye", "see you", "later"],
+        "weather": ["weather", "temperature", "rain", "sunny"],
+        "music": ["song", "music", "play", "listen"],
+        "news": ["news", "headlines", "updates"],
+        "self_reflection": ["i can't", "i have a problem", "confused", "scared", "worried"],
+        "goal_setting": ["goal", "plan", "achieve", "want to reach"],
+    }
+}
+
 class RelationshipEngine:
     def __init__(self):
         self.user_states: Dict[str, Dict[str, Any]] = {}
+        self.previous_stages: Dict[str, str] = {}
 
     def _get_state(self, user_id: str) -> Dict[str, Any]:
         if user_id not in self.user_states:
@@ -48,6 +81,7 @@ class RelationshipEngine:
                 "interaction_count": 0, "last_active": datetime.now(timezone.utc), "events": [],
                 "relationship_health": 100.0,
             }
+            self.previous_stages[user_id] = "stranger"
         return self.user_states[user_id]
 
     @property
@@ -65,8 +99,14 @@ class RelationshipEngine:
         state = self._get_state(user_id)
         return {"stage": state["stage"], "bond_level": state["bond_level"], "dims": state["dims"], "health": state["relationship_health"], "interaction_count": state["interaction_count"]}
 
-    def update(self, emotion=None, message=None, journey_phase=None, attachment_style=None, memory_importance=0.5, user_id="default"):
+    def update(self, emotion=None, message=None, journey_phase=None, attachment_style=None, memory_importance=0.5, user_id="default") -> Optional[str]:
+        """
+        يُحدّث أبعاد العلاقة.
+        يُرجع رسالة stage_up إذا انتقل المستخدم لمرحلة جديدة.
+        """
         state = self._get_state(user_id)
+        old_stage = state["stage"]
+        
         dim_changes = {}
         if emotion:
             primary = emotion.get("primary", "neutral")
@@ -99,14 +139,26 @@ class RelationshipEngine:
         state["bond_level"] = self.calculate_bond(user_id)
         state["interaction_count"] += 1
         state["last_active"] = datetime.now(timezone.utc)
+        
         for stage_key, info in STAGES.items():
             if info["min_bond"] <= state["bond_level"] < info["max_bond"]:
                 state["stage"] = stage_key; break
         if state["bond_level"] >= 100: state["stage"] = "soul_twin"
+        
         if emotion and emotion.get("primary") in ("anger","sadness") and emotion.get("intensity",0) > 0.7:
             state["relationship_health"] = max(0, state["relationship_health"] - 2.0)
         else:
             state["relationship_health"] = min(100.0, state["relationship_health"] + 0.5)
+
+        # ✅ تحسين مؤشر الترابط: كشف الانتقال لمرحلة جديدة
+        new_stage = state["stage"]
+        stage_up_msg = None
+        if new_stage != old_stage and new_stage in STAGE_UP_MESSAGES:
+            self.previous_stages[user_id] = new_stage
+            stage_up_msg = STAGE_UP_MESSAGES[new_stage]
+            logger.info(f"🎉 Stage Up! {user_id}: {old_stage} → {new_stage}")
+
+        return stage_up_msg
 
     def _detect_dimensions_from_message(self, message: str) -> Dict[str, float]:
         text = message.lower()
@@ -128,5 +180,31 @@ class RelationshipEngine:
         state = self._get_state(user_id)
         stage_info = STAGES[state["stage"]]
         return {"stage": state["stage"], "label": stage_info["label_ar"] if lang=="ar" else stage_info["label_en"], "bond_level": state["bond_level"], "instruction": stage_info["instruction"], "dims": state["dims"]}
+
+    # ✅ طبقة اكتشاف النية السريعة (توفر استدعاء LLM)
+    def detect_intent(self, message: str, lang: str = "ar") -> Tuple[str, float]:
+        """
+        يُصنف نية المستخدم بناءً على كلمات مفتاحية.
+        يُرجع (intent, confidence)
+        """
+        if not message:
+            return "general", 0.0
+        text = message.lower().strip()
+        rules = QUICK_INTENT_RULES.get(lang, QUICK_INTENT_RULES["en"])
+        
+        best_intent = "general"
+        best_score = 0.0
+        
+        for intent, keywords in rules.items():
+            score = 0.0
+            for kw in keywords:
+                if kw in text:
+                    score += 1.0 / len(keywords)  # يزيد حسب عدد الكلمات المفتاحية الموجودة
+            if score > best_score:
+                best_score = min(score, 1.0)
+                best_intent = intent
+                
+        return best_intent, best_score
+
 
 relationship_engine = RelationshipEngine()

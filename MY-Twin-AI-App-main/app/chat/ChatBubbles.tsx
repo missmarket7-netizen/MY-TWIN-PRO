@@ -21,25 +21,27 @@ export const COLORS = {
   },
 };
 
+// ✅ مكون Markdown المحسّن (جاهز لاستقبال الردود الذكية من الباك-إند)
 export const MarkdownRenderer = memo(({ content, isDark }: { content: string; isDark: boolean }) => {
   const markdownStyles: any = {
-    body: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 16, lineHeight: 26 },
-    heading1: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, color: isDark ? '#FFF' : '#1A1A1A' },
-    heading2: { fontSize: 20, fontWeight: 'bold', marginBottom: 8, color: isDark ? '#FFF' : '#1A1A1A' },
-    heading3: { fontSize: 18, fontWeight: 'bold', marginBottom: 6, color: isDark ? '#FFF' : '#1A1A1A' },
+    body: { color: isDark ? '#FFF' : '#1A1A1A', fontSize: 16, lineHeight: 28 },
+    heading1: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, color: isDark ? '#D8B4FE' : '#6B21A8' },
+    heading2: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: isDark ? '#D8B4FE' : '#6B21A8' },
+    heading3: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, color: isDark ? '#D8B4FE' : '#6B21A8' },
     list_item: { marginBottom: 6, flexDirection: 'row' },
-    bullet_list: { marginBottom: 10 },
-    ordered_list: { marginBottom: 10 },
-    table: { marginBottom: 10, borderWidth: 1, borderColor: isDark ? '#444' : '#E0E0E0', borderRadius: 8 },
-    th: { padding: 8, backgroundColor: isDark ? '#333' : '#F5F5F5', fontWeight: 'bold' },
-    td: { padding: 8, borderTopWidth: 1, borderColor: isDark ? '#444' : '#E0E0E0' },
+    bullet_list: { marginBottom: 12 },
+    ordered_list: { marginBottom: 12 },
+    table: { marginVertical: 12, borderWidth: 1, borderColor: isDark ? '#444' : '#E0E0E0', borderRadius: 8 },
+    th: { padding: 10, backgroundColor: isDark ? '#333' : '#F5F5F5', fontWeight: 'bold', color: isDark ? '#FFF' : '#1A1A1A' },
+    td: { padding: 10, borderTopWidth: 1, borderColor: isDark ? '#444' : '#E0E0E0', color: isDark ? '#CCC' : '#444' },
     code_inline: { backgroundColor: isDark ? '#333' : '#F0F0F0', color: isDark ? '#FFF' : '#333', paddingHorizontal: 6, borderRadius: 4 },
     code_block: { backgroundColor: isDark ? '#222' : '#F0F0F0', padding: 12, borderRadius: 8, marginBottom: 8 },
-    blockquote: { borderLeftWidth: 3, borderLeftColor: '#7C3AED', paddingLeft: 12, marginBottom: 8, backgroundColor: isDark ? '#2A2A2A' : '#F9F9F9' },
+    blockquote: { borderLeftWidth: 4, borderLeftColor: '#7C3AED', paddingLeft: 16, marginVertical: 10, backgroundColor: isDark ? '#2A2A2A' : '#F9F9F9', borderRadius: 4 },
     strong: { fontWeight: 'bold' },
     em: { fontStyle: 'italic' },
     link: { color: '#7C3AED', textDecorationLine: 'underline' },
-    thematicBreak: { borderBottomWidth: 1, borderBottomColor: isDark ? '#444' : '#E0E0E0', marginVertical: 16 },
+    thematicBreak: { borderBottomWidth: 1, borderBottomColor: isDark ? '#444' : '#E0E0E0', marginVertical: 20 },
+    paragraph: { marginBottom: 12 },
   };
   return <Markdown style={markdownStyles} onLinkPress={(url: string) => { Linking.openURL(url).catch(() => {}); return false; }}>{content}</Markdown>;
 });
@@ -56,7 +58,6 @@ export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditi
       ) : (
         <Text style={[styles.userText, { color: '#FFF' }]}>{item.content}</Text>
       )}
-      {/* زر القلم: يحفظ النص في حقل الإدخال */}
       <TouchableOpacity onPress={() => onEditInInput ? onEditInInput(item) : onStartEdit(item)} style={styles.editBtn}>
         <Edit3 size={14} stroke="#FFF" />
       </TouchableOpacity>
@@ -64,11 +65,8 @@ export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditi
   </View>
 ));
 
-// ProviderBadge removed
-
 export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, onLike, onDislike, liked, disliked, provider }: any) => (
   <View style={styles.twinRow}>
-    {/* أيقونة التوأم أعلى الرد */}
     <Image source={APP_ICON} style={styles.twinAvatarTop} />
     <View style={styles.twinContentFull}>
       {item.youtubeVideo && (
@@ -120,6 +118,4 @@ const styles = StyleSheet.create({
   toolChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   toolChipText: { fontSize: 13, fontWeight: '500' },
   toolChipClose: { marginLeft: 4, padding: 2 },
-  providerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, alignSelf: 'flex-start', marginTop: 8 },
-  providerText: { fontSize: 10, fontWeight: '600' },
 });

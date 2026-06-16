@@ -19,6 +19,7 @@ from context_manager import context_manager
 from tools.agent_loop import agent_loop
 from response_validator import response_validator
 from response_engine import response_engine
+from tools.final_synthesizer import final_synthesizer
 from memory_summarizer import memory_summarizer
 from tools.agent_metrics import agent_metrics
 from model_router import model_router
@@ -29,17 +30,6 @@ from profile_extractor import profile_extractor
 logger = logging.getLogger("twin_brain")
 
 class TwinBrain:
-    EMOJI_MAP = {
-        "joy": ["😊", "😄", "💫", "✨", "🌟", "🥳", "🎉", "💖"],
-        "sadness": ["💜", "🫂", "🌧️", "💙", "🤗", "🌸"],
-        "anger": ["😤", "🔥", "⚡", "🧘", "🌿"],
-        "fear": ["🫶", "💜", "🤝", "✨"],
-        "love": ["💕", "💝", "💌", "🫶", "💖", "🌸"],
-        "surprise": ["😮", "🤩", "💡", "🎯", "🔮", "✨"],
-        "neutral": ["💜", "✨", "🤍", "🌙"],
-        "support": ["💪", "🤝", "🫶", "✨", "🌟"],
-    }
-
     FALLBACK_REPLIES = [
         "والله إني معاك، كمل كلامك متوقفش 💜",
         "حاسس بيك، إيه اللي شاغل بالك بالظبط؟",
@@ -85,8 +75,14 @@ class TwinBrain:
         dialect = get_dialect_for_user(country_code, message)
         dialect_prompt = get_dialect_prompt(dialect)
 
-        # 3. الأدوات - نجمع النتائج فقط، لا نعيدها مباشرة!
+        # 2.5 طبقة اكتشاف النية السريعة (Quick Intent Detection)
+        quick_intent, intent_conf = self.relationship.detect_intent(message, lang="ar")
+        if quick_intent != "general" and intent_conf > 0.7:
+            logger.info(f"⚡ Quick Intent Detected: {quick_intent} (confidence: {intent_conf:.2f})")
+
+        # 3. الأدوات - نجمع النتائج فقط
         tool_context = ""
+        tool_results = []
         if user_id:
             try:
                 tool_result = await tool_router.route(
@@ -95,6 +91,7 @@ class TwinBrain:
                 if tool_result:
                     logger.info(f"🔧 أداة سريعة: {tool_result[:100]}...")
                     tool_context = f"<TOOL_RESULT>\n{tool_result}\n</TOOL_RESULT>"
+                    tool_results.append(tool_result)
                     await agent_metrics.log_tool_execution(
                         user_id=user_id, tool_name="tool_router", success=True,
                         latency_ms=0, input_query=message[:100], output_summary=tool_result[:100]
@@ -131,9 +128,10 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Feedback fetch failed: {e}")
 
-        # 6. تحديث العلاقة
+        # 6. تحديث العلاقة (مع تفعيل stage-up message)
         journey_info = {}
         attachment_info = {}
+        stage_up_message = None
         if user_id:
             try:
                 if join_date:
@@ -147,12 +145,14 @@ class TwinBrain:
                     )
                 else:
                     attachment_info = {"style": "unknown", "confidence": 0.0}
-                self.relationship.update(
+                stage_up_message = self.relationship.update(
                     emotion=emotion, message=message,
                     journey_phase=journey_info.get("phase") if journey_info else None,
                     attachment_style=attachment_info.get("style") if attachment_info else None,
                     memory_importance=emotion.get("intensity", 0.5)
                 )
+                if stage_up_message:
+                    logger.info(f"🎉 Stage Up! Message: {stage_up_message}")
             except Exception as e:
                 logger.warning(f"Relationship update failed: {e}")
 
@@ -170,7 +170,6 @@ class TwinBrain:
 
         final_reply = None
         provider = "multi_ai"
-        tool_results = []
         latency = 0
 
         # 8. Agent Loop (أدوات معقدة)
@@ -196,7 +195,7 @@ class TwinBrain:
             except Exception as e:
                 logger.error(f"Agent loop failed: {e}")
 
-        # 9. بناء الـ Prompt للـ LLM (القلب الجديد المتكامل)
+        # 9. بناء الـ Prompt للـ LLM
         if not final_reply:
             rel_stage = self.relationship.get_stage_instruction()
             if isinstance(rel_stage, dict):
@@ -218,7 +217,6 @@ class TwinBrain:
                     relationship_for_prompt["attachment_style"] = att_style
                     relationship_for_prompt["attachment_guidance"] = att_adjustments
 
-            # بناء formatted_context بالترتيب الصحيح
             formatted_context = context_manager.format_context_for_prompt(full_context) + last_feedback
             
             if tool_results:
@@ -227,7 +225,6 @@ class TwinBrain:
             if tool_context:
                 formatted_context = tool_context + "\n\n" + formatted_context
 
-            # Fallback لـ context_summary
             if not context_summary:
                 context_summary = formatted_context[:500] if formatted_context else ""
 
@@ -248,7 +245,6 @@ class TwinBrain:
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
-                # ✅ تكامل عميق: تمرير message + context ليستخدمها المجلس في تقييم التعقيد والنقد
                 reply, provider = await self.council.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
@@ -266,7 +262,6 @@ class TwinBrain:
                 provider = "fallback"
             latency = (time.time() - start) * 1000
 
-            # ✅ تم حذف _pick_emoji اليدوي لأن response_engine يتولى الإيموجي الآن
             final_reply = reply
 
         # 10. Self-critic
@@ -294,14 +289,34 @@ class TwinBrain:
             final_reply = "أنا هنا لدعمك، لكن لا يمكنني الرد على هذا. 💜"
             provider = "safety_validator"
 
-        # 12. تنسيق الرد النهائي
+        # 12. Final Synthesizer (طبقة الدمج النهائية)
+        try:
+            final_reply = await final_synthesizer.synthesize(
+                user_message=message,
+                tool_results=tool_results,
+                memory_context=formatted_context if 'formatted_context' in dir() else "",
+                llm_reply=final_reply,
+                plan=plan,
+                emotion=emotion,
+                lang="ar"
+            )
+        except Exception as e:
+            logger.warning(f"Final synthesizer failed: {e}")
+
+        # 13. تنسيق الرد النهائي
         final_reply = response_engine.process(
             final_reply,
             intent=plan.get("response_style", "general"),
             lang="ar"
         )
 
-        # 13. المهام الخلفية
+        # 14. إضافة رسالة مرحلة العلاقة (Stage-Up Message) في بداية الرد
+        if stage_up_message:
+            stage_up_text = stage_up_message.get("ar", "") if isinstance(stage_up_message, dict) else ""
+            if stage_up_text:
+                final_reply = f"🎉 **{stage_up_text}**\n\n{final_reply}"
+
+        # 15. المهام الخلفية
         if user_id:
             asyncio.create_task(store_mem(user_id, message, emotion.get("intensity", 0.5), emotion.get("primary", "neutral")))
             asyncio.create_task(extract_entities(user_id, message))

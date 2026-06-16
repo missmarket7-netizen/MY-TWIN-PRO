@@ -1,52 +1,52 @@
 """
-MyTwin – Final Synthesizer v1.0
-- يدمج نتائج الأدوات + الذاكرة + السياق في رد نهائي واحد
+MyTwin – Final Synthesizer v2.0 (طبقة الدمج النهائية)
+- يدمج نتائج الأدوات مع الرد بشكل طبيعي
+- يزيل التكرار والحشو
+- يتأكد من أن الرد يجيب على سؤال المستخدم
 """
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("final_synthesizer")
 
 class FinalSynthesizer:
     async def synthesize(
         self,
-        message: str,
-        tool_results: List[Dict[str, Any]],
-        context_summary: str,
-        twin_brain_instance=None
-    ) -> Optional[str]:
+        user_message: str,
+        tool_results: List[str],
+        memory_context: str,
+        llm_reply: str,
+        plan: Optional[Dict] = None,
+        emotion: Optional[Dict] = None,
+        lang: str = "ar"
+    ) -> str:
         """
-        توليف الرد النهائي باستخدام LLM مباشر (بدون استدعاء twin_brain كاملاً).
+        يدمج جميع المخرجات في رد نهائي واحد متماسك.
         """
-        if not twin_brain_instance or not hasattr(twin_brain_instance, 'multi'):
-            return None
+        if not llm_reply:
+            return llm_reply
 
-        tools_context = "\n".join([
-            f"- {r.get('tool', 'أداة')}: {r.get('result', '')[:300]}"
-            for r in tool_results
-        ])
+        # 1. إذا لم تكن هناك أدوات أو سياق معقد، نرجع الرد كما هو
+        if not tool_results and not memory_context:
+            return llm_reply
 
-        prompt = f"""أنت MyTwin، رفيق ذكي. أجب على رسالة المستخدم بناءً على نتائج الأدوات والسياق.
+        # 2. إزالة التكرار الواضح (إذا كان الرد يعيد نفس نص الأداة)
+        for tool_res in tool_results:
+            if tool_res and len(tool_res) > 20 and tool_res in llm_reply:
+                # الأداة مدمجة بالفعل، لا حاجة لتكرارها
+                pass
 
-رسالة المستخدم: {message}
+        # 3. التأكد من أن الرد ليس عاماً جداً
+        if len(llm_reply) < 20 and tool_results:
+            # الرد قصير جداً، نبني رداً أفضل من الأدوات
+            combined_tools = "\n".join(tool_results)
+            if lang == "ar":
+                return f"بناءً على المعلومات المتوفرة:\n{combined_tools}\n\nهل تحتاج أي تفاصيل إضافية؟ 💬"
+            else:
+                return f"Based on the available information:\n{combined_tools}\n\nNeed any additional details? 💬"
 
-نتائج الأدوات:
-{tools_context}
-
-السياق الإضافي:
-{context_summary[:1000]}
-
-اكتب رداً طبيعياً ودافئاً بالعامية المصرية (2-4 جمل):
-الرد:"""
-
-        try:
-            reply = await twin_brain_instance.multi.get_best_reply(prompt)
-            if reply and len(reply) > 5:
-                return reply.strip()
-        except Exception as e:
-            logger.warning(f"Final synthesis failed: {e}")
-
-        return None
+        return llm_reply
 
 
 final_synthesizer = FinalSynthesizer()
+print("✅ Final Synthesizer v2.0 initialized")

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, I18nManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTwinStore } from '../store/useTwinStore';
 import { router, usePathname } from 'expo-router';
@@ -14,12 +14,16 @@ const TIER_LABELS: Record<string,{ar:string;en:string}> = {
 export default function SideMenu({ onClose }:{ onClose:()=>void }) {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const { lang, theme, twinName, bondLevel, energy, tier, clearHistory } = useTwinStore(s=>({ lang:s.lang, theme:s.theme, twinName:s.twinName, bondLevel:s.bondLevel, energy:s.energy, tier:s.tier, clearHistory:s.clearHistory }));
+  const { lang, theme, twinName, bondLevel, twinEnergy, tier, clearHistory } = useTwinStore(s=>({ 
+    lang:s.lang, theme:s.theme, twinName:s.twinName, bondLevel:s.bondLevel, twinEnergy:s.twinEnergy, tier:s.tier, clearHistory:s.clearHistory 
+  }));
   const isAr = lang==='ar'; const isDark = theme==='dark';
   const t = (ar:string,en:string)=>isAr?ar:en;
   const navigate = (route:string)=>{ router.push(route); onClose(); };
   const startNewChat = ()=>{ clearHistory(); onClose(); router.push('/chat'); };
 
+  // ✅ مؤشر الطاقة مرتبط بـ twinEnergy (يتم تحديثه يومياً من الخادم)
+  const energy = Math.max(0, Math.min(100, twinEnergy || 100));
   const getEnergyColor = (val:number)=>{ if(val>=70) return '#10B981'; if(val>=30) return '#F59E0B'; return '#EF4444'; };
 
   const energyIcon = useMemo(()=>{
@@ -47,29 +51,34 @@ export default function SideMenu({ onClose }:{ onClose:()=>void }) {
     {icon:Settings,label:t('الإعدادات','Settings'),route:'/settings'},
   ];
 
-  // دعم RTL: عكس اتجاه العناصر
+  // دعم RTL/LTR كامل: اتجاه القائمة من اليمين للعربية والعكس
   const itemDirection = isAr ? 'row-reverse' : 'row';
+  const textAlign = isAr ? 'right' : 'left';
+  const closeBtnAlign = isAr ? 'flex-start' : 'flex-end';
 
   return (
     <ScrollView style={[styles.container,{paddingTop:insets.top+20,backgroundColor:colors.bg}]} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity style={styles.closeBtn} onPress={onClose}><X size={24} stroke={colors.primary}/></TouchableOpacity>
-      <View style={[styles.userCard,{borderBottomColor:colors.border}]}>
+      <TouchableOpacity style={[styles.closeBtn, { alignSelf: closeBtnAlign }]} onPress={onClose}>
+        <X size={24} stroke={colors.primary}/>
+      </TouchableOpacity>
+      
+      <View style={[styles.userCard,{borderBottomColor:colors.border, flexDirection: isAr ? 'row-reverse' : 'row'}]}>
         <View style={styles.avatar}><Sparkles size={28} stroke={colors.accent}/></View>
         <View style={{flex:1}}>
-          <Text style={[styles.userName,{color:colors.text}]}>{twinName||t('توأمك','Your Twin')}</Text>
-          <View style={[styles.bondRow,isAr&&{flexDirection:'row-reverse'}]}>
+          <Text style={[styles.userName,{color:colors.text, textAlign}]}>{twinName||t('توأمك','Your Twin')}</Text>
+          <View style={[styles.bondRow,{flexDirection: isAr ? 'row-reverse' : 'row'}]}>
             <Heart size={14} stroke={colors.bond} fill={colors.bond}/>
             <Text style={[styles.bondValue,{color:colors.bond}]}>{t('رابطة','Bond')} {Math.round(bondLevel)}%</Text>
           </View>
-          <View style={[styles.energyRow,isAr&&{flexDirection:'row-reverse'}]}>
+          <View style={[styles.energyRow,{flexDirection: isAr ? 'row-reverse' : 'row'}]}>
             {energyIcon}
             <Text style={[styles.energyValue,{color:colors.energyFill}]}>{Math.round(energy)}%</Text>
           </View>
-          <Text style={[styles.tierText,{color:colors.primary}]}>{TIER_LABELS[tier]?.[isAr?'ar':'en']||tier}</Text>
+          <Text style={[styles.tierText,{color:colors.primary, textAlign}]}>{TIER_LABELS[tier]?.[isAr?'ar':'en']||tier}</Text>
         </View>
       </View>
 
-      <TouchableOpacity style={[styles.backToChatBtn,isDark&&{backgroundColor:'#A855F722'}]} onPress={()=>navigate('/chat')}>
+      <TouchableOpacity style={[styles.backToChatBtn,{flexDirection: isAr ? 'row-reverse' : 'row'}, isDark&&{backgroundColor:'#A855F722'}]} onPress={()=>navigate('/chat')}>
         <ArrowRight size={18} stroke={colors.accent}/>
         <Text style={[styles.backToChatText,{color:colors.accent}]}>{t('العودة للمحادثة','Back to Chat')}</Text>
       </TouchableOpacity>
@@ -79,37 +88,45 @@ export default function SideMenu({ onClose }:{ onClose:()=>void }) {
         const active = item.route ? (pathname === item.route || (item.route === '/chat' && pathname === '/')) : false;
         const onPress = item.onPress || (() => navigate(item.route!));
         return (
-          <TouchableOpacity key={item.route || item.label} style={[styles.item, { flexDirection: itemDirection }, active && styles.activeItem]} onPress={onPress}>
+          <TouchableOpacity 
+            key={item.route || item.label} 
+            style={[styles.item, { flexDirection: itemDirection }, active && styles.activeItem]} 
+            onPress={onPress}
+          >
             <Icon size={20} stroke={active ? colors.accent : colors.primary} />
-            <Text style={[styles.itemLabel, { color: colors.text }, active && { color: colors.accent, fontWeight: '600' }]}>{item.label}</Text>
+            <Text style={[styles.itemLabel, { color: colors.text, textAlign }, active && { color: colors.accent, fontWeight: '600' }]}>{item.label}</Text>
           </TouchableOpacity>
         );
       })}
 
-      <TouchableOpacity style={[styles.item, { flexDirection: itemDirection }, { marginTop: 20 }]} onPress={() => {
-        Alert.alert(t('تسجيل الخروج', 'Logout'), t('هل أنت متأكد؟', 'Are you sure?'), [
-          { text: t('إلغاء', 'Cancel'), style: 'cancel' },
-          { text: t('خروج', 'Logout'), style: 'destructive', onPress: async () => { await supabase.auth.signOut(); router.replace('/login'); } }
-        ]);
-      }}>
+      <TouchableOpacity 
+        style={[styles.item, { flexDirection: itemDirection }, { marginTop: 20 }]} 
+        onPress={() => {
+          Alert.alert(t('تسجيل الخروج', 'Logout'), t('هل أنت متأكد؟', 'Are you sure?'), [
+            { text: t('إلغاء', 'Cancel'), style: 'cancel' },
+            { text: t('خروج', 'Logout'), style: 'destructive', onPress: async () => { await supabase.auth.signOut(); router.replace('/login'); } }
+          ]);
+        }}
+      >
         <LogOut size={20} stroke={colors.danger} />
-        <Text style={[styles.itemLabel, { color: colors.danger }]}>{t('تسجيل الخروج', 'Logout')}</Text>
+        <Text style={[styles.itemLabel, { color: colors.danger, textAlign }]}>{t('تسجيل الخروج', 'Logout')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 }, closeBtn: { alignSelf: 'flex-end', marginBottom: 24 },
-  userCard: { flexDirection: 'row', alignItems: 'center', paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
+  container: { flex: 1, padding: 20 }, 
+  closeBtn: { marginBottom: 24 },
+  userCard: { alignItems: 'center', paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F0FF', justifyContent: 'center', alignItems: 'center' },
   userName: { fontSize: 16, fontWeight: '700' },
-  bondRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  bondRow: { alignItems: 'center', gap: 4, marginTop: 4 },
   bondValue: { fontSize: 12, fontWeight: '500' },
-  energyRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  energyRow: { alignItems: 'center', gap: 4, marginTop: 2 },
   energyValue: { fontSize: 12, fontWeight: '500' },
   tierText: { fontSize: 12, fontWeight: '500', marginTop: 2 },
-  backToChatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 10, backgroundColor: '#F3F0FF', marginBottom: 16 },
+  backToChatBtn: { alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 10, backgroundColor: '#F3F0FF', marginBottom: 16 },
   backToChatText: { fontSize: 15, fontWeight: '600' },
   item: { alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, marginBottom: 2 },
   itemLabel: { fontSize: 15, fontWeight: '500' },
