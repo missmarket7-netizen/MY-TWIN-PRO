@@ -67,10 +67,6 @@ class TwinBrain:
     async def detect_emotion(self, text: str) -> Dict[str, Any]:
         return await self.emotion_tracker.analyze(text)
 
-    def _pick_emoji(self, primary_emotion: str) -> str:
-        emojis = self.EMOJI_MAP.get(primary_emotion, self.EMOJI_MAP["neutral"])
-        return random.choice(emojis)
-
     async def respond(self, message, twin_name, bond_level, dims, memories, history,
                       calm=False, personality=None, country_code="SA", user_id=None, tier="free",
                       join_date=None, recent_messages=None, user_profile=None):
@@ -200,7 +196,7 @@ class TwinBrain:
             except Exception as e:
                 logger.error(f"Agent loop failed: {e}")
 
-        # 9. بناء الـ Prompt للـ LLM (القلب الجديد)
+        # 9. بناء الـ Prompt للـ LLM (القلب الجديد المتكامل)
         if not final_reply:
             rel_stage = self.relationship.get_stage_instruction()
             if isinstance(rel_stage, dict):
@@ -225,13 +221,15 @@ class TwinBrain:
             # بناء formatted_context بالترتيب الصحيح
             formatted_context = context_manager.format_context_for_prompt(full_context) + last_feedback
             
-            # Agent loop results أولاً
             if tool_results:
                 formatted_context = "<TOOL_RESULTS>\n" + "\n".join(tool_results) + "\n</TOOL_RESULTS>\n\n" + formatted_context
             
-            # أداة سريعة ثانياً
             if tool_context:
                 formatted_context = tool_context + "\n\n" + formatted_context
+
+            # Fallback لـ context_summary
+            if not context_summary:
+                context_summary = formatted_context[:500] if formatted_context else ""
 
             prompt = await self.prompt_builder.build(
                 twin_name=twin_name, user_name="صديقي", relationship=relationship_for_prompt,
@@ -250,11 +248,14 @@ class TwinBrain:
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
+                # ✅ تكامل عميق: تمرير message + context ليستخدمها المجلس في تقييم التعقيد والنقد
                 reply, provider = await self.council.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
-                    multi_client=self.multi,
-                    emotion_primary=emotion.get("primary", "neutral")
+                    emotion_primary=emotion.get("primary", "neutral"),
+                    message=message,
+                    context=formatted_context,
+                    multi_client=self.multi
                 )
             except AIUnavailable:
                 reply = random.choice(self.FALLBACK_REPLIES)
@@ -265,9 +266,7 @@ class TwinBrain:
                 provider = "fallback"
             latency = (time.time() - start) * 1000
 
-            if reply and not any(emoji in reply for emoji in ["😊", "💜", "✨"]):
-                reply = reply.strip() + " " + self._pick_emoji(emotion.get("primary", "neutral"))
-
+            # ✅ تم حذف _pick_emoji اليدوي لأن response_engine يتولى الإيموجي الآن
             final_reply = reply
 
         # 10. Self-critic

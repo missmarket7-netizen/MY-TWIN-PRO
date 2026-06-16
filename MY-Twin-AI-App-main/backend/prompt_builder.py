@@ -1,11 +1,12 @@
 """
-MyTwin – Dynamic Prompt Builder v7.0 (Production Grade)
+MyTwin – Dynamic Prompt Builder v7.1 (Production Grade)
 - هيكل شبيه بـ ChatGPT: نية → تفكير → سياق → تخصيص
 - يمنع الهلوسة واختلاق الذكريات
 - أسئلة ختامية ذكية واختيارية
 - يدعم العربية والإنجليزية بعمق
+- يفصل نتائج الأدوات عن الذكريات
 """
-import logging
+import logging, re
 from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
@@ -61,14 +62,14 @@ class PromptBuilder:
         sections.append(self._build_profile_section(relationship, emotion, attachment_info, journey_info, lang))
 
         # =========================
-        # 5. الذكريات (مقيدة)
-        # =========================
-        sections.append(self._build_memory_section(memory_context, lang))
-
-        # =========================
-        # 6. أدوات خارجية
+        # 5. أدوات خارجية (تُفصل عن الذكريات)
         # =========================
         sections.append(self._build_tool_section(memory_context, lang))
+
+        # =========================
+        # 6. الذكريات (مقيدة)
+        # =========================
+        sections.append(self._build_memory_section(memory_context, lang))
 
         # =========================
         # 7. وعي طويل المدى
@@ -176,19 +177,29 @@ Before answering, think:
         return "<USER_PROFILE>\n" + "\n".join(lines) + "\n</USER_PROFILE>" if lines else ""
 
     def _build_memory_section(self, memory_context: str, lang: str) -> str:
-        """تعرض الذكريات الحقيقية فقط مع تعليمات صارمة"""
+        """تعرض الذكريات الحقيقية فقط مع تعليمات صارمة، بعد إزالة الأدوات"""
         if not memory_context:
+            return ""
+        # إزالة أجزاء TOOL_RESULT و TOOL_RESULTS من السياق لتجنب التكرار
+        clean_context = re.sub(r'<TOOL_RESULT[^>]*>.*?</TOOL_RESULT>', '', memory_context, flags=re.DOTALL)
+        clean_context = re.sub(r'<TOOL_RESULTS>.*?</TOOL_RESULTS>', '', clean_context, flags=re.DOTALL)
+        clean_context = clean_context.strip()
+        if not clean_context:
             return ""
         return f"""<RELEVANT_MEMORIES>
 هذه معلومات حقيقية عن المستخدم من محادثات سابقة. استخدمها فقط إذا كانت مرتبطة بالسؤال الحالي.
-{memory_context}
+{clean_context}
 </RELEVANT_MEMORIES>"""
 
     def _build_tool_section(self, memory_context: str, lang: str) -> str:
         """تفصل نتائج الأدوات عن الذكريات"""
-        if not memory_context or "<TOOL_RESULT>" not in memory_context:
+        if not memory_context:
             return ""
-        # استخراج جزء TOOL_RESULT من السياق
+        # استخراج TOOL_RESULT و TOOL_RESULTS من السياق
+        tool_parts = re.findall(r'<TOOL_RESULT[^>]*>.*?</TOOL_RESULT>', memory_context, re.DOTALL)
+        tool_parts += re.findall(r'<TOOL_RESULTS>.*?</TOOL_RESULTS>', memory_context, re.DOTALL)
+        if tool_parts:
+            return "<TOOL_OUTPUT>\n" + "\n".join(tool_parts) + "\n</TOOL_OUTPUT>"
         return ""
 
     def _build_consciousness_section(self, ctx: Optional[Dict], lang: str) -> str:
@@ -261,4 +272,4 @@ Now respond with the best possible reply. Start with the direct answer, then add
 
 
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v7.0 (Production Grade)")
+print("✅ Prompt Builder v7.1 (Production Grade)")
