@@ -1,15 +1,6 @@
 import {
-  View,
-  FlatList,
-  StyleSheet,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  Animated,
-  Text,
-  Alert,
-  TouchableOpacity,
+  View, FlatList, StyleSheet, StatusBar, KeyboardAvoidingView,
+  Platform, Image, Animated, Text, Alert, TouchableOpacity,
 } from 'react-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,13 +9,8 @@ import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../lib/supabase';
 import { useTwinStore, ChatMessage } from '../../store/useTwinStore';
 import {
-  sendChatFromStore,
-  updateStoreFromResponse,
-  fetchWeather,
-  fetchYouTube,
-  fetchSpotify,
-  fetchNews,
-  fetchCurrency,
+  sendChatFromStore, updateStoreFromResponse,
+  fetchWeather, fetchYouTube, fetchSpotify, fetchNews, fetchCurrency,
 } from '../../lib/api';
 import SideMenu from '../../components/SideMenu';
 import TypingIndicator from '../../components/TypingIndicator';
@@ -38,56 +24,30 @@ const APP_ICON = require('../../assets/icon.png');
 export default function Chat() {
   const insets = useSafeAreaInsets();
   const {
-    userId,
-    twinName,
-    twinGender,
-    tier,
-    chatHistory,
-    addMessage,
-    triggerHaptic,
-    lang,
-    theme,
-    setTwinName,
-    setTwinGender,
-    openMenu,
-    closeMenu,
-    voiceEnabled,
-    setVoiceEnabled,
-    bondLevel,
-    setThinking,
-    setThinkingStage,
+    userId, twinName, twinGender, tier, chatHistory, addMessage,
+    triggerHaptic, lang, theme, setTwinName, setTwinGender,
+    openMenu, closeMenu, voiceEnabled, setVoiceEnabled,
+    bondLevel, setThinking, setThinkingStage,
   } = useTwinStore((s) => ({
-    userId: s.userId,
-    twinName: s.twinName,
-    twinGender: s.twinGender,
-    tier: s.tier,
-    chatHistory: s.chatHistory,
-    addMessage: s.addMessage,
-    triggerHaptic: s.triggerHaptic,
-    lang: s.lang,
-    theme: s.theme,
-    setTwinName: s.setTwinName,
-    setTwinGender: s.setTwinGender,
-    openMenu: s.openMenu,
-    closeMenu: s.closeMenu,
-    voiceEnabled: s.voiceEnabled,
-    setVoiceEnabled: s.setVoiceEnabled,
-    bondLevel: s.bondLevel,
-    setThinking: s.setThinking,
-    setThinkingStage: s.setThinkingStage,
+    userId: s.userId, twinName: s.twinName, twinGender: s.twinGender, tier: s.tier,
+    chatHistory: s.chatHistory, addMessage: s.addMessage,
+    triggerHaptic: s.triggerHaptic, lang: s.lang, theme: s.theme,
+    setTwinName: s.setTwinName, setTwinGender: s.setTwinGender,
+    openMenu: s.openMenu, closeMenu: s.closeMenu,
+    voiceEnabled: s.voiceEnabled, setVoiceEnabled: s.setVoiceEnabled,
+    bondLevel: s.bondLevel, setThinking: s.setThinking, setThinkingStage: s.setThinkingStage,
   }));
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
-  const [featureModal, setFeatureModal] = useState<{ visible: boolean; type: string }>({ visible: false, type: '' });
-  const [featureInput, setFeatureInput] = useState('');
   const [messageQueue, setMessageQueue] = useState<Array<{ msg?: string; image?: string }>>([]);
   const [twinEnergy, setTwinEnergy] = useState(100);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [activeToolsList, setActiveToolsList] = useState<any[]>([]);
   const [editingContent, setEditingContent] = useState('');
   const [feedbackMap, setFeedbackMap] = useState<Record<string, 'like' | 'dislike' | null>>({});
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   const flatRef = useRef<FlatList<ChatMessage>>(null);
   const attachAnim = useRef(new Animated.Value(0)).current;
@@ -117,6 +77,36 @@ export default function Chat() {
     })();
   }, [chatHistory]);
 
+  // إنشاء جلسة جديدة عند أول رسالة
+  const createSessionIfNeeded = async () => {
+    if (currentSessionId || !userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({ user_id: userId, messages: [] })
+        .select('id')
+        .single();
+      if (data && !error) {
+        setCurrentSessionId(data.id);
+      }
+    } catch (e) {
+      console.warn('Session creation failed:', e);
+    }
+  };
+
+  // تحديث الجلسة بالرسائل الجديدة
+  const updateSession = async (messages: ChatMessage[]) => {
+    if (!currentSessionId || !userId) return;
+    try {
+      await supabase
+        .from('chat_sessions')
+        .update({ messages, updated_at: new Date().toISOString() })
+        .eq('id', currentSessionId);
+    } catch (e) {
+      console.warn('Session update failed:', e);
+    }
+  };
+
   const saveFeedback = async (messageId: string, rating: 'like' | 'dislike') => {
     if (!userId) return;
     try { await supabase.from('message_feedback').upsert({ user_id: userId, message_id: messageId, rating, created_at: new Date().toISOString() }, { onConflict: 'user_id,message_id' }); } catch (e) { console.warn('Feedback save failed:', e); }
@@ -134,24 +124,52 @@ export default function Chat() {
 
   const sendMessage = useCallback(async (msg?: string, imageBase64?: string) => {
     const message = (msg || input).trim();
-    if (!message && !imageBase64) return;
+    if (!message && !imageBase64 && activeToolsList.length === 0) return;
+
+    await createSessionIfNeeded();
 
     const msgId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-    addMessage({ id: msgId, role: 'user', content: message || '📷 صورة', image: imageBase64, timestamp: Date.now() });
+    const userMsg: ChatMessage = { id: msgId, role: 'user', content: message || '📷 صورة', image: imageBase64, timestamp: Date.now() };
+    addMessage(userMsg);
     setInput(''); setLoading(true); setThinking(true); setThinkingStage('thinking');
 
     try {
+      if (activeToolsList.length > 0) {
+        const tool = activeToolsList[0].type;
+        let result = '';
+        switch (tool) {
+          case 'weather': result = (await fetchWeather('Cairo')).result || 'الطقس غير متاح'; break;
+          case 'youtube': result = (await fetchYouTube(input || 'music')).result || 'لم أجد فيديوهات'; break;
+          case 'spotify': result = (await fetchSpotify(input || 'music')).result || 'لم أجد أغاني'; break;
+          case 'news': result = (await fetchNews()).result || 'الأخبار غير متاحة'; break;
+          case 'currency': result = (await fetchCurrency('USD')).result || 'أسعار العملات غير متاحة'; break;
+        }
+        if (result) {
+          const twinMsg: ChatMessage = { id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), role: 'twin', content: result, timestamp: Date.now(), provider: 'tool' };
+          addMessage(twinMsg);
+          if (voiceEnabled) await speakResponse(result);
+        }
+        setActiveToolsList([]);
+        return;
+      }
+
       const response = await sendChatFromStore(message, imageBase64);
       const youtubeRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[\w-]+|https?:\/\/youtu\.be\/[\w-]+/g;
       const youtubeLinks = response.reply.match(youtubeRegex);
-      addMessage({
+      const twinMsg: ChatMessage = {
         id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
         role: 'twin', content: response.reply, timestamp: Date.now(),
         emotion: response.emotion?.primary, memoryRecall: response.memory_used,
         youtubeVideo: youtubeLinks ? youtubeLinks[0] : undefined,
         provider: response.provider || 'multi_ai',
-      });
+      };
+      addMessage(twinMsg);
       updateStoreFromResponse(response);
+      
+      // حفظ الجلسة بعد كل رسالة جديدة
+      const updatedHistory = useTwinStore.getState().chatHistory;
+      updateSession(updatedHistory);
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
         const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/stats`, { headers: { Authorization: `Bearer ${session.access_token}` } });
@@ -159,34 +177,29 @@ export default function Chat() {
       }
       if (voiceEnabled) { try { await speakResponse(response.reply); } catch {} }
     } catch (error: any) {
-      // ✅ عرض تفاصيل الخطأ الحقيقية
+      const isAr = lang === 'ar';
       let errMsg = '';
-
       if (error?.response) {
         const status = error.response.status;
-        const detail = error.response.data?.detail || '';
-        errMsg = `خطأ ${status}: ${detail || error.message}`;
-        if (status === 401) errMsg = lang === 'ar' ? 'انتهت الجلسة، سجّل الدخول مجدداً' : 'Session expired, please log in again';
-        else if (status >= 500) errMsg = lang === 'ar' ? 'مشكلة في الخادم مؤقتاً 💜' : 'Temporary server issue 💜';
+        if (status === 401) errMsg = isAr ? 'انتهت الجلسة، سجّل الدخول تاني يا وحش 😅' : 'Session expired, log in again buddy 😅';
+        else if (status === 429) errMsg = isAr ? 'استهدى بالله، كده كتير! جرب بعد شوية 🤯' : 'Whoa, slow down! Try again later 🤯';
+        else if (status >= 500) errMsg = isAr ? 'السيرفر نام شوية، هنصحيه ونكمل ☕' : 'Server is napping, let me wake it up ☕';
+        else errMsg = isAr ? `حصل خطأ ${status}: جرب مرة تانية 😬` : `Error ${status}: Something went wrong 😬`;
       } else if (error?.message === 'Network Error') {
-        errMsg = lang === 'ar' ? 'لا يوجد اتصال بالإنترنت 📡' : 'No internet connection 📡';
+        errMsg = isAr ? 'الإنترنت طاير، شوف الواي فاي 😵‍💫' : 'No internet, check your Wi-Fi 😵‍💫';
       } else if (error?.code === 'ECONNABORTED' || error?.name === 'AbortError') {
-        errMsg = lang === 'ar' ? 'انتهت مهلة الاتصال ⏰' : 'Request timed out ⏰';
+        errMsg = isAr ? 'النت بطيء، اصبر شوية 🐌' : 'Too slow! Let me try again 🐌';
       } else {
-        errMsg = error?.message || (lang === 'ar' ? 'تعذر الاتصال 😔' : 'Connection failed 😔');
+        errMsg = isAr ? 'حصل حاجة غريبة، جرب تاني 🌪️' : 'Something weird happened, try again 🌪️';
       }
-
-      console.log('❌ Chat error:', errMsg, error);
-      addMessage({
+      const errorMsg: ChatMessage = {
         id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
-        role: 'twin',
-        timestamp: Date.now(),
-        failed: true,
-        content: errMsg,
-        provider: 'error',
-      });
+        role: 'twin', timestamp: Date.now(), failed: true,
+        content: errMsg, provider: 'error',
+      };
+      addMessage(errorMsg);
     } finally { setLoading(false); setThinking(false); }
-  }, [input, loading, voiceEnabled, lang, addMessage, setThinking, setThinkingStage]);
+  }, [input, loading, voiceEnabled, lang, addMessage, setThinking, setThinkingStage, activeToolsList, currentSessionId, userId]);
 
   const send = useCallback(async (msg?: string, imageBase64?: string) => {
     if (loading) { setMessageQueue(prev => [...prev, { msg, image: imageBase64 }]); return; }
@@ -197,32 +210,28 @@ export default function Chat() {
   const handleRetry = useCallback((failedMsg: ChatMessage) => { sendMessage(failedMsg.content, failedMsg.image); }, [sendMessage]);
   const handleRegenerate = useCallback((lastMsg: ChatMessage) => { sendMessage(lastMsg.content); }, [sendMessage]);
   const toggleSound = () => setVoiceEnabled(!voiceEnabled);
+  const handleEditInInput = useCallback((msg: ChatMessage) => { setInput(msg.content); }, []);
   const handleStartEdit = useCallback((msg: ChatMessage) => { setEditingMessageId(msg.id); setEditingContent(msg.content); }, []);
   const handleSaveEdit = useCallback((msg: ChatMessage, newContent: string) => {
     if (newContent.trim() && newContent !== msg.content) { setEditingMessageId(null); sendMessage(newContent.trim(), msg.image); } else { setEditingMessageId(null); }
   }, [sendMessage]);
 
-  const handleAddTool = (toolDef: any) => { setActiveToolsList((prev: any[]) => [...prev, { id: Date.now().toString(), ...toolDef }]); };
-  const handleRemoveTool = (toolId: string) => { setActiveToolsList((prev: any[]) => prev.filter(t => t.id !== toolId)); };
+  const handleAddTool = (toolDef: any) => { setActiveToolsList(prev => [...prev, { id: Date.now().toString(), ...toolDef }]); };
+  const handleRemoveTool = (toolId: string) => { setActiveToolsList(prev => prev.filter(t => t.id !== toolId)); };
 
-  const handleQuickTool = async (tool: string) => {
-    let result = ''; setLoading(true);
-    try {
-      switch (tool) {
-        case 'weather': result = (await fetchWeather('Cairo')).result || 'الطقس غير متاح'; break;
-        case 'youtube': result = (await fetchYouTube(input || 'music')).result || 'لم أجد فيديوهات'; break;
-        case 'spotify': result = (await fetchSpotify(input || 'music')).result || 'لم أجد أغاني'; break;
-        case 'news': result = (await fetchNews()).result || 'الأخبار غير متاحة'; break;
-        case 'currency': result = (await fetchCurrency('USD')).result || 'أسعار العملات غير متاحة'; break;
-      }
-      if (result) { addMessage({ id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), role: 'twin', content: result, timestamp: Date.now(), provider: 'tool' }); if (voiceEnabled) await speakResponse(result); }
-    } catch { Alert.alert('خطأ', 'تعذر تنفيذ الأداة'); } finally { setLoading(false); }
-  };
-
-  const renderMsg = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
-    if (item.role === 'user') return <UserBubble item={item} isDark={isDark} onStartEdit={handleStartEdit} onSaveEdit={handleSaveEdit} isEditing={editingMessageId === item.id} editContent={editingContent} setEditContent={setEditingContent} />;
-    return <TwinBubble item={item} isDark={isDark} onCopy={handleCopy} onRetry={handleRetry} onRegenerate={handleRegenerate} onLike={handleLike} onDislike={handleDislike} liked={feedbackMap[item.id] === 'like'} disliked={feedbackMap[item.id] === 'dislike'} provider={item.provider} />;
-  }, [isDark, handleCopy, handleRetry, handleRegenerate, handleLike, handleDislike, feedbackMap, editingMessageId, editingContent]);
+  const renderMsg = useCallback(({ item }: { item: ChatMessage }) => {
+    if (item.role === 'user') return (
+      <UserBubble item={item} isDark={isDark} onStartEdit={handleStartEdit} onSaveEdit={handleSaveEdit}
+        isEditing={editingMessageId === item.id} editContent={editingContent} setEditContent={setEditingContent}
+        onEditInInput={handleEditInInput} />
+    );
+    return (
+      <TwinBubble item={item} isDark={isDark} onCopy={handleCopy} onRetry={handleRetry}
+        onRegenerate={handleRegenerate} onLike={handleLike} onDislike={handleDislike}
+        liked={feedbackMap[item.id] === 'like'} disliked={feedbackMap[item.id] === 'dislike'}
+        provider={item.provider} />
+    );
+  }, [isDark, handleCopy, handleRetry, handleRegenerate, handleLike, handleDislike, feedbackMap, editingMessageId, editingContent, handleStartEdit, handleSaveEdit, handleEditInInput]);
 
   const ListFooter = useCallback(() => {
     if (!loading) return null;
@@ -244,8 +253,16 @@ export default function Chat() {
           </View>
           <TouchableOpacity onPress={toggleSound} style={styles.soundBtn}>{voiceEnabled ? <Volume2 size={22} stroke={colors.text} /> : <VolumeX size={22} stroke={colors.subtext} />}</TouchableOpacity>
         </View>
-        <FlatList ref={flatRef} data={chatHistory} keyExtractor={(item) => item.id} renderItem={renderMsg} ListFooterComponent={ListFooter} contentContainerStyle={styles.listContent} onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })} removeClippedSubviews initialNumToRender={10} maxToRenderPerBatch={10} windowSize={5} keyboardDismissMode="interactive" />
-        <ChatInput input={input} setInput={setInput} loading={loading} isRTL={isRTL} isDark={isDark} colors={colors} lang={lang} onSend={send} onToolAction={handleQuickTool} onCamera={() => {}} onGallery={() => {}} onFile={() => {}} activeTools={activeToolsList} onRemoveTool={handleRemoveTool} showAttach={showAttach} setShowAttach={setShowAttach} attachAnim={attachAnim} />
+        <FlatList ref={flatRef} data={chatHistory} keyExtractor={(item) => item.id} renderItem={renderMsg}
+          ListFooterComponent={ListFooter} contentContainerStyle={styles.listContent}
+          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
+          removeClippedSubviews initialNumToRender={10} maxToRenderPerBatch={10} windowSize={5}
+          keyboardDismissMode="interactive" />
+        <ChatInput input={input} setInput={setInput} loading={loading} isRTL={isRTL} isDark={isDark}
+          colors={colors} lang={lang} onSend={send} onAddTool={handleAddTool}
+          onRemoveTool={handleRemoveTool} activeTools={activeToolsList}
+          onCamera={() => {}} onGallery={() => {}} onFile={() => {}}
+          showAttach={showAttach} setShowAttach={setShowAttach} attachAnim={attachAnim} />
       </KeyboardAvoidingView>
     </View>
   );

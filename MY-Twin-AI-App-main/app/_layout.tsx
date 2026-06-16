@@ -2,10 +2,7 @@ import * as Sentry from '@sentry/react-native';
 import { Stack, useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useMemo } from "react";
-import {
-  Pressable, StyleSheet, Animated, Modal,
-  useWindowDimensions, TouchableOpacity, Text
-} from "react-native";
+import { Pressable, StyleSheet, Animated, Modal, useWindowDimensions, TouchableOpacity, Text } from "react-native";
 import { useTwinStore } from "../store/useTwinStore";
 import { initAnalytics } from "../lib/analytics";
 import SideMenu from "../components/SideMenu";
@@ -20,27 +17,15 @@ Sentry.init({
   enableNative: true,
 });
 
-function BackButton() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { theme } = useTwinStore();
-  const isDark = theme === 'dark';
-  const hiddenRoutes = ['/chat', '/splash', '/login', '/onboarding', '/', '/chat/index'];
-  if (hiddenRoutes.includes(pathname)) return null;
-  return (
-    <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
-      <Text style={{ color: isDark ? '#D8B4FE' : '#7C3AED', fontSize: 28, fontWeight: '300', lineHeight: 32 }}>‹</Text>
-    </TouchableOpacity>
-  );
-}
-
 export default function RootLayout() {
   const theme = useTwinStore(s => s.theme);
   const menuVisible = useTwinStore(s => s.menuVisible);
   const closeMenu = useTwinStore(s => s.closeMenu);
+  const lang = useTwinStore(s => s.lang);
   const userId = useTwinStore(s => s.userId);
   const isDark = theme === 'dark';
-  const slideAnim = useRef(new Animated.Value(-300)).current;
+  const isRTL = lang === 'ar';
+  const slideAnim = useRef(new Animated.Value(isRTL ? 300 : -300)).current;
   const { width } = useWindowDimensions();
   const drawerWidth = width * 0.8;
 
@@ -49,8 +34,13 @@ export default function RootLayout() {
   useEffect(() => { let cancelled = false; const setup = async () => { if (!cancelled) await initAnalytics(); }; setup(); return () => { cancelled = true; }; }, []);
 
   useEffect(() => {
-    Animated.spring(slideAnim, { toValue: menuVisible ? 0 : -drawerWidth, damping: 18, stiffness: 120, useNativeDriver: true }).start();
-  }, [menuVisible, drawerWidth]);
+    Animated.spring(slideAnim, {
+      toValue: menuVisible ? 0 : (isRTL ? drawerWidth : -drawerWidth),
+      damping: 18,
+      stiffness: 120,
+      useNativeDriver: true,
+    }).start();
+  }, [menuVisible, drawerWidth, isRTL]);
 
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -72,11 +62,19 @@ export default function RootLayout() {
         {menuVisible && (
           <Modal visible transparent animationType="none" onRequestClose={closeMenu}>
             <Pressable style={styles.overlay} onPress={closeMenu}>
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
-                <Animated.View style={[styles.sidebar, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', width: drawerWidth, transform: [{ translateX: slideAnim }] }]}>
-                  <SideMenu onClose={closeMenu} />
-                </Animated.View>
-              </Pressable>
+              <Animated.View
+                style={[
+                  styles.sidebar,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    width: drawerWidth,
+                    [isRTL ? 'right' : 'left']: 0,
+                    transform: [{ translateX: slideAnim }],
+                  },
+                ]}
+              >
+                <SideMenu onClose={closeMenu} />
+              </Animated.View>
             </Pressable>
           </Modal>
         )}
@@ -87,5 +85,5 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sidebar: { position: 'absolute', left: 0, top: 0, bottom: 0, shadowColor: "#000", shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 15 },
+  sidebar: { position: 'absolute', top: 0, bottom: 0, shadowColor: "#000", shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 15 },
 });

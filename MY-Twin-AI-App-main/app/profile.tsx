@@ -6,10 +6,12 @@ import {
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useTwinStore } from '../store/useTwinStore';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
 import { router } from 'expo-router';
 import {
   User, Mail, Phone, Crown, Zap, MessageSquare, Edit, LogOut, Trash2,
-  Heart, Brain, TrendingUp, ArrowLeft, Plus, X, Smile, Sparkles,
+  Heart, Brain, TrendingUp, Plus, X, Smile, Sparkles,
   Lightbulb, Target, Star
 } from 'lucide-react-native';
 
@@ -20,7 +22,7 @@ const MOOD_OPTIONS = [
   { emoji:'😤', label_ar:'غاضب', label_en:'Angry', value:'anger', color:'#EF4444' },
   { emoji:'😨', label_ar:'قلق', label_en:'Anxious', value:'fear', color:'#A78BFA' },
   { emoji:'💕', label_ar:'محب', label_en:'Loving', value:'love', color:'#EC4899' },
-  { emoji:'😴', label_ar:'متعب', label_en:'Tired', value:'sadness', color:'#8B5CF6' },
+  { emoji:'😴', label_ar:'متعب', label_en:'Tired', value:'tired', color:'#8B5CF6' },
 ];
 
 const TEXTS: Record<string, Record<string,string>> = {
@@ -165,14 +167,15 @@ export default function Profile() {
   }
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><ArrowLeft size={24} stroke={txt} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>{t('title')}</Text>
-        <TouchableOpacity onPress={() => setEditing(!editing)} style={styles.editHeaderBtn}><Edit size={20} stroke={primary} /></TouchableOpacity>
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={t('title')} />
 
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={moodsRefreshing} onRefresh={() => fetchMoods(true)} colors={[primary]} />}>
         
+        <TouchableOpacity style={[styles.editFab, { backgroundColor: primary }]} onPress={() => setEditing(!editing)}>
+          <Edit size={22} stroke="#FFF" />
+        </TouchableOpacity>
+
         <View style={[styles.userCard, { backgroundColor: card, borderColor: border }]}>
           <View style={styles.avatar}><User size={44} stroke="#FFF" /></View>
           <Text style={[styles.userName, { color: txt }]}>{profile.full_name || '—'}</Text>
@@ -323,12 +326,9 @@ export default function Profile() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
-  editHeaderBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20, paddingBottom: 40 },
-  userCard: { alignItems: 'center', padding: 24, borderRadius: 20, borderWidth: 1, marginBottom: 16 },
+  editFab: { position: 'absolute', right: 20, top: 10, zIndex: 10, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  userCard: { alignItems: 'center', padding: 24, borderRadius: 20, borderWidth: 1, marginBottom: 16, marginTop: 50 },
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#6B21A8', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   userName: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
   userEmail: { fontSize: 14 },

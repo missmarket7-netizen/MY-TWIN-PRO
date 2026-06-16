@@ -86,7 +86,7 @@ ALLOWED_ORIGINS = [
     "exp://192.168.1.1:19000"
 ]
 
-app = FastAPI(title="MyTwin API", version="10.7.3")
+app = FastAPI(title="MyTwin API", version="10.7.4")
 app.include_router(telegram_router)
 
 @app.on_event("startup")
@@ -136,7 +136,7 @@ class ReferralCodeReq(BaseModel):
 
 # ========== المحادثة ==========
 @app.post("/api/chat")
-@limiter.limit("30/minute")
+@limiter.limit("3/minute")
 async def chat(
     request: Request,
     body: ChatReq,
@@ -378,7 +378,7 @@ async def create_task_endpoint(title: str, due: Optional[str] = None, uid: str =
 # ========== صحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "10.7.3"}
+    return {"status": "ok", "version": "10.7.4"}
 
 @app.get("/health")
 async def health_check():
@@ -406,7 +406,7 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
             return {"status": "error", "message": "Image API key not configured"}
         client = genai.Client(api_key=image_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash-image",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         if response.parts and hasattr(response.parts[0], 'inline_data'):

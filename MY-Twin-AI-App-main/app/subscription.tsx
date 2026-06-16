@@ -6,7 +6,8 @@ import { router } from 'expo-router';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initIAP, getProducts, purchaseSubscription, restorePurchases, TIER_MAP } from '../lib/iapService';
 import { Tier, useTwinStore } from '../store/useTwinStore';
-import { CheckCircle2, Crown, ArrowLeft, Shield, CreditCard } from 'lucide-react-native';
+import Header from '../components/Header';
+import { CheckCircle2, Crown, Shield } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 
 interface StoreProduct {
@@ -140,7 +141,6 @@ export default function SubscriptionScreen() {
     return { price: `$${plan.defaultPrice}`, period: plan.defaultPeriod, currency: 'USD', originalPrice: '' };
   }, [products]);
 
-  // ✅ تحقق أمني من الإيصال عبر Supabase Edge Function
   const verifyReceipt = async (receipt: string, productId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.functions.invoke('verify-receipt', {
@@ -150,15 +150,11 @@ export default function SubscriptionScreen() {
       return data?.valid === true;
     } catch (e) {
       console.warn('⚠️ فشل التحقق من الإيصال:', e);
-      // في بيئة التطوير: نقبل الإيصال. في الإنتاج: نرفضه.
       return __DEV__ ? true : false;
     }
   };
 
-  // ✅ تأكيد وجود وسيلة دفع (للتجارب المجانية)
   const checkPaymentMethod = async (): Promise<boolean> => {
-    // في بيئة حقيقية، هذا يتحقق عبر Google Play / App Store API
-    // للمحاكاة: نتحقق من وجود products كدليل على توفر IAP
     return iapAvailable && products.length > 0;
   };
 
@@ -173,7 +169,6 @@ export default function SubscriptionScreen() {
       return;
     }
 
-    // ✅ التحقق من وسيلة الدفع قبل التجربة المجانية
     if (plan.trialDays > 0) {
       const hasPayment = await checkPaymentMethod();
       if (!hasPayment) {
@@ -222,7 +217,6 @@ export default function SubscriptionScreen() {
     } catch (e: any) {
       const msg = e?.message || '';
       if (msg.includes('cancelled') || msg.includes('Cancel')) {
-        // المستخدم ألغى بنفسه — لا نعرض خطأ
         return;
       }
       Alert.alert(isAr ? 'خطأ' : 'Error', msg || (isAr ? 'فشل الشراء' : 'Purchase failed'));
@@ -316,16 +310,7 @@ export default function SubscriptionScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      {/* Header احترافي */}
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} stroke={txt} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>
-          {isAr ? 'الاشتراكات' : 'Subscriptions'}
-        </Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Header title={isAr ? 'الاشتراكات' : 'Subscriptions'} />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.titleSection}>
@@ -338,7 +323,6 @@ export default function SubscriptionScreen() {
           </Text>
         </View>
 
-        {/* ✅ أيقونة الأمان */}
         <View style={[styles.securityBadge, { backgroundColor: card, borderColor: border }]}>
           <Shield size={18} stroke="#10B981" />
           <Text style={[styles.securityText, { color: sub }]}>
@@ -375,9 +359,6 @@ export default function SubscriptionScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   container: { flex: 1 },
   content: { paddingBottom: 40, paddingTop: 8 },
   titleSection: { padding: 24, paddingTop: 20, alignItems: 'center' },

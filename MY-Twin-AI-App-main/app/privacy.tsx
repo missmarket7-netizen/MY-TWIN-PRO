@@ -1,9 +1,10 @@
-import { SafeAreaView, ScrollView, Text, StyleSheet, View, TouchableOpacity } from 'react-native';
+import { SafeAreaView, ScrollView, Text, StyleSheet, View } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
-import { router } from 'expo-router';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
 import {
   Shield, Lock, Brain, UserCheck, Trash2, AlertTriangle,
-  Download, Mail, FileText, Cloud, Smartphone, Eye, ArrowLeft
+  Download, Mail, FileText, Cloud, Smartphone, Eye
 } from 'lucide-react-native';
 
 export default function Privacy() {
@@ -46,16 +47,8 @@ export default function Privacy() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      {/* Header احترافي */}
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} stroke={txt} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>
-          {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
-        </Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={isAr ? 'سياسة الخصوصية' : 'Privacy Policy'} />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <Shield size={48} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />
@@ -81,9 +74,6 @@ export default function Privacy() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
   updated: { fontSize: 13, textAlign: 'center', marginBottom: 24 },
   card: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },

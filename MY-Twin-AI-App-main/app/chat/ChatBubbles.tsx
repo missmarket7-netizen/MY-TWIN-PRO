@@ -39,11 +39,12 @@ export const MarkdownRenderer = memo(({ content, isDark }: { content: string; is
     strong: { fontWeight: 'bold' },
     em: { fontStyle: 'italic' },
     link: { color: '#7C3AED', textDecorationLine: 'underline' },
+    thematicBreak: { borderBottomWidth: 1, borderBottomColor: isDark ? '#444' : '#E0E0E0', marginVertical: 16 },
   };
   return <Markdown style={markdownStyles} onLinkPress={(url: string) => { Linking.openURL(url).catch(() => {}); return false; }}>{content}</Markdown>;
 });
 
-export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditing, editContent, setEditContent }: any) => (
+export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditing, editContent, setEditContent, onEditInInput }: any) => (
   <View style={styles.userRow}>
     <View style={[styles.userBubble, { backgroundColor: isDark ? COLORS.dark.bubbleUser : COLORS.light.bubbleUser }]}>
       {item.image && <Image source={{ uri: item.image?.startsWith('data:') ? item.image : `data:image/jpeg;base64,${item.image}` }} style={styles.chatImage} />}
@@ -55,9 +56,10 @@ export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditi
       ) : (
         <Text style={[styles.userText, { color: '#FFF' }]}>{item.content}</Text>
       )}
-      {!isEditing && (
-        <TouchableOpacity onPress={() => onStartEdit(item)} style={styles.editBtn}><Edit3 size={14} stroke="#FFF" /></TouchableOpacity>
-      )}
+      {/* زر القلم: يحفظ النص في حقل الإدخال */}
+      <TouchableOpacity onPress={() => onEditInInput ? onEditInInput(item) : onStartEdit(item)} style={styles.editBtn}>
+        <Edit3 size={14} stroke="#FFF" />
+      </TouchableOpacity>
     </View>
   </View>
 ));
@@ -85,8 +87,9 @@ const ProviderBadge = memo(({ provider, isDark }: { provider: string; isDark: bo
 
 export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, onLike, onDislike, liked, disliked, provider }: any) => (
   <View style={styles.twinRow}>
-    <Image source={APP_ICON} style={styles.twinAvatar} />
-    <View style={styles.twinContent}>
+    {/* أيقونة التوأم أعلى الرد */}
+    <Image source={APP_ICON} style={styles.twinAvatarTop} />
+    <View style={styles.twinContentFull}>
       {item.youtubeVideo && (
         <TouchableOpacity onPress={() => Linking.openURL(item.youtubeVideo!)} style={styles.youtubeCard}>
           <Film size={24} stroke="#EF4444" />
@@ -125,9 +128,9 @@ const styles = StyleSheet.create({
   editBtn: { position: 'absolute', bottom: -12, right: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 10, padding: 4 },
   editInput: { fontSize: 16, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FFF' },
   editSaveBtn: { backgroundColor: '#10B981', borderRadius: 14, padding: 6 },
-  twinRow: { flexDirection: 'row', justifyContent: 'flex-start', marginBottom: 24, gap: 10 },
-  twinAvatar: { width: 30, height: 30, borderRadius: 15, marginTop: 2 },
-  twinContent: { flex: 1 },
+  twinRow: { alignItems: 'flex-start', marginBottom: 24, paddingHorizontal: 16 },
+  twinAvatarTop: { width: 30, height: 30, borderRadius: 15, marginBottom: 8 },
+  twinContentFull: { width: '100%' },
   youtubeCard: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#EF444420', backgroundColor: '#EF444410', marginBottom: 8 },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
   actionBtn: { padding: 4 },

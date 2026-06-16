@@ -5,11 +5,11 @@ import {
 import { useTwinStore } from '../store/useTwinStore';
 import { supabase } from '../lib/supabase';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { router } from 'expo-router';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
 import {
   BrainCircuit, Heart, Star, Target, MessageCircle,
-  Sparkles, Trophy, Smile, Moon, ArrowLeft, Trash2,
-  Clock, Layers
+  Sparkles, Trophy, Smile, Moon, Clock, Layers
 } from 'lucide-react-native';
 
 const EVENT_CONFIG: Record<string, { icon: any; color: string; label_ar: string; label_en: string }> = {
@@ -100,11 +100,8 @@ export default function MemoriesScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><ArrowLeft size={24} stroke={txt} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>{t('ذكرياتنا', 'Our Memories')}</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={t('ذكرياتنا', 'Our Memories')} />
 
       <View style={[styles.tabs, { borderBottomColor: border }]}>
         {[
@@ -194,9 +191,6 @@ export default function MemoriesScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   tabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, gap: 8 },
   tabText: { fontSize: 15, fontWeight: '600' },

@@ -8,11 +8,44 @@ class AIUnavailable(Exception):
 
 class MultiAIClient:
     def __init__(self):
-        self._openai_client = None
-        self._groq_client = None
-        self._genai_client = None
+        # قوائم العملاء لكل مزود
+        self._groq_clients = []
+        self._openrouter_clients = []
+        self._genai_clients = []
+
+        # تجهيز مفاتيح Groq (أساسي + احتياطي)
+        groq_keys = [os.getenv("GROQ_API_KEY", ""), os.getenv("GROQ_API_KEY_2", "")]
+        for key in groq_keys:
+            if key:
+                try:
+                    from openai import OpenAI
+                    self._groq_clients.append(OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key))
+                except Exception as e:
+                    logger.warning(f"Groq client init failed: {e}")
+
+        # تجهيز مفاتيح OpenRouter (أساسي + احتياطي)
+        openrouter_keys = [os.getenv("OPENROUTER_API_KEY", ""), os.getenv("OPENROUTER_API_KEY_2", "")]
+        for key in openrouter_keys:
+            if key:
+                try:
+                    from openai import OpenAI
+                    self._openrouter_clients.append(OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key))
+                except Exception as e:
+                    logger.warning(f"OpenRouter client init failed: {e}")
+
+        # تجهيز مفاتيح Gemini (أساسي + احتياطي)
+        gemini_keys = [os.getenv("GEMINI_API_KEY", ""), os.getenv("GEMINI_API_KEY_2", "")]
+        for key in gemini_keys:
+            if key:
+                try:
+                    from google import genai
+                    self._genai_clients.append(genai.Client(api_key=key))
+                except Exception as e:
+                    logger.warning(f"Gemini client init failed: {e}")
+
         self.max_retries = 1
         self.timeout = 12
+        logger.info(f"✅ MultiAI initialized: Groq={len(self._groq_clients)}, OpenRouter={len(self._openrouter_clients)}, Gemini={len(self._genai_clients)}")
 
     async def get_best(self, prompt: str, preferred_providers: Optional[List[str]] = None,
                        task: str = "general", lang: str = "ar") -> Tuple[str, str]:
@@ -53,11 +86,11 @@ class MultiAIClient:
         test_prompt = "Say 'ok'"
         results = {}
         providers = [
-            ("groq", self._try_groq, "llama-3.3-70b-versatile"),
-            ("openrouter", self._try_openrouter, "meta-llama/llama-4-maverick"),
-            ("gemini", self._try_gemini, "gemini-2.5-flash"),
+            ("groq", self._try_groq),
+            ("openrouter", self._try_openrouter),
+            ("gemini", self._try_gemini),
         ]
-        for name, func, _ in providers:
+        for name, func in providers:
             try:
                 res = await asyncio.wait_for(func(test_prompt), timeout=5)
                 results[name] = bool(res and len(res) > 1)
@@ -66,59 +99,46 @@ class MultiAIClient:
         return results
 
     async def _try_groq(self, prompt: str) -> Optional[str]:
-        try:
-            from openai import OpenAI
-            key = os.getenv("GROQ_API_KEY")
-            if not key: return None
-            if not self._groq_client:
-                self._groq_client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
+        for client in self._groq_clients:
             for model in ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]:
                 try:
-                    resp = self._groq_client.chat.completions.create(
+                    resp = client.chat.completions.create(
                         model=model, messages=[{"role":"user","content":prompt}],
                         max_tokens=500, temperature=0.7, timeout=10
                     )
                     return resp.choices[0].message.content
-                except Exception: continue
-        except Exception: pass
+                except Exception:
+                    continue
         return None
 
     async def _try_openrouter(self, prompt: str) -> Optional[str]:
-        try:
-            from openai import OpenAI
-            key = os.getenv("OPENROUTER_API_KEY")
-            if not key: return None
-            if not self._openai_client:
-                self._openai_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key)
+        for client in self._openrouter_clients:
             for model in ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]:
                 try:
-                    resp = self._openai_client.chat.completions.create(
+                    resp = client.chat.completions.create(
                         model=model, messages=[{"role":"user","content":prompt}],
                         max_tokens=500, temperature=0.7, timeout=10
                     )
                     return resp.choices[0].message.content
-                except Exception: continue
-        except Exception: pass
+                except Exception:
+                    continue
         return None
 
     async def _try_gemini(self, prompt: str) -> Optional[str]:
-        try:
-            from google import genai
-            key = os.getenv("GEMINI_API_KEY")
-            if not key: return None
-            if not self._genai_client:
-                self._genai_client = genai.Client(api_key=key)
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: self._genai_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config={"max_output_tokens": 500, "temperature": 0.7}
+        for client in self._genai_clients:
+            try:
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda c=client: c.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt,
+                        config={"max_output_tokens": 500, "temperature": 0.7}
+                    )
                 )
-            )
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            logger.warning(f"Gemini error: {e}")
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                logger.warning(f"Gemini key failed, trying next: {e}")
+                continue
         return None

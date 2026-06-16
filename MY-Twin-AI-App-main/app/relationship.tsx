@@ -2,9 +2,11 @@ import { SafeAreaView, ScrollView, Text, StyleSheet, View, FlatList, TouchableOp
 import { useTwinStore } from '../store/useTwinStore';
 import { supabase } from '../lib/supabase';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
 import CircleProgress from '../components/CircleProgress';
 import BondTimeline from '../components/BondTimeline';
-import { Shield, Heart, Handshake, Brain, Smile, Link, Target, Plus, Trash2, X, Sparkles } from 'lucide-react-native';
+import { Shield, Heart, Handshake, Brain, Smile, Link, Target, Plus, Trash2, X } from 'lucide-react-native';
 
 interface Goal { id: string; title: string; status: string; progress: number; category: string; deadline: string|null; created_at: string; }
 
@@ -15,7 +17,6 @@ export default function Relationship() {
   const bg = isDark ? '#1A1A1A' : '#F8F6F2'; const txt = isDark ? '#FFF' : '#1A1A1A';
   const sub = isDark ? '#888' : '#666'; const card = isDark ? '#2A2A2A' : '#FFF'; const border = isDark ? '#444' : '#F0F0F0';
 
-  // ✅ حالة الأهداف
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalsLoading, setGoalsLoading] = useState(true);
   const [goalsRefreshing, setGoalsRefreshing] = useState(false);
@@ -68,9 +69,10 @@ export default function Relationship() {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={t('علاقتي مع توأمي', 'My Relationship')} />
+      
       <ScrollView contentContainerStyle={s.container} refreshControl={<RefreshControl refreshing={goalsRefreshing} onRefresh={()=>fetchGoals(true)} colors={['#6B21A8']}/>}>
-        <Text style={[s.title, { color: txt }]}>{isAr ? 'علاقتي مع توأمي 💜' : 'My Relationship 💜'}</Text>
-
         {/* ملخص العلاقة */}
         <View style={[s.summaryCard, { backgroundColor: card, borderColor: border }]}>
           <View style={s.summaryRow}>
@@ -96,7 +98,7 @@ export default function Relationship() {
           })}
         </View>
 
-        {/* ✅ قسم الأهداف (مدمج) */}
+        {/* قسم الأهداف */}
         <View style={[s.sectionHeader, { marginTop: 20 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Target size={20} stroke={isDark ? '#D8B4FE' : '#6B21A8'} />
@@ -155,7 +157,6 @@ export default function Relationship() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 }, container: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 20, textAlign: 'center' },
   summaryCard: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
@@ -165,7 +166,6 @@ const s = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
   circleWrap: { width: '30%', alignItems: 'center', marginBottom: 16 },
-  // أهداف
   addGoalBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#6B21A8', justifyContent: 'center', alignItems: 'center' },
   goalCard: { padding: 14, borderRadius: 14, borderWidth: 1 },
   goalTitle: { fontSize: 15, fontWeight: '600', flex: 1 },
@@ -174,7 +174,6 @@ const s = StyleSheet.create({
   goalProgressText: { fontSize: 12, fontWeight: '600' },
   goalInput: { padding: 14, borderRadius: 12, borderWidth: 1, fontSize: 15, marginBottom: 16 },
   saveGoalBtn: { backgroundColor: '#6B21A8', padding: 14, borderRadius: 12, alignItems: 'center' },
-  // Modal
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { width: '90%', backgroundColor: '#FFF', borderRadius: 20, padding: 20 },
   modalTitle: { fontSize: 18, fontWeight: '700' },

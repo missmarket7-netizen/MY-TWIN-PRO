@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, I18nManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTwinStore } from '../store/useTwinStore';
 import { router, usePathname } from 'expo-router';
@@ -47,6 +47,9 @@ export default function SideMenu({ onClose }:{ onClose:()=>void }) {
     {icon:Settings,label:t('الإعدادات','Settings'),route:'/settings'},
   ];
 
+  // دعم RTL: عكس اتجاه العناصر
+  const itemDirection = isAr ? 'row-reverse' : 'row';
+
   return (
     <ScrollView style={[styles.container,{paddingTop:insets.top+20,backgroundColor:colors.bg}]} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
       <TouchableOpacity style={styles.closeBtn} onPress={onClose}><X size={24} stroke={colors.primary}/></TouchableOpacity>
@@ -76,14 +79,14 @@ export default function SideMenu({ onClose }:{ onClose:()=>void }) {
         const active = item.route ? (pathname === item.route || (item.route === '/chat' && pathname === '/')) : false;
         const onPress = item.onPress || (() => navigate(item.route!));
         return (
-          <TouchableOpacity key={item.route || item.label} style={[styles.item, isAr && styles.itemRTL, active && styles.activeItem]} onPress={onPress}>
+          <TouchableOpacity key={item.route || item.label} style={[styles.item, { flexDirection: itemDirection }, active && styles.activeItem]} onPress={onPress}>
             <Icon size={20} stroke={active ? colors.accent : colors.primary} />
             <Text style={[styles.itemLabel, { color: colors.text }, active && { color: colors.accent, fontWeight: '600' }]}>{item.label}</Text>
           </TouchableOpacity>
         );
       })}
 
-      <TouchableOpacity style={[styles.item, isAr && styles.itemRTL, { marginTop: 20 }]} onPress={() => {
+      <TouchableOpacity style={[styles.item, { flexDirection: itemDirection }, { marginTop: 20 }]} onPress={() => {
         Alert.alert(t('تسجيل الخروج', 'Logout'), t('هل أنت متأكد؟', 'Are you sure?'), [
           { text: t('إلغاء', 'Cancel'), style: 'cancel' },
           { text: t('خروج', 'Logout'), style: 'destructive', onPress: async () => { await supabase.auth.signOut(); router.replace('/login'); } }
@@ -108,8 +111,7 @@ const styles = StyleSheet.create({
   tierText: { fontSize: 12, fontWeight: '500', marginTop: 2 },
   backToChatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 10, backgroundColor: '#F3F0FF', marginBottom: 16 },
   backToChatText: { fontSize: 15, fontWeight: '600' },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, marginBottom: 2 },
-  itemRTL: { flexDirection: 'row-reverse' },
-  activeItem: { backgroundColor: '#F3F0FF', borderLeftWidth: 3, borderLeftColor: '#A855F7' },
+  item: { alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, marginBottom: 2 },
   itemLabel: { fontSize: 15, fontWeight: '500' },
+  activeItem: { backgroundColor: '#F3F0FF', borderLeftWidth: 3, borderLeftColor: '#A855F7' },
 });

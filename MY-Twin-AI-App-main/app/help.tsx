@@ -2,11 +2,10 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTwinStore } from '../store/useTwinStore';
 import { Stack } from 'expo-router';
-import { ChevronLeft, Mail, MessageCircle, ExternalLink } from 'lucide-react-native';
-import { router } from 'expo-router';
+import Header from '../components/Header';
+import { Mail, MessageCircle, ExternalLink } from 'lucide-react-native';
 
 export default function HelpScreen() {
-  const insets = useSafeAreaInsets();
   const { theme, lang } = useTwinStore();
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
@@ -22,19 +21,9 @@ export default function HelpScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={24} stroke={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('مساعدة', 'Help')}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <Header title={t('مساعدة', 'Help')} />
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* الأسئلة الشائعة */}
@@ -95,9 +84,6 @@ export default function HelpScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
-  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
   faqCard: { padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 12 },

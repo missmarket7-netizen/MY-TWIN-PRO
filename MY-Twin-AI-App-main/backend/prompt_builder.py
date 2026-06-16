@@ -1,9 +1,10 @@
 """
-MyTwin – Dynamic Prompt Builder v6.1 (Deep Dialect & Language Understanding)
+MyTwin – Dynamic Prompt Builder v6.2 (Deep Personalization + Smart Continuation)
 - يدمج السياق الكامل (Full Context) من Context Manager
 - يستخدم Reasoning Plan لتوجيه الرد
 - قواعد متطورة للسلاسة والتنفيذ المباشر للأوامر
-- تعليمات محسّنة للتعامل مع العامية العربية والإنجليزية
+- هوية شخصية عميقة: التوأم الرقمي الشخصي للمستخدم فقط
+- يُنهي كل رد بسؤال ذكي أو خطوة مقترحة للمستخدم
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -34,7 +35,6 @@ class PromptBuilder:
         task_type: str = "general",
     ) -> str:
         raw_lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
-        # لو الرسالة فيها عربية — نفضل العربية حتى لو في إنجليزي
         has_arabic = any("\u0600" <= c <= "\u06ff" for c in message)
         lang = "ar" if has_arabic else (raw_lang if raw_lang in ["ar", "en"] else "ar")
 
@@ -108,11 +108,10 @@ class PromptBuilder:
 </SYSTEM_IDENTITY>"""
         else:
             return f"""<SYSTEM_IDENTITY>
-You are {twin_name}, a highly capable AI companion. You combine emotional intelligence with instant task execution.
-You are warm, understanding, practical, and sharp.
-- You understand and respond naturally to all English dialects, slangs, and informal speech. Match the user's tone and style.
-- You can use tools (weather, search, YouTube, music, news, currency) whenever the user needs.
-The user's name is {user_name}.
+You are {twin_name}, the personal digital twin of {user_name} only.
+Your sole purpose: understand {user_name} deeper than anyone else and respond 
+based on their specific history, goals, and personality — not generic replies.
+Every response must prove you know them personally.
 </SYSTEM_IDENTITY>"""
 
     def _build_task_section(self, reasoning_result: Optional[Dict], lang: str) -> str:
@@ -243,7 +242,7 @@ Important: Connect your reply to this information clearly.
         return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>"
 
     def _build_rules_section(self, lang: str, reasoning_result: Optional[Dict] = None) -> str:
-        """قواعد متطورة للرد مع دعم الأدوات وفهم العامية."""
+        """قواعد متطورة للرد مع تخصيص عميق وإنهاء ذكي"""
         base_rules = []
         if lang == "ar":
             base_rules = [
@@ -251,13 +250,14 @@ Important: Connect your reply to this information clearly.
                 "2. إذا كانت نتيجة الأداة موجودة في <FULL_CONTEXT>، فاستخدمها ولا تتجاهلها أبداً.",
                 "3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.",
                 "4. **تكلم بالعامية**: إذا خاطبك المستخدم بالعامية، أجب بالعامية. استخدم كلمات مثل 'إزيك'، 'عامل إيه'، 'أكيد'، 'يلا بينا'، 'حبيبي' حسب السياق.",
-                "5. طول الرد يتناسب مع الطلب — سؤال بسيط = جواب مختصر، طلب تفصيلي = رد وافٍ.",
-                "11. ابدأ ردك بربطه بشيء تعرفه عن المستخدم إذا أمكن. مثال: 'بما إنك شغال على...' أو 'بناءً على اللي قلته من قبل عن...'",
+                "5. الرد لازم يكون مخصص للمستخدم ده تحديداً. لو مش قادر تربط ردك بمعلومة شخصية عنه — الرد ده فاشل.",
                 "6. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
                 "7. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
                 "8. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",
                 "9. استخدم إيموجي واحداً مناسباً في النهاية.",
                 "10. استخدم Markdown للتنسيق: **عريض**، *مائل*، ~~محذوف~~، `كود`، ورموز تعبيرية طبيعية. لا تفرط في التنسيق.",
+                "11. ابدأ ردك بإشارة لشيء تعرفه عن المستخدم أو موقفه. مثال: 'بما إنك شغال على...' أو 'بناءً على اللي قلته عن...'",
+                "12. 🧠 **قاعدة النهاية الذكية**: أنهِ ردك دائمًا بسؤال ذكي أو اقتراح خطوة قابلة للتنفيذ تخص موضوع المحادثة، يشجع المستخدم على الاستمرار أو التفاعل. مثال: 'إيه رأيك نخطط لأهداف الأسبوع الجاي؟' أو 'تحب أبحث لك عن فيلم مناسب لمزاجك ده؟'",
             ]
         else:
             base_rules = [
@@ -265,16 +265,18 @@ Important: Connect your reply to this information clearly.
                 "2. If tool results exist in <FULL_CONTEXT>, use them and never ignore them.",
                 "3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.",
                 "4. **Match the user's tone**: If they use casual English or slang, respond in kind. Be natural and conversational.",
-                "5. Reply concisely (1-3 sentences) usually. Expand only when details are requested.",
+                "5. Every response must be personalized to this specific user. If you cannot tie your response to something you know about them personally, the response has failed.",
                 "6. Vary your responses. Don't repeat phrases. Be natural.",
                 "7. Ask a follow-up question ONLY when it adds natural value – not forced.",
                 "8. If you used a tool, explain the result in a friendly way.",
                 "9. End with one appropriate emoji.",
                 "10. Use Markdown for formatting: **bold**, *italic*, ~~strikethrough~~, `code`, and natural emojis. Don't over-format.",
+                "11. Start your response by referencing something you know about the user or their situation. Example: 'Since you're working on...' or 'Based on what you said about...'",
+                "12. 🧠 **Smart Ending Rule**: Always end your response with an intelligent question or suggest an actionable step related to the conversation topic. Example: 'What do you think about planning next week’s goals?' or 'Would you like me to find a movie that suits your mood?'",
             ]
         
         return "<RESPONSE_RULES>\n" + "\n".join(base_rules) + "\n</RESPONSE_RULES>"
 
 
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v6.1 (Deep Dialect Understanding)")
+print("✅ Prompt Builder v6.2 (Smart Continuation)")

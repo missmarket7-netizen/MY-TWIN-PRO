@@ -6,10 +6,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTwinStore } from '../store/useTwinStore';
 import { API } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { router } from 'expo-router';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
 import {
   Gift, Copy, Share2, Users, Zap, Crown, CheckCircle2,
-  UserPlus, Sparkles, TrendingUp, ArrowRight, Ticket, ArrowLeft
+  UserPlus, Sparkles, TrendingUp, ArrowRight, Ticket
 } from 'lucide-react-native';
 
 interface ReferralStats {
@@ -143,16 +144,8 @@ export default function Referral() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      {/* Header احترافي */}
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} stroke={txt} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>
-          {t('نظام الدعوات', 'Referral System')}
-        </Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={t('نظام الدعوات', 'Referral System')} />
 
       <ScrollView
         contentContainerStyle={styles.container}
@@ -163,7 +156,6 @@ export default function Referral() {
           {t('ادعُ أصدقاءك واربح مكافآت!', 'Invite friends and earn rewards!')}
         </Text>
 
-        {/* بطاقة الإحصائيات */}
         <View style={[styles.statsCard, { backgroundColor: card, borderColor: border }]}>
           <View style={styles.statItem}>
             <Users size={24} stroke="#6B21A8" />
@@ -178,7 +170,6 @@ export default function Referral() {
           </View>
         </View>
 
-        {/* كودي */}
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionTitle, { color: txt }]}>{t('كود الدعوة الخاص بي', 'My Referral Code')}</Text>
           {myCode ? (
@@ -210,7 +201,6 @@ export default function Referral() {
           )}
         </View>
 
-        {/* تفعيل كود */}
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionTitle, { color: txt }]}>{t('تفعيل كود صديق', 'Activate a Friend Code')}</Text>
           <View style={[styles.activateRow, isAr && { flexDirection: 'row-reverse' }]}>
@@ -238,7 +228,6 @@ export default function Referral() {
           </View>
         </View>
 
-        {/* مستويات المكافآت */}
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionTitle, { color: txt }]}>{t('مستويات المكافآت', 'Reward Tiers')}</Text>
           {REWARD_TIERS.map((tier, i) => {
@@ -275,9 +264,6 @@ export default function Referral() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   container: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 24 },

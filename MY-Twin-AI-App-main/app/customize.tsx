@@ -4,8 +4,9 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { useTwinStore, TwinStyle, TwinGender, ReplyStyle } from '../store/useTwinStore';
-import { router } from 'expo-router';
-import { Palette, User, Save, Smile, Heart, Star, RotateCcw, Sparkles, ArrowLeft } from 'lucide-react-native';
+import Header from '../components/Header';
+import { Stack } from 'expo-router';
+import { Palette, User, Save, Smile, Heart, Star, RotateCcw, Sparkles, Volume2 } from 'lucide-react-native';
 
 const STYLES: Record<string, Record<string, string>> = {
   ar: { supportive: 'داعم', coach: 'مدرب', wise: 'حكيم', fun: 'مرح', calm: 'هادئ' },
@@ -32,6 +33,7 @@ export default function Customize() {
     twinName, twinGender, twinStyle, replyStyle,
     twinTraits, setTwinName, setTwinGender, setTwinStyle,
     setReplyStyle, setTwinTraits, lang, theme,
+    setVoiceEnabled, voiceEnabled,
   } = useTwinStore();
 
   const isAr = lang === 'ar';
@@ -63,9 +65,10 @@ export default function Customize() {
     setTwinStyle(style);
     setReplyStyle(reply);
     setTwinTraits(selectedTraits);
+    setVoiceEnabled(true);
     setSaved(true);
     Alert.alert('✅', t('تم حفظ التغييرات', 'Changes saved'));
-  }, [name, gender, style, reply, selectedTraits, setTwinName, setTwinGender, setTwinStyle, setReplyStyle, setTwinTraits, t]);
+  }, [name, gender, style, reply, selectedTraits, setTwinName, setTwinGender, setTwinStyle, setReplyStyle, setTwinTraits, setVoiceEnabled, t]);
 
   const handleReset = () => {
     Alert.alert(
@@ -112,16 +115,8 @@ export default function Customize() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      {/* Header احترافي */}
-      <View style={[styles.header, { borderBottomColor: border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} stroke={txt} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: txt }]}>
-          {t('تخصيص التوأم', 'Customize Twin')}
-        </Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title={t('تخصيص التوأم', 'Customize Twin')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Sparkles size={40} stroke={primary} style={{ alignSelf: 'center', marginBottom: 20 }} />
@@ -140,15 +135,20 @@ export default function Customize() {
           />
         </View>
 
-        {/* النوع */}
-        <Text style={[styles.label, { color: sub }]}>{t('النوع', 'Gender')}</Text>
+        {/* النوع (يؤثر على الصوت) */}
+        <Text style={[styles.label, { color: sub }]}>
+          {t('النوع (يؤثر على الصوت)', 'Gender (affects voice)')}
+        </Text>
         <View style={[styles.optionsRow, isAr && { flexDirection: 'row-reverse' }]}>
           {(['female', 'male'] as TwinGender[]).map(g => (
             <TouchableOpacity
               key={g}
               style={[styles.option, { borderColor: border, backgroundColor: card }, gender === g && { borderColor: primary, backgroundColor: primary + '20' }]}
-              onPress={() => setGender(g)}
+              onPress={() => {
+                setGender(g);
+              }}
             >
+              <Volume2 size={14} stroke={gender === g ? primary : sub} />
               <Text style={[styles.optionText, { color: sub }, gender === g && { color: primary, fontWeight: '700' }]}>
                 {GENDER_LABELS[lang]?.[g] || g}
               </Text>
@@ -223,15 +223,12 @@ export default function Customize() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 16 },
   inputRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 4, gap: 10 },
   input: { flex: 1, fontSize: 15 },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
-  option: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, marginHorizontal: 4, marginBottom: 8 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, marginHorizontal: 4, marginBottom: 8 },
   optionText: { fontSize: 13, fontWeight: '500' },
   btnRow: { flexDirection: 'row', gap: 12, marginTop: 32 },
   saveBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B21A8', padding: 16, borderRadius: 12, gap: 8 },
