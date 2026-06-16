@@ -101,7 +101,7 @@ export default function MemoriesScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('ذكرياتنا', 'Our Memories')} />
+      <Header />
 
       <View style={[styles.tabs, { borderBottomColor: border }]}>
         {[

@@ -23,7 +23,7 @@ export default function HelpScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('مساعدة', 'Help')} />
+      <Header />
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* الأسئلة الشائعة */}

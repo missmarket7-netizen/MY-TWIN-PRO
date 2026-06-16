@@ -120,7 +120,18 @@ export const updateStoreFromResponse = (r: TwinResponse) => {
   s.setTotalMessages(s.totalMessages + 1);
 };
 
-export const fetchWeather = async (city: string = 'Cairo') => { const { data } = await API.get('/api/services/weather', { params: { city } }); return data; };
+export const fetchWeather = async (city: string = 'Cairo') => {
+  let params: any = {};
+  if (city.includes(',')) {
+    // إحداثيات: "lat,lon"
+    const [lat, lon] = city.split(',');
+    params = { lat, lon };
+  } else {
+    params = { city };
+  }
+  const { data } = await API.get('/api/services/weather', { params });
+  return data;
+};
 export const fetchYouTube = async (query: string, lang: string = 'ar') => { const { data } = await API.get('/api/services/youtube', { params: { query, lang } }); return data; };
 export const fetchSpotify = async (query: string) => { const { data } = await API.get('/api/services/spotify', { params: { query } }); return data; };
 export const fetchGoogleSearch = async (query: string) => { const { data } = await API.get('/api/services/google', { params: { query } }); return data; };

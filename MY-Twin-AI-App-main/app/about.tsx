@@ -33,7 +33,7 @@ export default function About() {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={isAr ? 'حول التطبيق' : 'About'} />
+      <Header />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <Image source={APP_ICON} style={s.logo} />
         <Text style={[s.title, { color: txt }]}>MyTwin</Text>

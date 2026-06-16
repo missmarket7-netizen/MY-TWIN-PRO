@@ -71,7 +71,7 @@ export default function Settings() {
 
   return (
     <SafeAreaView style={[s.safe, isDark && { backgroundColor: '#1A1A1A' }]}>
-      <Header title={t.title} />
+      <Header />
       <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.content}>
           <View style={[s.tierBadge, isDark && { backgroundColor: '#2A2A2A', borderColor: '#444' }]}>

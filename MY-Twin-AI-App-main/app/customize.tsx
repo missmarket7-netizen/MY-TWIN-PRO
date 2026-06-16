@@ -116,7 +116,7 @@ export default function Customize() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('تخصيص التوأم', 'Customize Twin')} />
+      <Header />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Sparkles size={40} stroke={primary} style={{ alignSelf: 'center', marginBottom: 20 }} />

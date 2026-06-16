@@ -54,7 +54,7 @@ export default function Terms() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={isAr ? 'الشروط والأحكام' : 'Terms & Conditions'} />
+      <Header />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <FileText size={48} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />

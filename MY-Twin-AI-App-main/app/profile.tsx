@@ -168,7 +168,7 @@ export default function Profile() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('title')} />
+      <Header />
 
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={moodsRefreshing} onRefresh={() => fetchMoods(true)} colors={[primary]} />}>
         

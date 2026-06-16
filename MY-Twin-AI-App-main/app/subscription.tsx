@@ -310,7 +310,7 @@ export default function SubscriptionScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      <Header title={isAr ? 'الاشتراكات' : 'Subscriptions'} />
+      <Header />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.titleSection}>

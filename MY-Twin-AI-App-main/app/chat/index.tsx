@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../lib/supabase';
+import * as Location from 'expo-location';
 import { useTwinStore, ChatMessage } from '../../store/useTwinStore';
 import {
   sendChatFromStore, updateStoreFromResponse,
@@ -138,7 +139,10 @@ export default function Chat() {
         const tool = activeToolsList[0].type;
         let result = '';
         switch (tool) {
-          case 'weather': result = (await fetchWeather('Cairo')).result || 'الطقس غير متاح'; break;
+          case 'weather':
+          const loc = activeToolsList[0]?.location || 'Cairo';
+          result = (await fetchWeather(loc)).result || 'الطقس غير متاح';
+          break;
           case 'youtube': result = (await fetchYouTube(input || 'music')).result || 'لم أجد فيديوهات'; break;
           case 'spotify': result = (await fetchSpotify(input || 'music')).result || 'لم أجد أغاني'; break;
           case 'news': result = (await fetchNews()).result || 'الأخبار غير متاحة'; break;
@@ -215,6 +219,20 @@ export default function Chat() {
   const handleSaveEdit = useCallback((msg: ChatMessage, newContent: string) => {
     if (newContent.trim() && newContent !== msg.content) { setEditingMessageId(null); sendMessage(newContent.trim(), msg.image); } else { setEditingMessageId(null); }
   }, [sendMessage]);
+
+  
+  const getCurrentLocation = async (): Promise<string> => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({});
+        return `${loc.coords.latitude},${loc.coords.longitude}`;
+      }
+    } catch (e) {
+      console.warn('Location error:', e);
+    }
+    return 'Cairo';
+  };
 
   const handleAddTool = (toolDef: any) => { setActiveToolsList(prev => [...prev, { id: Date.now().toString(), ...toolDef }]); };
   const handleRemoveTool = (toolId: string) => { setActiveToolsList(prev => prev.filter(t => t.id !== toolId)); };

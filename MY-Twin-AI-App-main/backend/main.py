@@ -288,12 +288,19 @@ async def spotify_endpoint(query: str, uid: str = Depends(get_user)):
     return {"result": result, "remaining": remaining}
 
 @app.get("/api/services/weather")
-async def weather_endpoint(city: str = "Cairo", uid: str = Depends(get_user)):
+async def weather_endpoint(city: Optional[str] = None, lat: Optional[float] = None, lon: Optional[float] = None, uid: str = Depends(get_user)):
     p = get_profile(uid)
     allowed, remaining = check_feature_usage(uid, p.get("tier", "free"), "weather")
     if not allowed:
         return JSONResponse(status_code=429, content={"error": "daily_limit_reached"})
-    result = await get_weather(city)
+    
+    if lat is not None and lon is not None:
+        result = await get_weather(f"{lat},{lon}")
+    elif city:
+        result = await get_weather(city)
+    else:
+        result = await get_weather("Cairo")
+    
     return {"result": result} if result else {"error": "unavailable"}
 
 @app.get("/api/services/google")

@@ -145,7 +145,7 @@ export default function Referral() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('نظام الدعوات', 'Referral System')} />
+      <Header />
 
       <ScrollView
         contentContainerStyle={styles.container}

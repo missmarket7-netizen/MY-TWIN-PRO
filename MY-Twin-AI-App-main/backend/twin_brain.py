@@ -21,6 +21,7 @@ from response_validator import response_validator
 from memory_summarizer import memory_summarizer
 from tools.agent_metrics import agent_metrics
 from model_router import model_router
+from llm_council import LLMCouncil
 from self_critic import SelfCritic
 from profile_extractor import profile_extractor
 
@@ -57,6 +58,7 @@ class TwinBrain:
         self.twin_name = "MyTwin"
         self.user_join_dates = {}
         self.self_critic = SelfCritic()
+        self.council = LLMCouncil(self.multi)
 
     async def health_check_all_providers(self) -> Dict[str, bool]:
         return await self.multi.health_check()
@@ -235,7 +237,7 @@ class TwinBrain:
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
-                reply, provider = await model_router.get_best_reply(
+                reply, provider = await self.council.get_best_reply(
                     prompt=prompt,
                     task_type=task_type,
                     multi_client=self.multi,

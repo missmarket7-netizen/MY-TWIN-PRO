@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Animated, ActivityIndicator, ScrollView } from 'react-native';
-import { Send, X, Camera, Image as ImageIcon, FileText, Search, Cloud, Music, Film, DollarSign, TrendingUp, Wand2 } from 'lucide-react-native';
+import { Send, X, Camera, Image as ImageIcon, FileText, Search, Cloud, Music, Film, DollarSign, TrendingUp, Wand2, Mic, MicOff } from 'lucide-react-native';
+import { transcribeAudio } from '../../utils/voice_engine';
 import { ToolChip } from './ChatBubbles';
 
 const SCREEN_WIDTH = require('react-native').Dimensions.get('window').width;

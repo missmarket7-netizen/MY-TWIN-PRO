@@ -70,7 +70,7 @@ export default function Relationship() {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title={t('علاقتي مع توأمي', 'My Relationship')} />
+      <Header />
       
       <ScrollView contentContainerStyle={s.container} refreshControl={<RefreshControl refreshing={goalsRefreshing} onRefresh={()=>fetchGoals(true)} colors={['#6B21A8']}/>}>
         {/* ملخص العلاقة */}
