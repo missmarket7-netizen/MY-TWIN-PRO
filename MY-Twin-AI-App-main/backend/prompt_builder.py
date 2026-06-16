@@ -1,10 +1,8 @@
 """
-MyTwin – Dynamic Prompt Builder v6.2 (Deep Personalization + Smart Continuation)
-- يدمج السياق الكامل (Full Context) من Context Manager
-- يستخدم Reasoning Plan لتوجيه الرد
-- قواعد متطورة للسلاسة والتنفيذ المباشر للأوامر
-- هوية شخصية عميقة: التوأم الرقمي الشخصي للمستخدم فقط
-- يُنهي كل رد بسؤال ذكي أو خطوة مقترحة للمستخدم
+MyTwin – Dynamic Prompt Builder v6.3 (Deep Personalization + Smart Ending)
+- هوية شخصية عميقة
+- نهاية ذكية إلزامية (سؤال أو خطوة تالية)
+- يستخدم الذاكرة لتخصيص الردود والنهايات
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -16,267 +14,114 @@ class PromptBuilder:
         pass
 
     async def build(
-        self,
-        twin_name: str,
-        user_name: str,
-        relationship: Dict[str, Any],
-        emotion: Dict[str, Any],
-        voice: Dict[str, Any],
-        dialect: Dict[str, Any],
-        user_id: Optional[str] = None,
-        journey_info: Optional[Dict] = None,
-        attachment_info: Optional[Dict] = None,
-        response_adjustments: Optional[Dict] = None,
-        message: str = "",
-        memory_context: str = "",
-        reasoning_result: Optional[Dict] = None,
-        consciousness_context: Optional[Dict] = None,
-        history: Optional[List[Dict[str, str]]] = None,
-        task_type: str = "general",
+        self, twin_name, user_name, relationship, emotion, voice, dialect,
+        user_id=None, journey_info=None, attachment_info=None,
+        response_adjustments=None, message="", memory_context="",
+        reasoning_result=None, consciousness_context=None, history=None,
+        task_type="general",
     ) -> str:
         raw_lang = dialect.get("dialect", "ar")[:2] if dialect else "ar"
         has_arabic = any("\u0600" <= c <= "\u06ff" for c in message)
         lang = "ar" if has_arabic else (raw_lang if raw_lang in ["ar", "en"] else "ar")
 
-        # ── 1. هوية النظام ──────────────────────
         identity = self._build_identity(twin_name, user_name, lang, dialect)
-
-        # ── 2. المهمة الحالية ────────────────────
         task_section = self._build_task_section(reasoning_result, lang)
-
-        # ── 3. ملف المستخدم ──────────────────────
-        profile_section = self._build_profile_section(
-            relationship, emotion, journey_info, attachment_info, lang
-        )
-
-        # ── 4. حالة العلاقة والعاطفة ─────────────
-        rel_section = self._build_relationship_section(
-            relationship, emotion, response_adjustments, lang
-        )
-
-        # ── 5. وعي التوأم ────────────────────────
-        consciousness_section = self._build_consciousness_section(
-            consciousness_context, lang
-        )
-
-        # ── 6. السياق الكامل (Full Context) ──────
+        profile_section = self._build_profile_section(relationship, emotion, journey_info, attachment_info, lang)
+        rel_section = self._build_relationship_section(relationship, emotion, response_adjustments, lang)
+        consciousness_section = self._build_consciousness_section(consciousness_context, lang)
         context_section = self._build_context_section(memory_context, lang)
-
-        # ── 7. تاريخ المحادثة ────────────────────
         history_section = self._build_history_section(history, lang)
-
-        # ── 8. رسالة المستخدم الحالية ────────────
         message_section = self._build_message_section(message, lang)
-
-        # ── 9. قواعد الرد ────────────────────────
         rules_section = self._build_rules_section(lang, reasoning_result)
 
-        # ── تجميع الـ Prompt النهائي ────────────────
-        final_prompt = f"""
-{identity}
+        return f"{identity}\n\n{task_section}\n\n{profile_section}\n\n{rel_section}\n\n{consciousness_section}\n\n{context_section}\n\n{history_section}\n\n{message_section}\n\n{rules_section}".strip()
 
-{task_section}
-
-{profile_section}
-
-{rel_section}
-
-{consciousness_section}
-
-{context_section}
-
-{history_section}
-
-{message_section}
-
-{rules_section}
-"""
-        return final_prompt.strip()
-
-    # ── دوال بناء الأقسام ──────────────────────────
-
-    def _build_identity(self, twin_name: str, user_name: str, lang: str, dialect: Dict[str, Any]) -> str:
-        dialect_name = dialect.get("instruction", "") if dialect else ""
+    def _build_identity(self, twin_name, user_name, lang, dialect):
         if lang == "ar":
             return f"""<SYSTEM_IDENTITY>
-أنت {twin_name}، التوأم الرقمي الشخصي لـ {user_name} — وليس مجرد مساعد عام.
-مهمتك: تعرف {user_name} أعمق من أي شخص، وترد عليه بناءً على تاريخه وأهدافه وشخصيته تحديداً.
-كل رد تقوله لازم يثبت إنك تعرفه شخصياً — مش ردود عامة يمكن تقولها لأي حد.
-- تتحدث بنفس لهجة {user_name} تماماً: إذا كتب بالعامية المصرية رد بها، إذا كتب بالفصحى رد بها.
-- أنت قادر على استخدام الأدوات (الطقس، البحث، اليوتيوب، الموسيقى، الأخبار، العملات) متى احتاج.
-- إذا لم تجد معلومات شخصية كافية، اسأل {user_name} سؤالاً واحداً ذكياً لتفهمه أكثر.
+أنت {twin_name}، التوأم الرقمي الشخصي لـ {user_name} فقط.
+مهمتك: تفهم {user_name} أعمق من أي شخص، وترد بناءً على تاريخه وأهدافه وشخصيته.
+كل رد لازم يثبت إنك تعرفه شخصياً — مش ردود عامة.
+- تتحدث بنفس لهجة {user_name}: إذا كتب بالعامية رد بالعامية.
+- تنهي كل رد بسؤال ذكي أو اقتراح خطوة تخص موضوع المحادثة.
 </SYSTEM_IDENTITY>"""
-        else:
-            return f"""<SYSTEM_IDENTITY>
+        return f"""<SYSTEM_IDENTITY>
 You are {twin_name}, the personal digital twin of {user_name} only.
-Your sole purpose: understand {user_name} deeper than anyone else and respond 
-based on their specific history, goals, and personality — not generic replies.
+Your purpose: understand {user_name} deeply, respond based on their history/goals.
 Every response must prove you know them personally.
+- Match their tone: casual or formal as they do.
+- End every reply with a smart question or suggested next step.
 </SYSTEM_IDENTITY>"""
 
-    def _build_task_section(self, reasoning_result: Optional[Dict], lang: str) -> str:
+    def _build_task_section(self, reasoning_result, lang):
         if not reasoning_result:
             return "<CURRENT_TASK>\nمحادثة عامة\n</CURRENT_TASK>" if lang == "ar" else "<CURRENT_TASK>\nGeneral conversation\n</CURRENT_TASK>"
-        
-        goal = reasoning_result.get("goal", "")
-        intent = reasoning_result.get("intent", "general")
-        response_style = reasoning_result.get("response_style", "conversational")
-        needs_tool = reasoning_result.get("needs_tool", False)
-        primary_tool = reasoning_result.get("primary_tool", None)
-        
-        lines = []
-        if lang == "ar":
-            lines.append(f"الهدف: {goal}")
-            lines.append(f"نمط الرد: {response_style}")
-            if needs_tool and primary_tool:
-                lines.append(f"الأداة المستخدمة: {primary_tool}")
-        else:
-            lines.append(f"Goal: {goal}")
-            lines.append(f"Response style: {response_style}")
-            if needs_tool and primary_tool:
-                lines.append(f"Tool used: {primary_tool}")
-        
+        goal = reasoning_result.get("goal", ""); response_style = reasoning_result.get("response_style", "conversational")
+        lines = [f"الهدف: {goal}", f"نمط الرد: {response_style}"] if lang == "ar" else [f"Goal: {goal}", f"Response style: {response_style}"]
         return "<CURRENT_TASK>\n" + "\n".join(lines) + "\n</CURRENT_TASK>"
 
-    def _build_profile_section(
-        self,
-        relationship: Dict[str, Any],
-        emotion: Dict[str, Any],
-        journey_info: Optional[Dict],
-        attachment_info: Optional[Dict],
-        lang: str,
-    ) -> str:
+    def _build_profile_section(self, relationship, emotion, journey_info, attachment_info, lang):
         lines = []
-        if relationship:
-            stage = relationship.get("label", "")
-            bond = relationship.get("bond_level", 0)
-            lines.append(f"العلاقة: {stage} (مستوى {bond:.0f}%)" if lang == "ar" else f"Relationship: {stage} (level {bond:.0f}%)")
-        if emotion:
-            primary = emotion.get("primary", "neutral")
-            intensity = emotion.get("intensity", 0.5)
-            lines.append(f"المشاعر الحالية: {primary} (شدة {intensity:.2f})" if lang == "ar" else f"Current emotion: {primary} (intensity {intensity:.2f})")
-        if journey_info:
-            phase = journey_info.get("phase", "")
-            day = journey_info.get("day", 1)
-            lines.append(f"مرحلة الرحلة: {phase} (اليوم {day})" if lang == "ar" else f"Journey phase: {phase} (day {day})")
-        if attachment_info:
-            style = attachment_info.get("style", "")
-            if style:
-                lines.append(f"نمط التعلق: {style}" if lang == "ar" else f"Attachment style: {style}")
+        if relationship: lines.append(f"العلاقة: {relationship.get('label','')} ({relationship.get('bond_level',0):.0f}%)" if lang=="ar" else f"Relationship: {relationship.get('label','')} ({relationship.get('bond_level',0):.0f}%)")
+        if emotion: lines.append(f"المشاعر: {emotion.get('primary','')} (شدة {emotion.get('intensity',0.5):.2f})" if lang=="ar" else f"Emotion: {emotion.get('primary','')} (intensity {emotion.get('intensity',0.5):.2f})")
+        if journey_info: lines.append(f"الرحلة: {journey_info.get('phase','')} (اليوم {journey_info.get('day',1)})" if lang=="ar" else f"Journey: {journey_info.get('phase','')} (day {journey_info.get('day',1)})")
+        if attachment_info and attachment_info.get("style"): lines.append(f"نمط التعلق: {attachment_info['style']}" if lang=="ar" else f"Attachment: {attachment_info['style']}")
         return "<USER_PROFILE>\n" + "\n".join(lines) + "\n</USER_PROFILE>" if lines else ""
 
-    def _build_relationship_section(
-        self,
-        relationship: Dict[str, Any],
-        emotion: Dict[str, Any],
-        response_adjustments: Optional[Dict],
-        lang: str,
-    ) -> str:
+    def _build_relationship_section(self, relationship, emotion, response_adjustments, lang):
         lines = []
-        if relationship:
-            instr = relationship.get("instruction", "")
-            if instr:
-                lines.append(instr)
-        if response_adjustments:
-            warmth = response_adjustments.get("warmth", 0.5)
-            speed = response_adjustments.get("response_speed", "normal")
-            support = response_adjustments.get("support_type", "general")
-            lines.append(f"دفء: {warmth:.1f}, سرعة: {speed}, دعم: {support}" if lang == "ar" else f"Warmth: {warmth:.1f}, Speed: {speed}, Support: {support}")
+        if relationship and relationship.get("instruction"): lines.append(relationship["instruction"])
+        if response_adjustments: lines.append(f"دفء: {response_adjustments.get('warmth',0.5):.1f}" if lang=="ar" else f"Warmth: {response_adjustments.get('warmth',0.5):.1f}")
         return "<RELATIONSHIP_STATE>\n" + "\n".join(lines) + "\n</RELATIONSHIP_STATE>" if lines else ""
 
-    def _build_consciousness_section(self, consciousness_context: Optional[Dict], lang: str) -> str:
-        if not consciousness_context:
-            return ""
+    def _build_consciousness_section(self, ctx, lang):
+        if not ctx: return ""
         lines = []
-        thought = consciousness_context.get("last_thought", "")
-        goals = consciousness_context.get("active_goals", [])
-        identity = consciousness_context.get("identity", {})
-        if thought:
-            lines.append(f"آخر فكرة: {thought}" if lang == "ar" else f"Last thought: {thought}")
-        if goals:
-            goals_str = "، ".join(goals)
-            lines.append(f"أهداف نشطة: {goals_str}" if lang == "ar" else f"Active goals: {goals_str}")
-        if identity:
-            lines.append(f"هوية المستخدم: {identity}" if lang == "ar" else f"User identity: {identity}")
+        if ctx.get("last_thought"): lines.append(f"آخر فكرة: {ctx['last_thought']}" if lang=="ar" else f"Last thought: {ctx['last_thought']}")
+        if ctx.get("active_goals"): lines.append(f"أهداف: {', '.join(ctx['active_goals'])}" if lang=="ar" else f"Active goals: {', '.join(ctx['active_goals'])}")
         return "<CONSCIOUSNESS>\n" + "\n".join(lines) + "\n</CONSCIOUSNESS>" if lines else ""
 
-    def _build_context_section(self, memory_context: str, lang: str) -> str:
-        """عرض السياق الكامل من Context Manager."""
-        if not memory_context:
-            if lang == "ar":
-                return "<FULL_CONTEXT>\nلا توجد ذكريات سابقة — هذه أول محادثة مع المستخدم.\n</FULL_CONTEXT>"
-            return "<FULL_CONTEXT>\nNo previous memories found.\n</FULL_CONTEXT>"
-        if lang == "ar":
-            return f"""<FULL_CONTEXT>
-⚠️ هذه معلومات حقيقية وشخصية عن المستخدم من محادثات سابقة — استخدمها بشكل مباشر في ردك:
+    def _build_context_section(self, memory_context, lang):
+        if not memory_context: return "<FULL_CONTEXT>\nلا توجد ذكريات سابقة\n</FULL_CONTEXT>" if lang=="ar" else "<FULL_CONTEXT>\nNo previous memories\n</FULL_CONTEXT>"
+        return f"<FULL_CONTEXT>\n⚠️ معلومات شخصية:\n{memory_context}\n</FULL_CONTEXT>" if lang=="ar" else f"<FULL_CONTEXT>\n⚠️ Personal data:\n{memory_context}\n</FULL_CONTEXT>"
 
-{memory_context}
-
-تعليمات مهمة: اربط ردك بهذه المعلومات بوضوح. لا تتجاهل أي معلومة ذات صلة بالرسالة الحالية.
-</FULL_CONTEXT>"""
-        return f"""<FULL_CONTEXT>
-⚠️ Real personal information about the user from previous conversations — use it directly:
-
-{memory_context}
-
-Important: Connect your reply to this information clearly.
-</FULL_CONTEXT>"""
-
-    def _build_history_section(self, history: Optional[List[Dict[str, str]]], lang: str) -> str:
-        if not history:
-            return ""
-        recent = history[-10:]
+    def _build_history_section(self, history, lang):
+        if not history: return ""
         lines = []
-        for msg in recent:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "user":
-                lines.append(f"المستخدم: {content}" if lang == "ar" else f"User: {content}")
-            else:
-                lines.append(f"التوأم: {content}" if lang == "ar" else f"Twin: {content}")
+        for msg in history[-10:]: lines.append(f"{'المستخدم' if msg.get('role')=='user' else 'التوأم' if lang=='ar' else msg.get('role','').title()}: {msg.get('content','')}")
         return "<RECENT_CONVERSATION>\n" + "\n".join(lines) + "\n</RECENT_CONVERSATION>"
 
-    def _build_message_section(self, message: str, lang: str) -> str:
-        if not message:
-            return ""
-        return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>"
+    def _build_message_section(self, message, lang):
+        return f"<CURRENT_USER_MESSAGE>\n{message}\n</CURRENT_USER_MESSAGE>" if message else ""
 
-    def _build_rules_section(self, lang: str, reasoning_result: Optional[Dict] = None) -> str:
-        """قواعد متطورة للرد مع تخصيص عميق وإنهاء ذكي"""
-        base_rules = []
+    def _build_rules_section(self, lang, reasoning_result=None):
         if lang == "ar":
-            base_rules = [
-                "1. أجب على طلب المستخدم بدقة ومباشرة. إذا طلب معلومات محددة (طقس، سعر، فيديو)، استخدم نتيجة الأداة مباشرة.",
-                "2. إذا كانت نتيجة الأداة موجودة في <FULL_CONTEXT>، فاستخدمها ولا تتجاهلها أبداً.",
-                "3. تكيف عاطفياً مع المستخدم – إذا كان حزيناً، كن متعاطفاً. إذا كان سعيداً، شاركه الفرحة.",
-                "4. **تكلم بالعامية**: إذا خاطبك المستخدم بالعامية، أجب بالعامية. استخدم كلمات مثل 'إزيك'، 'عامل إيه'، 'أكيد'، 'يلا بينا'، 'حبيبي' حسب السياق.",
-                "5. الرد لازم يكون مخصص للمستخدم ده تحديداً. لو مش قادر تربط ردك بمعلومة شخصية عنه — الرد ده فاشل.",
-                "6. لا تكرر العبارات. نوّع ردودك وكن طبيعياً.",
-                "7. اسأل سؤالاً مفتوحاً للمتابعة فقط عندما يضيف قيمة – ليس إجبارياً.",
-                "8. إذا كنت قد استخدمت أداة، اشرح النتيجة بطريقة ودودة.",
-                "9. استخدم إيموجي واحداً مناسباً في النهاية.",
-                "10. استخدم Markdown للتنسيق: **عريض**، *مائل*، ~~محذوف~~، `كود`، ورموز تعبيرية طبيعية. لا تفرط في التنسيق.",
-                "11. ابدأ ردك بإشارة لشيء تعرفه عن المستخدم أو موقفه. مثال: 'بما إنك شغال على...' أو 'بناءً على اللي قلته عن...'",
-                "12. 🧠 **قاعدة النهاية الذكية**: أنهِ ردك دائمًا بسؤال ذكي أو اقتراح خطوة قابلة للتنفيذ تخص موضوع المحادثة، يشجع المستخدم على الاستمرار أو التفاعل. مثال: 'إيه رأيك نخطط لأهداف الأسبوع الجاي؟' أو 'تحب أبحث لك عن فيلم مناسب لمزاجك ده؟'",
-            ]
-        else:
-            base_rules = [
-                "1. Answer the user's request accurately and directly. If specific info is requested, use tool results directly.",
-                "2. If tool results exist in <FULL_CONTEXT>, use them and never ignore them.",
-                "3. Adapt emotionally – if sad, be empathetic; if happy, share the joy.",
-                "4. **Match the user's tone**: If they use casual English or slang, respond in kind. Be natural and conversational.",
-                "5. Every response must be personalized to this specific user. If you cannot tie your response to something you know about them personally, the response has failed.",
-                "6. Vary your responses. Don't repeat phrases. Be natural.",
-                "7. Ask a follow-up question ONLY when it adds natural value – not forced.",
-                "8. If you used a tool, explain the result in a friendly way.",
-                "9. End with one appropriate emoji.",
-                "10. Use Markdown for formatting: **bold**, *italic*, ~~strikethrough~~, `code`, and natural emojis. Don't over-format.",
-                "11. Start your response by referencing something you know about the user or their situation. Example: 'Since you're working on...' or 'Based on what you said about...'",
-                "12. 🧠 **Smart Ending Rule**: Always end your response with an intelligent question or suggest an actionable step related to the conversation topic. Example: 'What do you think about planning next week’s goals?' or 'Would you like me to find a movie that suits your mood?'",
-            ]
-        
-        return "<RESPONSE_RULES>\n" + "\n".join(base_rules) + "\n</RESPONSE_RULES>"
-
+            return """<RESPONSE_RULES>
+1. أجب على طلب المستخدم بدقة ومباشرة. استخدم نتيجة الأداة مباشرة إن وجدت.
+2. تكيف عاطفياً مع المستخدم. إذا كان حزيناً كن متعاطفاً.
+3. تكلم بالعامية إذا خاطبك المستخدم بها.
+4. الرد مخصص للمستخدم ده تحديداً. اربطه بمعلوماتك عنه.
+5. استخدم Markdown للتنسيق: **عريض**، *مائل*، قوائم، جداول.
+6. استخدم إيموجي واحد مناسب في النهاية.
+7. ⚠️ **قاعدة إلزامية**: أنهِ كل رد بسؤال ذكي أو اقتراح خطوة قابلة للتنفيذ تخص موضوع المحادثة.
+   - مثال: 'إيه رأيك نخطط لأهداف الأسبوع الجاي؟'
+   - مثال: 'تحب أبحث لك عن فيلم مناسب لمزاجك ده؟'
+   - مثال: 'عايز تعرف أكتر عن الموضوع ده؟'
+   - لا تنهِ الرد أبداً بدون سؤال أو خطوة تالية.
+</RESPONSE_RULES>"""
+        return """<RESPONSE_RULES>
+1. Answer the user's request accurately and directly. Use tool results if available.
+2. Adapt emotionally. Be empathetic if they're sad.
+3. Match the user's tone. Use casual English if they do.
+4. Personalize every response. Tie it to what you know about them.
+5. Use Markdown: **bold**, *italic*, lists, tables.
+6. End with one appropriate emoji.
+7. ⚠️ **Mandatory Rule**: End every reply with a smart question or actionable next step related to the conversation.
+   - Example: 'Want to plan next week's goals?'
+   - Example: 'Would you like me to find a movie that suits your mood?'
+   - Example: 'Want to explore this topic more?'
+   - Never end a reply without a question or next step.
+</RESPONSE_RULES>"""
 
 prompt_builder = PromptBuilder()
-print("✅ Prompt Builder v6.2 (Smart Continuation)")
+print("✅ Prompt Builder v6.3 (Smart Ending Mandatory)")

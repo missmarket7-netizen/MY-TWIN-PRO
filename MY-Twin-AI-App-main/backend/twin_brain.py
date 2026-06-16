@@ -18,6 +18,7 @@ from tools.tool_router import tool_router
 from context_manager import context_manager
 from tools.agent_loop import agent_loop
 from response_validator import response_validator
+from response_engine import response_engine
 from memory_summarizer import memory_summarizer
 from tools.agent_metrics import agent_metrics
 from model_router import model_router
@@ -279,6 +280,13 @@ class TwinBrain:
         if not validation.get("valid", True):
             final_reply = "أنا هنا لدعمك، لكن لا يمكنني الرد على هذا. 💜"
             provider = "safety_validator"
+
+        # تنسيق وتجميل الرد النهائي
+        final_reply = response_engine.process(
+            final_reply,
+            intent=plan.get("response_style", "general"),
+            lang=lang if 'lang' in dir() else "ar"
+        )
 
         if user_id:
             asyncio.create_task(store_mem(user_id, message, emotion.get("intensity", 0.5), emotion.get("primary", "neutral")))

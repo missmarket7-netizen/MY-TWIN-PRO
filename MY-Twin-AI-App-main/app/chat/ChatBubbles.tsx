@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Share, Linking, TextInput } from 'react-native';
 import { ChatMessage } from '../../store/useTwinStore';
-import { Copy, Share2, RotateCcw, Edit3, Check, ThumbsUp, ThumbsDown, ExternalLink, Film, X, Cpu } from 'lucide-react-native';
+import { Copy, Share2, RotateCcw, Edit3, Check, ThumbsUp, ThumbsDown, ExternalLink, Film, X } from 'lucide-react-native';
 import Markdown from 'react-native-markdown-display';
 
 const APP_ICON = require('../../assets/icon.png');
@@ -64,26 +64,7 @@ export const UserBubble = memo(({ item, isDark, onStartEdit, onSaveEdit, isEditi
   </View>
 ));
 
-const ProviderBadge = memo(({ provider, isDark }: { provider: string; isDark: boolean }) => {
-  const labelMap: Record<string, string> = {
-    groq: 'Groq', gemini: 'Gemini', openrouter: 'Llama 4',
-    model_router: 'AI', agent_loop: 'Agent', multi_ai: 'Multi-AI',
-    fallback: 'AI', tool: 'Tool',
-  };
-  const colorMap: Record<string, string> = {
-    groq: '#F59E0B', gemini: '#10B981', openrouter: '#3B82F6',
-    model_router: '#8B5CF6', agent_loop: '#EC4899', multi_ai: '#7C3AED',
-    fallback: '#EF4444', tool: '#6366F1',
-  };
-  const label = labelMap[provider] || provider;
-  const color = colorMap[provider] || '#666';
-  return (
-    <View style={[styles.providerBadge, { backgroundColor: color + '15', borderColor: color + '30' }]}>
-      <Cpu size={10} stroke={color} />
-      <Text style={[styles.providerText, { color }]}>{label}</Text>
-    </View>
-  );
-});
+// ProviderBadge removed
 
 export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, onLike, onDislike, liked, disliked, provider }: any) => (
   <View style={styles.twinRow}>
@@ -105,7 +86,7 @@ export const TwinBubble = memo(({ item, isDark, onCopy, onRetry, onRegenerate, o
         <TouchableOpacity onPress={() => onLike(item)} style={[styles.actionBtn, liked && { backgroundColor: '#10B98120', borderRadius: 8 }]}><ThumbsUp size={16} stroke={liked ? '#10B981' : isDark ? '#999' : '#666'} fill={liked ? '#10B981' : 'transparent'} /></TouchableOpacity>
         <TouchableOpacity onPress={() => onDislike(item)} style={[styles.actionBtn, disliked && { backgroundColor: '#EF444420', borderRadius: 8 }]}><ThumbsDown size={16} stroke={disliked ? '#EF4444' : isDark ? '#999' : '#666'} fill={disliked ? '#EF4444' : 'transparent'} /></TouchableOpacity>
       </View>
-      {provider && <ProviderBadge provider={provider} isDark={isDark} />}
+      
       {item.failed && (
         <TouchableOpacity onPress={() => onRetry(item)} style={styles.retryBtn}><RotateCcw size={14} stroke="#EF4444" /><Text style={styles.retryText}>إعادة المحاولة</Text></TouchableOpacity>
       )}
