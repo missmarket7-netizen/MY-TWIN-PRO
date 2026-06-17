@@ -29,16 +29,36 @@ const QUESTIONS = {
   ],
 };
 
-const TRAIT_INFO: Record<string, { ar: string; en: string; emoji: string; color: string }> = {
-  analytical: { ar: 'تحليلي', en: 'Analytical', emoji: '🧠', color: '#3B82F6' },
-  emotional: { ar: 'عاطفي', en: 'Emotional', emoji: '❤️', color: '#EC4899' },
-  social: { ar: 'اجتماعي', en: 'Social', emoji: '🤝', color: '#10B981' },
-  independent: { ar: 'مستقل', en: 'Independent', emoji: '🦅', color: '#F59E0B' },
-  ambitious: { ar: 'طموح', en: 'Ambitious', emoji: '🚀', color: '#8B5CF6' },
-  calm: { ar: 'هادئ', en: 'Calm', emoji: '😌', color: '#6366F1' },
+const TRAIT_INFO: Record<string, { ar: string; en: string; emoji: string; color: string; description: { ar: string; en: string } }> = {
+  analytical: { 
+    ar: 'تحليلي', en: 'Analytical', emoji: '🧠', color: '#3B82F6',
+    description: { ar: 'تميل للتفكير المنطقي والتحليل العميق قبل اتخاذ القرارات.', en: 'You tend toward logical thinking and deep analysis before making decisions.' }
+  },
+  emotional: { 
+    ar: 'عاطفي', en: 'Emotional', emoji: '❤️', color: '#EC4899',
+    description: { ar: 'تعتمد على مشاعرك وحدسك في فهم العالم من حولك.', en: 'You rely on your feelings and intuition to understand the world around you.' }
+  },
+  social: { 
+    ar: 'اجتماعي', en: 'Social', emoji: '🤝', color: '#10B981',
+    description: { ar: 'تجد طاقتك في العلاقات والتواصل مع الآخرين.', en: 'You find your energy in relationships and connecting with others.' }
+  },
+  independent: { 
+    ar: 'مستقل', en: 'Independent', emoji: '🦅', color: '#F59E0B',
+    description: { ar: 'تقدر حريتك الشخصية وتميل للاعتماد على نفسك.', en: 'You value your personal freedom and tend to rely on yourself.' }
+  },
+  ambitious: { 
+    ar: 'طموح', en: 'Ambitious', emoji: '🚀', color: '#8B5CF6',
+    description: { ar: 'تسعى دائماً لتحقيق الأهداف وترك بصمة في العالم.', en: 'You always strive to achieve goals and leave a mark on the world.' }
+  },
+  calm: { 
+    ar: 'هادئ', en: 'Calm', emoji: '😌', color: '#6366F1',
+    description: { ar: 'تسعى للسلام الداخلي والتوازن في حياتك.', en: 'You seek inner peace and balance in your life.' }
+  },
 };
 
-function analyzePersonality(answers: Record<string, string>, lang: string) {
+function generatePersonalitySummary(answers: Record<string, string>, lang: string) {
+  const isAr = lang === 'ar';
+  
   const traitMap: Record<string, Record<string, string[]>> = {
     ar: {
       analytical: ['أحللها بهدوء','منجزاً ومليئاً بالمهام','أبحث عن حل مباشر','الذكاء والدهاء'],
@@ -57,12 +77,35 @@ function analyzePersonality(answers: Record<string, string>, lang: string) {
       calm: ['Distract myself with something else','In nature or relaxing','Rest and relaxation'],
     },
   };
+  
   const map = traitMap[lang] || traitMap['ar'];
   const traits: Record<string, number> = { analytical:0, emotional:0, social:0, independent:0, ambitious:0, calm:0 };
   Object.values(answers).forEach(ans => { for (const [trait, options] of Object.entries(map)) { if (options.includes(ans)) traits[trait] += 2; } });
   const sorted = Object.entries(traits).sort((a,b) => b[1] - a[1]);
-  return { traits, dominant: sorted[0][0], secondary: sorted[1][0] };
+  
+  const dominant = sorted[0][0];
+  const secondary = sorted[1][0];
+  const dInfo = TRAIT_INFO[dominant];
+  const sInfo = TRAIT_INFO[secondary];
+  
+  let summary: string;
+  
+  if (isAr) {
+    summary = `أنت شخصية ${dInfo.ar} بشكل أساسي، مع طابع ${sInfo.ar} ثانوي. ${dInfo.description.ar} في الوقت نفسه، ${sInfo.description.ar} هذه المزيج يجعلك فريداً في طريقة تعاملك مع الحياة والآخرين.`;
+  } else {
+    summary = `You are primarily an ${dInfo.en} personality, with a secondary ${sInfo.en} trait. ${dInfo.description.en} At the same time, ${sInfo.description.en} This unique blend shapes how you approach life and relationships.`;
+  }
+  
+  return { 
+    traits, 
+    dominant, 
+    secondary, 
+    summary,
+    dominantInfo: dInfo,
+    secondaryInfo: sInfo
+  };
 }
+
 export default function Onboarding() {
   const { userId, twinName, twinGender, setTwinName, setTwinGender, addMessage, lang, theme } = useTwinStore();
   const isAr = lang === 'ar'; const isDark = theme === 'dark';
@@ -95,19 +138,21 @@ export default function Onboarding() {
     if (!userName.trim()) { Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'من فضلك أدخل اسمك' : 'Please enter your name'); return; }
     setLoading(true);
     try {
-      let analysis = analyzePersonality(answers, lang);
-      // ✅ محاولة تحليل LLM عبر API
+      let analysis = generatePersonalitySummary(answers, lang);
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
         try {
           const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/analyze-personality`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ answers, lang })
+            body: JSON.stringify({ answers, lang, userName: userName.trim() })
           });
           if (res.ok) {
             const data = await res.json();
-            if (data.analysis) analysis = data.analysis;
+            if (data.summary) {
+              analysis = { ...analysis, summary: data.summary };
+            }
           }
         } catch {}
       }
@@ -127,12 +172,10 @@ export default function Onboarding() {
       });
       if (error) throw error;
 
-      // تخزين كذاكرة دائمة
-      const d = TRAIT_INFO[analysis.dominant];
-      const s = TRAIT_INFO[analysis.secondary];
       const memoryContent = isAr
-        ? `تحليل شخصية ${userName.trim()}: الطابع الأساسي ${d.ar}، الثانوي ${s.ar}.`
-        : `Personality analysis for ${userName.trim()}: primary ${d.en}, secondary ${d.en}.`;
+        ? `تحليل شخصية ${userName.trim()}: ${analysis.summary}`
+        : `Personality analysis for ${userName.trim()}: ${analysis.summary}`;
+      
       await supabase.from('memories').insert({
         user_id: userId,
         content: memoryContent,
@@ -152,12 +195,13 @@ export default function Onboarding() {
     setShowAnalysis(false);
     const analysis = analysisResult;
     if (!analysis) { router.replace('/chat'); return; }
-    const d = TRAIT_INFO[analysis.dominant];
-    const s = TRAIT_INFO[analysis.secondary];
+    
     const genderEmoji = newTwinGender === 'male' ? '♂️' : '♀️';
+    
     const welcomeMsg = isAr
-      ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'} ${genderEmoji}\n\n**طابعك الأساسي:** ${d.emoji} ${d.ar}\n**الثانوي:** ${s.emoji} ${s.ar}\n\nأنا هنا لمساعدتك في رحلتك. اسألني أي شيء! 💜`
-      : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'} ${genderEmoji}\n\n**Primary trait:** ${d.emoji} ${d.en}\n**Secondary:** ${s.emoji} ${s.en}\n\nI'm here to help you on your journey. Ask me anything! 💜`;
+      ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'} ${genderEmoji}\n\n**تحليل شخصيتك:**\n\n${analysis.summary}\n\nأنا هنا لمساعدتك في رحلتك. اسألني أي شيء! 💜`
+      : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'} ${genderEmoji}\n\n**Your Personality Analysis:**\n\n${analysis.summary}\n\nI'm here to help you on your journey. Ask me anything! 💜`;
+    
     addMessage({ role: 'twin', content: welcomeMsg, id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), timestamp: Date.now() });
     router.replace('/chat');
   };
@@ -204,9 +248,8 @@ export default function Onboarding() {
             <Sparkles size={40} stroke="#A855F7" style={{ alignSelf:'center', marginBottom:16 }} />
             <Text style={[styles.modalTitle, isDark && { color:'#FFF' }]}>{isAr ? 'تم تحليل شخصيتك!' : 'Your Personality Analysis!'}</Text>
             {analysisResult && (<>
-              <View style={styles.traitsRow}>
-                <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.dominant]?.color }]}><Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.dominant]?.emoji}</Text><Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.dominant]?.ar : TRAIT_INFO[analysisResult.dominant]?.en}</Text><Text style={styles.traitType}>{isAr ? 'الأساسي' : 'Primary'}</Text></View>
-                <View style={[styles.traitCard, { borderColor: TRAIT_INFO[analysisResult.secondary]?.color }]}><Text style={styles.traitEmoji}>{TRAIT_INFO[analysisResult.secondary]?.emoji}</Text><Text style={[styles.traitLabel, isDark && { color:'#FFF' }]}>{isAr ? TRAIT_INFO[analysisResult.secondary]?.ar : TRAIT_INFO[analysisResult.secondary]?.en}</Text><Text style={styles.traitType}>{isAr ? 'الثانوي' : 'Secondary'}</Text></View>
+              <View style={styles.summaryContainer}>
+                <Text style={[styles.summaryText, isDark && { color:'#FFF' }]}>{analysisResult.summary}</Text>
               </View>
               <Text style={[styles.modalSubtext, isDark && { color:'#CCC' }]}>{isAr ? 'فهم شخصيتك يساعدني في أن أكون أقرب إليك 💜' : 'Understanding your personality helps me be closer to you 💜'}</Text>
             </>)}
@@ -249,11 +292,22 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
   modalCard: { backgroundColor: '#FFF', borderRadius: 24, padding: 28, margin: 24, alignItems: 'center' },
   modalTitle: { fontSize: 22, fontWeight: '800', color: '#1A1A1A', textAlign: 'center', marginBottom: 20 },
-  traitsRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
-  traitCard: { flex: 1, alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 2 },
-  traitEmoji: { fontSize: 40, marginBottom: 8 },
-  traitLabel: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
-  traitType: { fontSize: 12, color: '#888', marginTop: 4 },
+  summaryContainer: { 
+    backgroundColor: '#F8F6F2', 
+    borderRadius: 16, 
+    padding: 20, 
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6B21A8',
+    width: '100%'
+  },
+  summaryText: { 
+    fontSize: 15, 
+    color: '#1A1A1A', 
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '500'
+  },
   modalSubtext: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
   modalBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B21A8', padding: 16, borderRadius: 14, gap: 8, width: '100%' },
   modalBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
