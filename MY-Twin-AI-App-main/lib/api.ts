@@ -9,9 +9,16 @@ const APP_VERSION = Application.nativeApplicationVersion ?? '1.0.0';
 const PLATFORM = Platform.OS;
 
 let requestCounter = 0;
-function generateRequestId(): string { requestCounter++; return `${Date.now().toString(36)}-${requestCounter.toString(36)}-${Math.random().toString(36).substring(2, 7)}`; }
+function generateRequestId(): string { 
+  requestCounter++; 
+  return `${Date.now().toString(36)}-${requestCounter.toString(36)}-${Math.random().toString(36).substring(2, 7)}`; 
+}
 
-export const API = axios.create({ baseURL: BASE_URL, timeout: 30000, headers: { 'Content-Type': 'application/json' } });
+export const API = axios.create({ 
+  baseURL: BASE_URL, 
+  timeout: 30000, 
+  headers: { 'Content-Type': 'application/json' } 
+});
 
 let _token = '';
 let _tokenRefreshing = false;
@@ -27,26 +34,55 @@ async function getFreshToken(): Promise<string> {
   _tokenPromise = (async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) { _token = session.access_token; return _token; }
-    } catch (e) { console.error('getSession error:', e); }
+      if (session?.access_token) { 
+        _token = session.access_token; 
+        return _token; 
+      }
+    } catch (e) { 
+      console.error('getSession error:', e); 
+    }
     return '';
   })();
-  _tokenPromise.finally(() => { _tokenRefreshing = false; _tokenPromise = null; });
+  _tokenPromise.finally(() => { 
+    _tokenRefreshing = false; 
+    _tokenPromise = null; 
+  });
   return _tokenPromise;
+}
+
+// ✅ إصلاح: تصفية twinGender لقبول 'male' | 'female' فقط
+function sanitizeTwinGender(gender: string | undefined): 'male' | 'female' {
+  if (gender === 'male' || gender === 'female') return gender;
+  return 'female'; // افتراضي للأنثى
 }
 
 API.interceptors.request.use(async (config) => {
   if (!config.headers['X-Request-ID']) config.headers['X-Request-ID'] = generateRequestId();
-  config.headers['X-App-Version'] = APP_VERSION; config.headers['X-Platform'] = PLATFORM;
-  try { const store = useTwinStore.getState(); if (store.twinGender) config.headers['X-Twin-Gender'] = store.twinGender; } catch (e) {}
-  const token = await getFreshToken(); if (token) config.headers['Authorization'] = `Bearer ${token}`;
+  config.headers['X-App-Version'] = APP_VERSION; 
+  config.headers['X-Platform'] = PLATFORM;
+  
+  // ✅ إصلاح: try-catch حول useTwinStore في interceptor
+  try { 
+    const store = useTwinStore.getState(); 
+    if (store.twinGender) {
+      config.headers['X-Twin-Gender'] = sanitizeTwinGender(store.twinGender);
+    }
+  } catch (e) {}
+  
+  const token = await getFreshToken(); 
+  if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
 
-interface RetryConfig extends InternalAxiosRequestConfig { _retry?: boolean; _retryCount?: number; }
+interface RetryConfig extends InternalAxiosRequestConfig { 
+  _retry?: boolean; 
+  _retryCount?: number; 
+}
 
 API.interceptors.response.use((r) => r, async (error: AxiosError) => {
-  const config = error.config as RetryConfig | undefined; if (!config) return Promise.reject(error);
+  const config = error.config as RetryConfig | undefined; 
+  if (!config) return Promise.reject(error);
+  
   if (error.response?.status === 401 && !config._retry) {
     config._retry = true;
     try {
@@ -56,8 +92,11 @@ API.interceptors.response.use((r) => r, async (error: AxiosError) => {
         if (config.headers) config.headers['Authorization'] = `Bearer ${_token}`;
         return API(config);
       }
-    } catch (refreshError) { console.error('Token refresh failed:', refreshError); }
+    } catch (refreshError) { 
+      console.error('Token refresh failed:', refreshError); 
+    }
   }
+  
   const shouldRetry = !error.response || error.response.status >= 502 || error.code === 'ECONNABORTED';
   if (shouldRetry) {
     config._retryCount = config._retryCount ?? 0;
@@ -71,17 +110,47 @@ API.interceptors.response.use((r) => r, async (error: AxiosError) => {
 });
 
 export interface TwinResponse {
-  reply: string; new_bond?: number; twin_gender?: 'male'|'female'; voice_personality?: string;
-  emotion?: { primary: string; secondary: string; intensity: number; valence: number; arousal: number; trend?: string; riskLevel?: string };
-  relationship_dims?: Record<string, number>; relationship_stage?: string; journey_phase?: string; journey_day?: number;
-  attachment_style?: string; consciousness?: { last_thought?: string; active_goals?: string[] };
-  memory_used?: boolean; thinking_stage?: string; dialect?: string; latency_ms?: number; energy?: number; provider?: string;
+  reply: string; 
+  new_bond?: number; 
+  twin_gender?: 'male' | 'female'; 
+  voice_personality?: string;
+  emotion?: { 
+    primary: string; 
+    secondary: string; 
+    intensity: number; 
+    valence: number; 
+    arousal: number; 
+    trend?: string; 
+    riskLevel?: string 
+  };
+  relationship_dims?: Record<string, number>; 
+  relationship_stage?: string; 
+  journey_phase?: string; 
+  journey_day?: number;
+  attachment_style?: string; 
+  consciousness?: { last_thought?: string; active_goals?: string[] };
+  memory_used?: boolean; 
+  thinking_stage?: string; 
+  dialect?: string; 
+  latency_ms?: number; 
+  energy?: number; 
+  provider?: string;
 }
 
 export interface TwinRequest {
-  message: string; twinName: string; bondLevel: number; relationshipDims: RelationshipDims;
-  chatHistory?: Array<{ role: string; content: string }>; journeyPhase?: string; attachmentStyle?: string;
-  twinStyle?: string; replyStyle?: string; lang?: string; image?: string; calmMode?: boolean; twinGender?: 'male'|'female';
+  message: string; 
+  twinName: string; 
+  bondLevel: number; 
+  relationshipDims: RelationshipDims;
+  chatHistory?: Array<{ role: string; content: string }>; 
+  journeyPhase?: string; 
+  attachmentStyle?: string;
+  twinStyle?: string; 
+  replyStyle?: string; 
+  lang?: string; 
+  image?: string; 
+  calmMode?: boolean; 
+  twinGender?: 'male' | 'female';
 }
 
 function toSafeRecord(dims: RelationshipDims | Record<string, any>): Record<string, number> {
@@ -95,16 +164,71 @@ function toSafeRecord(dims: RelationshipDims | Record<string, any>): Record<stri
 }
 
 export const askTwin = async (req: TwinRequest): Promise<TwinResponse> => {
-  const store = useTwinStore.getState(); const g = req.twinGender || store.twinGender || 'female';
+  const store = useTwinStore.getState(); 
+  const g = sanitizeTwinGender(req.twinGender || store.twinGender);
   const safeDims = toSafeRecord(req.relationshipDims || {});
-  const payload = { message: req.message, twin_name: req.twinName||'توأمك', bond_level: req.bondLevel||0, relationship_dims: safeDims, history: req.chatHistory?.slice(-10)||[], journey_phase: req.journeyPhase||'introduction', attachment_style: req.attachmentStyle||'unknown', twin_style: req.twinStyle||'supportive', reply_style: req.replyStyle||'medium', lang: req.lang||'ar', image: req.image, calm_mode: req.calmMode||false, twin_gender: g };
-  const { data } = await API.post('/api/chat', payload, { headers: { 'X-Calm-Mode': String(req.calmMode||false), 'X-Twin-Gender': g } });
-  return { reply: data.reply, new_bond: data.new_bond, emotion: data.emotion, relationship_dims: data.relationship_dims, relationship_stage: data.relationship_stage, journey_phase: data.journey_phase, journey_day: data.journey_day, attachment_style: data.attachment_style, consciousness: data.consciousness, memory_used: data.memory_used, thinking_stage: data.thinking_stage, dialect: data.dialect, latency_ms: data.latency_ms, energy: data.energy, provider: data.provider, twin_gender: data.twin_gender||g, voice_personality: data.voice_personality };
+  
+  const payload = {
+    message: req.message,
+    twin_name: req.twinName || 'توأمك',
+    bond_level: req.bondLevel || 0,
+    relationship_dims: safeDims,
+    history: req.chatHistory?.slice(-10) || [],
+    journey_phase: req.journeyPhase || 'introduction',
+    attachment_style: req.attachmentStyle || 'unknown',
+    twin_style: req.twinStyle || 'supportive',
+    reply_style: req.replyStyle || 'medium',
+    lang: req.lang || 'ar',
+    image: req.image,
+    calm_mode: req.calmMode || false,
+    twin_gender: g,
+  };
+  
+  const { data } = await API.post('/api/chat', payload, {
+    headers: {
+      'X-Calm-Mode': String(req.calmMode || false),
+      'X-Twin-Gender': g,
+    }
+  });
+  
+  return {
+    reply: data.reply,
+    new_bond: data.new_bond,
+    emotion: data.emotion,
+    relationship_dims: data.relationship_dims,
+    relationship_stage: data.relationship_stage,
+    journey_phase: data.journey_phase,
+    journey_day: data.journey_day,
+    attachment_style: data.attachment_style,
+    consciousness: data.consciousness,
+    memory_used: data.memory_used,
+    thinking_stage: data.thinking_stage,
+    dialect: data.dialect,
+    latency_ms: data.latency_ms,
+    energy: data.energy,
+    provider: data.provider,
+    twin_gender: data.twin_gender || g,
+    voice_personality: data.voice_personality,
+  };
 };
 
 export const sendChatFromStore = async (message: string, image?: string): Promise<TwinResponse> => {
   const s = useTwinStore.getState();
-  return askTwin({ message, twinName: s.twinName, bondLevel: s.bondLevel, relationshipDims: s.relationshipDims, chatHistory: s.chatHistory.slice(-10), journeyPhase: s.journeyPhase, attachmentStyle: s.attachmentStyle, twinStyle: s.twinStyle, replyStyle: s.replyStyle, lang: s.lang, image, calmMode: s.calmMode, twinGender: s.twinGender });
+  return askTwin({
+    message,
+    twinName: s.twinName,
+    bondLevel: s.bondLevel,
+    relationshipDims: s.relationshipDims,
+    chatHistory: s.chatHistory.slice(-10),
+    journeyPhase: s.journeyPhase,
+    attachmentStyle: s.attachmentStyle,
+    twinStyle: s.twinStyle,
+    replyStyle: s.replyStyle,
+    lang: s.lang,
+    image,
+    calmMode: s.calmMode,
+    twinGender: sanitizeTwinGender(s.twinGender),
+  });
 };
 
 export const updateStoreFromResponse = (r: TwinResponse) => {
@@ -115,15 +239,24 @@ export const updateStoreFromResponse = (r: TwinResponse) => {
   if (r.journey_phase) s.setJourneyPhase(r.journey_phase as any);
   if (r.attachment_style) s.setAttachmentStyle(r.attachment_style as any);
   if (r.emotion) s.setEmotionState(r.emotion as any);
-  if (r.thinking_stage) { s.setThinkingStage(r.thinking_stage); s.setThinking(true); } else { s.setThinking(false); }
-  if (r.twin_gender) s.setTwinGender(r.twin_gender);
+  if (r.thinking_stage) { 
+    s.setThinkingStage(r.thinking_stage); 
+    s.setThinking(true); 
+  } else { 
+    s.setThinking(false); 
+  }
+  // ✅ إصلاح: التحقق من twin_gender قبل التعيين
+  if (r.twin_gender) {
+    s.setTwinGender(r.twin_gender);
+  }
   s.setTotalMessages(s.totalMessages + 1);
 };
+
+// ==================== SERVICES ====================
 
 export const fetchWeather = async (city: string = 'Cairo') => {
   let params: any = {};
   if (city.includes(',')) {
-    // إحداثيات: "lat,lon"
     const [lat, lon] = city.split(',');
     params = { lat, lon };
   } else {
@@ -132,20 +265,80 @@ export const fetchWeather = async (city: string = 'Cairo') => {
   const { data } = await API.get('/api/services/weather', { params });
   return data;
 };
-export const fetchYouTube = async (query: string, lang: string = 'ar') => { const { data } = await API.get('/api/services/youtube', { params: { query, lang } }); return data; };
-export const fetchSpotify = async (query: string) => { const { data } = await API.get('/api/services/spotify', { params: { query } }); return data; };
-export const fetchGoogleSearch = async (query: string) => { const { data } = await API.get('/api/services/google', { params: { query } }); return data; };
-export const fetchCalendarEvents = async () => { const { data } = await API.get('/api/services/calendar'); return data; };
-export const fetchNews = async (country: string = 'sa') => { const { data } = await API.get('/api/services/news', { params: { country } }); return data; };
-export const fetchMaps = async (query: string) => { const { data } = await API.get('/api/services/maps', { params: { query } }); return data; };
-export const fetchLocationInfo = async (lat: number, lon: number) => { const { data } = await API.get('/api/services/location', { params: { lat, lon } }); return data; };
-export const fetchCurrency = async (base: string = 'USD') => { const { data } = await API.get('/api/services/currency', { params: { base } }); return data; };
-export const sendHomeAssistantCommand = async (command: string, entity_id?: string) => { const { data } = await API.post('/api/services/homeassistant', { command, entity_id }); return data; };
-export const sendEmail = async (to: string, subject: string, body: string) => { const { data } = await API.post('/api/services/email', { to, subject, body }); return data; };
-export const sendTelegram = async (chatId: string, message: string) => { const { data } = await API.post('/api/services/telegram', { chat_id: chatId, message }); return data; };
-export const fetchNotes = async () => { const { data } = await API.get('/api/services/notes'); return data; };
-export const createNote = async (content: string) => { const { data } = await API.post('/api/services/notes', { content }); return data; };
-export const fetchTasks = async () => { const { data } = await API.get('/api/services/tasks'); return data; };
-export const createTask = async (title: string, due?: string) => { const { data } = await API.post('/api/services/tasks', { title, due }); return data; };
+
+export const fetchYouTube = async (query: string, lang: string = 'ar') => {
+  const { data } = await API.get('/api/services/youtube', { params: { query, lang } });
+  return data;
+};
+
+export const fetchSpotify = async (query: string) => {
+  const { data } = await API.get('/api/services/spotify', { params: { query } });
+  return data;
+};
+
+export const fetchGoogleSearch = async (query: string) => {
+  const { data } = await API.get('/api/services/google', { params: { query } });
+  return data;
+};
+
+export const fetchCalendarEvents = async () => {
+  const { data } = await API.get('/api/services/calendar');
+  return data;
+};
+
+export const fetchNews = async (country: string = 'sa') => {
+  const { data } = await API.get('/api/services/news', { params: { country } });
+  return data;
+};
+
+export const fetchMaps = async (query: string) => {
+  const { data } = await API.get('/api/services/maps', { params: { query } });
+  return data;
+};
+
+export const fetchLocationInfo = async (lat: number, lon: number) => {
+  const { data } = await API.get('/api/services/location', { params: { lat, lon } });
+  return data;
+};
+
+export const fetchCurrency = async (base: string = 'USD') => {
+  const { data } = await API.get('/api/services/currency', { params: { base } });
+  return data;
+};
+
+export const sendHomeAssistantCommand = async (command: string, entity_id?: string) => {
+  const { data } = await API.post('/api/services/homeassistant', { command, entity_id });
+  return data;
+};
+
+export const sendEmail = async (to: string, subject: string, body: string) => {
+  const { data } = await API.post('/api/services/email', { to, subject, body });
+  return data;
+};
+
+export const sendTelegram = async (chatId: string, message: string) => {
+  const { data } = await API.post('/api/services/telegram', { chat_id: chatId, message });
+  return data;
+};
+
+export const fetchNotes = async () => {
+  const { data } = await API.get('/api/services/notes');
+  return data;
+};
+
+export const createNote = async (content: string) => {
+  const { data } = await API.post('/api/services/notes', { content });
+  return data;
+};
+
+export const fetchTasks = async () => {
+  const { data } = await API.get('/api/services/tasks');
+  return data;
+};
+
+export const createTask = async (title: string, due?: string) => {
+  const { data } = await API.post('/api/services/tasks', { title, due });
+  return data;
+};
 
 export default API;

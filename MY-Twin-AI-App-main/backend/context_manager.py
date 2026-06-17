@@ -1,14 +1,13 @@
 """
-MyTwin – Context Manager v3.1 (Optimized & Cached)
-- ذاكرة مؤقتة لـ consciousness_core لتجنب استدعاء Supabase المتكرر
-- تطبيق فعلي لـ token_budget لكل قسم
-- قص ذكي للمحتوى الطويل (أدوات، أفكار، تاريخ)
-- ترتيب الذكريات حسب الأهمية في الملخص
-- إضافة planner_summary داخل السياق مباشرة
+MyTwin – Context Manager v3.2 (Production Ready)
+- كاش للوعي والتعلق لتجنب استدعاءات Supabase المكلفة
+- دعم تصفية السياق حسب النية (Intent-Based Context)
+- قص ذكي للمحتوى مع إشارات بصرية (...)
+- آلية تنظيف للكاش لمنع تسرب الذاكرة
 """
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger("context_manager")
 
@@ -41,6 +40,8 @@ class ContextManager:
         }
         self._consciousness_cache: Dict[str, Dict[str, Any]] = {}
         self._consciousness_cache_time: Dict[str, datetime] = {}
+        self._attachment_cache: Dict[str, Dict[str, Any]] = {}
+        self._attachment_cache_time: Dict[str, datetime] = {}
 
     async def _get_cached_consciousness_state(self, user_id: str) -> Optional[Dict[str, Any]]:
         now = datetime.now(timezone.utc)
@@ -53,12 +54,33 @@ class ContextManager:
                 state = consciousness_core.user_states.get(user_id, {})
                 self._consciousness_cache[user_id] = state
                 self._consciousness_cache_time[user_id] = now
+                # تنظيف الكاش إذا كبر
+                if len(self._consciousness_cache) > 1000:
+                    oldest = sorted(self._consciousness_cache_time.items(), key=lambda x: x[1])[:100]
+                    for uid, _ in oldest:
+                        self._consciousness_cache.pop(uid, None)
+                        self._consciousness_cache_time.pop(uid, None)
                 return state
             except Exception as e:
                 logger.warning(f"Failed to load consciousness state: {e}")
         return None
 
-    async def build_context(self, user_id, message, emotion, history=None, tool_results=None, lang="ar", tier="free", user_profile=None):
+    async def _get_cached_attachment_style(self, user_id: str, recent_texts: List[str]) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        if user_id in self._attachment_cache and user_id in self._attachment_cache_time:
+            if (now - self._attachment_cache_time[user_id]).total_seconds() < 600:
+                return self._attachment_cache[user_id]
+        if attachment_engine:
+            try:
+                att_info = await attachment_engine.detect_attachment_style(user_id, recent_texts)
+                self._attachment_cache[user_id] = att_info
+                self._attachment_cache_time[user_id] = now
+                return att_info
+            except Exception as e:
+                logger.warning(f"Attachment detection failed: {e}")
+        return {}
+
+    async def build_context(self, user_id, message, emotion, history=None, tool_results=None, lang="ar", tier="free", user_profile=None, intent="general"):
         context = {
             "user_profile": {},
             "relationship": {},
@@ -99,10 +121,11 @@ class ContextManager:
                 "intensity": emotion.get("intensity", 0.5),
             }
 
-        # 4. Memories (ذكية + غنية + Hard Memories)
+        # 4. Memories (مدعومة بالنية)
         if memory_retriever and user_id:
             try:
-                result = await memory_retriever.retrieve_and_summarize(message, user_id, self.max_memory_items)
+                # ✅ تمرير النية لاسترجاع ذكريات مخصصة
+                result = await memory_retriever.retrieve_and_summarize(message, user_id, self.max_memory_items, intent=intent)
                 memories = result.get("memories", [])
                 context["memories"] = [
                     {
@@ -121,9 +144,9 @@ class ContextManager:
         if history:
             context["recent_conversation"] = history[-self.max_history_items:]
 
-        # 6. Tool Results (قص النتائج الطويلة)
+        # 6. Tool Results (قص مع إشارة)
         if tool_results:
-            truncated = [t[:300] for t in tool_results[-self.max_tool_results:]]
+            truncated = [self._truncate(t, 300) for t in tool_results[-self.max_tool_results:]]
             context["tool_results"] = truncated
 
         # 7. Consciousness (مع كاش)
@@ -140,14 +163,17 @@ class ContextManager:
             except Exception as e:
                 logger.warning(f"Consciousness failed: {e}")
 
-        # 8. Attachment
-        if attachment_engine and user_id and history:
+        # 8. Attachment (مع كاش)
+        if user_id and history:
             try:
                 recent_texts = [h.get("content", "") for h in history[-20:] if isinstance(h, dict)]
-                att_info = await attachment_engine.detect_attachment_style(user_id, recent_texts)
+                att_info = await self._get_cached_attachment_style(user_id, recent_texts)
                 context["attachment"] = {"style": att_info.get("style"), "confidence": att_info.get("confidence")}
             except Exception as e:
                 logger.warning(f"Attachment failed: {e}")
+
+        # ✅ تفعيل compress_context
+        context = self.compress_context(context)
 
         # 9. إضافة planner_summary
         context["planner_summary"] = self.build_context_summary(context)
@@ -190,7 +216,7 @@ class ContextManager:
 
         tools = context.get("tool_results", [])
         if tools:
-            truncated_tools = [t[:200] for t in tools]
+            truncated_tools = [self._truncate(t, 200) for t in tools]
             parts.append("نتائج الأدوات السابقة:\n" + "\n".join(truncated_tools))
 
         cons = context.get("consciousness", {})
@@ -208,45 +234,45 @@ class ContextManager:
     def format_context_for_prompt(self, context: Dict[str, Any], lang: str = "ar") -> str:
         parts = []
         if context.get("tool_results"):
-            truncated = [t[:250] for t in context["tool_results"]]
+            truncated = [self._truncate(t, 250) for t in context["tool_results"]]
             parts.append("<TOOL_RESULTS>\n" + "\n".join(truncated) + "\n</TOOL_RESULTS>")
         if context.get("memories"):
             sorted_memories = sorted(context["memories"], key=lambda x: x.get("scores", {}).get("final", 0), reverse=True)
             mem_lines = []
             for m in sorted_memories:
                 hard = "[مهم]" if m.get("is_hard") else ""
-                content = m.get('content', '')[:200]
+                content = self._truncate(m.get('content', ''), 200)
                 mem_lines.append(f"- {hard} {content} (أهمية: {m.get('scores', {}).get('final', 0):.2f})")
             parts.append("<RELEVANT_MEMORIES>\n" + "\n".join(mem_lines) + "\n</RELEVANT_MEMORIES>")
         if context.get("recent_conversation"):
             lines = []
             for msg in context["recent_conversation"]:
-                role = "User" if msg.get("role") == "user" else "Twin"
-                content = (msg.get("content", "") or "")[:150]
+                role = "المستخدم" if msg.get("role") == "user" else "التوأم" if lang == "ar" else "User" if msg.get("role") == "user" else "Twin"
+                content = self._truncate(msg.get("content", "") or "", 150)
                 lines.append(f"{role}: {content}")
             parts.append("<RECENT_CONVERSATION>\n" + "\n".join(lines) + "\n</RECENT_CONVERSATION>")
         rel = context.get("relationship", {})
         if rel:
-            parts.append(f"<RELATIONSHIP> Bond: {rel.get('bond_level', 0):.0f}% </RELATIONSHIP>")
+            label = f"مستوى الرابطة: {rel.get('bond_level', 0):.0f}%" if lang == "ar" else f"Bond: {rel.get('bond_level', 0):.0f}%"
+            parts.append(f"<RELATIONSHIP> {label} </RELATIONSHIP>")
         cons = context.get("consciousness", {})
         if cons.get("active_goals") or cons.get("last_thought"):
-            parts.append(f"<CONSCIOUSNESS> Goals: {', '.join(cons.get('active_goals', []))}; Thought: {cons.get('last_thought', '')[:150]} </CONSCIOUSNESS>")
+            goals = ', '.join(cons.get('active_goals', []))
+            thought = cons.get('last_thought', '')[:150]
+            parts.append(f"<CONSCIOUSNESS> Goals: {goals}; Thought: {thought} </CONSCIOUSNESS>")
         return "\n".join(parts)
 
     def compress_context(self, context: Dict[str, Any], max_tokens: int = 2000) -> Dict[str, Any]:
-        # قص الذكريات
         memories = context.get("memories", [])
         while memories and len("\n".join([m.get("content", "") for m in memories])) // 4 > self.token_budget["memories"]:
             memories.pop(-1)
         context["memories"] = memories
 
-        # قص التاريخ
         history = context.get("recent_conversation", [])
         while history and len("\n".join([h.get("content", "") for h in history])) // 4 > self.token_budget["history"]:
             history.pop(0)
         context["recent_conversation"] = history
 
-        # قص نتائج الأدوات
         tools = context.get("tool_results", [])
         while tools and len("\n".join(tools)) // 4 > self.token_budget["tools"]:
             tools.pop(-1)
@@ -254,6 +280,36 @@ class ContextManager:
 
         return context
 
+    def _truncate(self, text: str, max_len: int) -> str:
+        if len(text) > max_len:
+            return text[:max_len] + "..."
+        return text
+
+    # ========== دوال تصفية السياق (جديدة) ==========
+    def filter_by_intent(self, context: Dict[str, Any], intent: str) -> str:
+        """
+        تُرجع سياقاً نصياً مُصفى حسب النية.
+        مثلاً: للمشاعر، نُرجع الذكريات والتعلق فقط.
+        """
+        if intent in ["emotional", "coaching"]:
+            parts = []
+            memories = context.get("memories", [])
+            if memories:
+                mem_lines = [self._truncate(m.get('content', ''), 200) for m in memories[:3]]
+                parts.append("<RELEVANT_MEMORIES>\n" + "\n".join(mem_lines) + "\n</RELEVANT_MEMORIES>")
+            rel = context.get("relationship", {})
+            if rel:
+                label = f"Bond: {rel.get('bond_level', 0):.0f}%"
+                parts.append(f"<RELATIONSHIP> {label} </RELATIONSHIP>")
+            return "\n".join(parts)
+        return self.format_context_for_prompt(context)
+
+    def filter_history_by_intent(self, history: List[Dict], intent: str) -> List[Dict]:
+        """تصفية التاريخ حسب النية (حالياً ترجع آخر 4 رسائل فقط)"""
+        if not history:
+            return []
+        return history[-4:]
+
 
 context_manager = ContextManager()
-print("✅ Context Manager v3.1 (Optimized & Cached)")
+print("✅ Context Manager v3.2 (Production Ready)")

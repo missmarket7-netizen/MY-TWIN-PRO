@@ -16,7 +16,8 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["react-native", "node"] 
   },
   "include": [
     "app/**/*.ts",

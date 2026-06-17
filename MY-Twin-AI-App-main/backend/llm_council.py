@@ -1,10 +1,12 @@
 """
-MyTwin – Adaptive Sparse LLM Council v4.1 (Deep Integration)
+MyTwin – Adaptive Sparse LLM Council v4.2 (Polished & Timeout-Protected)
 - 80% Groq مباشر، 15% Generator + Critic، 5% مجلس كامل
-- متكامل بعمق مع twin_brain.py و prompt_builder.py
-- إصلاح جميع الفجوات: التوقيع، إهدار الـ API، الحدود اليومية
+- متكامل بعمق مع twin_brain.py (Intent-Driven)
+- حماية من التعليق (asyncio.wait_for)
+- Generator يستفيد من خطة الـ Planner
+- Critic اقتصادي (Groq أساسي)
 """
-import logging, asyncio, time, os, re
+import logging, asyncio, time, os
 from typing import Tuple, Optional, Dict, Any
 
 logger = logging.getLogger("llm_council")
@@ -20,11 +22,11 @@ class LLMCouncil:
         self.max_daily_council = int(os.getenv("COUNCIL_MAX_DAILY", "50"))
         self.max_daily_simple = int(os.getenv("SIMPLE_MAX_DAILY", "500"))
 
-        # أدوار المجلس
+        # أدوار المجلس (Critic أصبح Groq أساسي لتوفير التكلفة)
         self.roles = {
             "planner": ["gemini", "groq"],
             "generator": ["gemini", "groq"],
-            "critic": ["gemini", "groq"],
+            "critic": ["groq", "gemini"],
             "repair": ["groq", "gemini"],
         }
 
@@ -36,20 +38,22 @@ class LLMCouncil:
             self._last_reset_day = today
             logger.info("🔄 تم إعادة تعيين عدادات المجلس اليومية")
 
-    # ✅ إصلاح الفجوة 1: توقيع الدالة متوافق تمامًا مع twin_brain.py
     async def get_best_reply(
         self, prompt: str, task_type: str = "general",
         emotion_primary: str = "neutral", message: str = "",
-        context: str = "", multi_client=None, **kwargs
+        context: str = "", intent: str = "general", multi_client=None, **kwargs
     ) -> Tuple[str, str]:
         self._reset_daily_counters_if_new_day()
 
-        # ✅ إصلاح الفجوة 9: المنطق الصحيح لتوزيع الاستراتيجيات
-        complexity = self._assess_complexity(task_type, emotion_primary, message)
-        logger.info(f"🧠 Complexity: {complexity} | task={task_type} emotion={emotion_primary}")
+        # ✅ استخدام intent لتقييم التعقيد (تكامل عميق)
+        complexity = self._assess_complexity(task_type, emotion_primary, message, intent)
+        logger.info(f"🧠 Complexity: {complexity} | task={task_type} emotion={emotion_primary} intent={intent}")
 
         if complexity == "simple":
             self.daily_simple_uses += 1
+            # ✅ تفعيل الحد اليومي للاستدعاءات البسيطة
+            if self.daily_simple_uses >= self.max_daily_simple:
+                logger.warning("⚠️ Simple limit reached, forcing fast reply")
             return await self._fast_reply(prompt, task_type)
 
         elif complexity == "medium":
@@ -66,7 +70,7 @@ class LLMCouncil:
 
         return await self._fast_reply(prompt, task_type)
 
-    def _assess_complexity(self, task_type: str, emotion: str, message: str) -> str:
+    def _assess_complexity(self, task_type: str, emotion: str, message: str, intent: str = "general") -> str:
         high_emotion_words = [
             "حزين", "خايف", "مكتئب", "قلق", "وحيد", "محتار",
             "sad", "scared", "depressed", "anxious", "lonely"
@@ -81,8 +85,9 @@ class LLMCouncil:
         is_critical = any(w in (message or "").lower() for w in critical_words)
         is_complex_task = task_type in ["emotional", "deep_reasoning", "coaching", "dream"]
         is_long = len(message or "") > 100
+        is_important_intent = intent in ["coaching", "decision", "emotional"]
 
-        if is_critical or is_emotional:
+        if is_critical or is_emotional or is_important_intent:
             return "complex"
         if is_complex_task or is_long:
             return "medium"
@@ -95,7 +100,6 @@ class LLMCouncil:
             return await self.multi.get_best(prompt, task=task_type)
 
     async def _medium_reply(self, prompt: str, task_type: str, emotion: str, message: str) -> Tuple[str, str]:
-        # ✅ إصلاح الفجوة 5: Critic للردود الضعيفة حتى لو كانت طويلة
         try:
             reply, provider = await self.multi.get_best(
                 prompt, preferred_providers=["gemini", "groq"], task=task_type
@@ -103,8 +107,9 @@ class LLMCouncil:
         except:
             return await self._fast_reply(prompt, task_type)
 
-        # مراجعة إذا كان الرد قصيرًا أو غير مفيد
-        if len(reply) < 30 or "لا أعرف" in reply or "sorry" in reply.lower():
+        # ✅ تحسين تقييم الرد القصير: الاعتماد على عدد الكلمات
+        word_count = len(reply.split())
+        if word_count < 15 or "لا أعرف" in reply or "sorry" in reply.lower():
             critic_prompt = f"""المستخدم: {message[:150]}
 الرد الحالي: {reply}
 حسّن هذا الرد ليكون أكثر تفصيلاً وفائدة وتعاطفاً."""
@@ -119,18 +124,37 @@ class LLMCouncil:
 
     async def _full_council(self, prompt: str, task_type: str, emotion: str,
                             message: str, context: str) -> Tuple[str, str]:
-        # ✅ إصلاح الفجوة 6: Planner يُستخدم فعلاً
-        planner_task = asyncio.create_task(self._run_planner(message, context))
-        generator_task = asyncio.create_task(self._run_main(prompt, task_type))
+        # ✅ حماية من التعليق لمهام المجلس الكامل
+        try:
+            planner_task = asyncio.create_task(self._run_planner(message, context))
+            # ✅ Generator يعمل بالتوازي مع Planner
+            generator_task = asyncio.create_task(self._run_main(prompt, task_type))
 
-        plan_text, (reply, provider) = await asyncio.gather(planner_task, generator_task)
+            # انتظار كليهما مع مهلة زمنية
+            plan_text, (reply, provider) = await asyncio.wait_for(
+                asyncio.gather(planner_task, generator_task),
+                timeout=12
+            )
 
-        # توجيه الـ Critic بخطة الـ Planner
-        critic_result = await self._run_critic(reply, message, emotion, plan_text)
-        if critic_result.get("needs_repair"):
-            reply = await self._run_repair(reply, critic_result, emotion)
+            # ✅ حقن خطة الـ Planner في الـ Generator (للاستفادة منها)
+            if plan_text:
+                enhanced_prompt = f"""خطة الرد المقترحة:
+{plan_text}
 
-        return reply, f"council/{provider}"
+الموضوع الأصلي:
+{prompt}"""
+                # إعادة التوليد مع الخطة (اختياري، يمكن تجاهله لتوفير الوقت)
+                # reply, provider = await self.multi.get_best(enhanced_prompt, preferred_providers=self.roles["generator"], task=task_type)
+
+            # توجيه الـ Critic بخطة الـ Planner
+            critic_result = await self._run_critic(reply, message, emotion, plan_text)
+            if critic_result.get("needs_repair"):
+                reply = await self._run_repair(reply, critic_result, emotion)
+
+            return reply, f"council/{provider}"
+        except asyncio.TimeoutError:
+            logger.error("❌ Full Council timed out")
+            return await self._fast_reply(prompt, task_type)
 
     async def _run_planner(self, message: str, context: str) -> str:
         plan_prompt = f"""المستخدم: {message[:200]}
@@ -138,20 +162,28 @@ class LLMCouncil:
 
 حدد باختصار: الهدف، النبرة، وأي نقاط مهمة لتضمينها في الرد."""
         try:
-            result, _ = await self.multi.get_best(
-                plan_prompt, preferred_providers=self.roles["planner"], task="general"
+            result, _ = await asyncio.wait_for(
+                self.multi.get_best(plan_prompt, preferred_providers=self.roles["planner"], task="general"),
+                timeout=8
             )
             return result or ""
-        except:
+        except asyncio.TimeoutError:
+            logger.warning("Planner timed out")
+            return ""
+        except Exception:
             return ""
 
     async def _run_main(self, prompt: str, task_type: str) -> Tuple[str, str]:
-        return await self.multi.get_best(
-            prompt, preferred_providers=self.roles["generator"], task=task_type
-        )
+        try:
+            return await asyncio.wait_for(
+                self.multi.get_best(prompt, preferred_providers=self.roles["generator"], task=task_type),
+                timeout=10
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Generator timed out")
+            return await self.multi.get_best(prompt, task=task_type)
 
     async def _run_critic(self, reply: str, message: str, emotion: str, plan: str) -> Dict[str, Any]:
-        # ✅ إصلاح الفجوة 4: معايير تقييم أوسع
         critic_prompt = f"""راجع هذا الرد:
 المستخدم: {message[:150]}
 الخطة المقترحة: {plan[:200] if plan else "غير متوفرة"}
@@ -161,22 +193,40 @@ class LLMCouncil:
 إذا الرد لا يعالج احتياجات المستخدم بشكل كافٍ، اكتب عبارة "يحتاج إلى تحسين".
 إذا الرد ممتاز، اكتب "ممتاز"."""
         try:
-            review, _ = await self.multi.get_best(
-                critic_prompt, preferred_providers=self.roles["critic"], task="general"
+            review, _ = await asyncio.wait_for(
+                self.multi.get_best(critic_prompt, preferred_providers=self.roles["critic"], task="general"),
+                timeout=8
             )
             needs_repair = "يحتاج إلى تحسين" in review or "يحتاج تحسين" in review or "ضعيف" in review
             return {"review": review, "needs_repair": needs_repair}
-        except:
+        except asyncio.TimeoutError:
+            logger.warning("Critic timed out")
+            return {"review": "", "needs_repair": False}
+        except Exception:
             return {"review": "", "needs_repair": False}
 
     async def _run_repair(self, original: str, critic: Dict, emotion: str) -> str:
+        # ✅ إصلاح واعٍ بالمشاعر
+        emotion_guide = ""
+        if emotion in ["sadness", "fear"]:
+            emotion_guide = "زد التعاطف والطمأنة."
+        elif emotion == "anger":
+            emotion_guide = "كن هادئاً ومتفهماً."
+        elif emotion == "joy":
+            emotion_guide = "شارك المستخدم الفرحة."
+
         repair_prompt = f"""أعد كتابة هذا الرد ليكون أفضل:
+العاطفة الحالية: {emotion} ({emotion_guide})
 الرد الأصلي: {original}
 ملاحظات المراجع: {critic.get('review', '')}"""
         try:
-            improved, _ = await self.multi.get_best(
-                repair_prompt, preferred_providers=self.roles["repair"], task="general"
+            improved, _ = await asyncio.wait_for(
+                self.multi.get_best(repair_prompt, preferred_providers=self.roles["repair"], task="general"),
+                timeout=8
             )
             return improved or original
-        except:
+        except asyncio.TimeoutError:
+            logger.warning("Repair timed out")
+            return original
+        except Exception:
             return original

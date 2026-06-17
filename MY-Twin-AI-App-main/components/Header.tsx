@@ -3,7 +3,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useTwinStore } from '../store/useTwinStore';
 
-export default function Header({ title }: { title: string }) {
+export default function Header({ title }: { title?: string }) {
   const { theme, lang } = useTwinStore();
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
@@ -16,9 +16,13 @@ export default function Header({ title }: { title: string }) {
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
         <ChevronLeft size={24} stroke={primary} />
       </TouchableOpacity>
-      <Text style={[styles.title, { color: txt }]} numberOfLines={1}>
-        {title}
-      </Text>
+      {title ? (
+        <Text style={[styles.title, { color: txt }]} numberOfLines={1}>
+          {title}
+        </Text>
+      ) : (
+        <View style={{ flex: 1 }} />
+      )}
       <View style={styles.placeholder} />
     </View>
   );
