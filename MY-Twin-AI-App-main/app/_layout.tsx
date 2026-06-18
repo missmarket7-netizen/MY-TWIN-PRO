@@ -52,9 +52,10 @@ export default function RootLayout() {
       <ToastProvider>
         <StatusBar style={isDark ? "light" : "dark"} />
         <Stack screenOptions={screenOptions}>
-          <Stack.Screen name="chat" />
-          <Stack.Screen name="splash" />
           <Stack.Screen name="index" />
+          <Stack.Screen name="splash" />
+          <Stack.Screen name="welcome" />
+          <Stack.Screen name="chat" />
           <Stack.Screen name="login" />
           <Stack.Screen name="onboarding" />
         </Stack>

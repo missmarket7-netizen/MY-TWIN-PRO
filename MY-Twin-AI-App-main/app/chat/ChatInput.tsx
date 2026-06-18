@@ -1,4 +1,4 @@
-import React, { memo, useState, useRef } from 'react';
+import React, { memo, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Modal, Animated, ActivityIndicator, ScrollView,
@@ -6,24 +6,21 @@ import {
 import {
   Send, X, Camera, Image as ImageIcon, FileText,
   Search, Cloud, Music, Film, DollarSign, TrendingUp,
-  Wand2, Mic, MicOff, Brain, Sparkles, Zap,
+  Wand2, Mic, MicOff,
 } from 'lucide-react-native';
 import { ToolChip } from './ChatBubbles';
-
-const SCREEN_WIDTH = require('react-native').Dimensions.get('window').width;
 
 export const ChatInput = memo(({
   input, setInput, loading, isRTL, isDark, colors, lang,
   onSend, onAddTool, activeTools, onRemoveTool,
   onCamera, onGallery, onFile,
   showAttach, setShowAttach, attachAnim,
+  isRecording = false, onMicPress,
 }: any) => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // ✅ قائمة الأدوات والإرفاق الموحدة
-  const unifiedMenu = [
+  // ✅ قائمة الأدوات والإرفاق الموحدة (مذكرة)
+  const unifiedMenu = useMemo(() => [
     { icon: Camera, label_ar: 'كاميرا', label_en: 'Camera', color: '#8B5CF6', onPress: onCamera },
     { icon: ImageIcon, label_ar: 'معرض', label_en: 'Gallery', color: '#EC4899', onPress: onGallery },
     { icon: FileText, label_ar: 'ملف', label_en: 'File', color: '#F59E0B', onPress: onFile },
@@ -34,14 +31,7 @@ export const ChatInput = memo(({
     { icon: DollarSign, label_ar: 'عملات', label_en: 'Currency', color: '#10B981', tool: 'currency' },
     { icon: TrendingUp, label_ar: 'أخبار', label_en: 'News', color: '#8B5CF6', tool: 'news' },
     { icon: Search, label_ar: 'بحث', label_en: 'Search', color: '#6366F1', tool: 'search' },
-  ];
-
-  // ✅ ردود سريعة ذكية
-  const quickReplies = lang === 'ar' ? [
-    'كيف حالك؟', 'شكراً', 'ممتاز', 'أحتاج مساعدة',
-  ] : [
-    'How are you?', 'Thanks', 'Great', 'I need help',
-  ];
+  ], [onCamera, onGallery, onFile, lang]);
 
   const handleToolSelect = (item: any) => {
     setShowAttach(false);
@@ -57,22 +47,11 @@ export const ChatInput = memo(({
     }
   };
 
-  const handleQuickReply = (text: string) => {
-    setInput(text);
-    setShowQuickReplies(false);
-    inputRef.current?.focus();
-  };
-
-  const handleVoicePress = () => {
-    setIsRecording(!isRecording);
-    // TODO: تكامل مع expo-av للتسجيل الصوتي
-  };
-
   const hasContent = input.trim().length > 0 || (activeTools && activeTools.length > 0);
 
   return (
     <>
-      {/* ✅ الأدوات النشطة */}
+      {/* الأدوات النشطة */}
       {activeTools && activeTools.length > 0 && (
         <ScrollView
           horizontal
@@ -92,35 +71,15 @@ export const ChatInput = memo(({
         </ScrollView>
       )}
 
-      {/* ✅ ردود سريعة (تظهر عندما يكون الإدخال فارغاً) */}
-      {!hasContent && !loading && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[styles.quickRepliesRow, { backgroundColor: colors.headerBg }]}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-        >
-          {quickReplies.map((reply, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.quickReplyChip, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-              onPress={() => handleQuickReply(reply)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.quickReplyText, { color: colors.text }]}>{reply}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-
-      {/* ✅ شريط الإدخال المحسّن */}
+      {/* شريط الإدخال المحسّن */}
       <View style={[styles.inputBar, { backgroundColor: colors.headerBg, borderTopColor: colors.border }]}>
-        {/* زر الإرفاق */}
+        {/* زر الإرفاق (تبديل باستخدام prev لتجنب الـ stale closure) */}
         <TouchableOpacity
-          onPress={() => setShowAttach(true)}
+          onPress={() => setShowAttach((prev: boolean) => !prev)}
           style={[styles.attachBtn, { backgroundColor: colors.inputBg }]}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={lang === 'ar' ? 'إرفاق أو أدوات' : 'Attach or Tools'}
         >
           <Text style={{ fontSize: 20, color: colors.subtext, fontWeight: '300' }}>+</Text>
         </TouchableOpacity>
@@ -137,15 +96,20 @@ export const ChatInput = memo(({
             multiline
             maxLength={2000}
             editable={!loading}
-            onSubmitEditing={() => onSend && onSend()}
-            returnKeyType="send"
+            blurOnSubmit={false}
+            returnKeyType="default"
+            autoCorrect={false}
+            autoCapitalize="sentences"
+            accessibilityLabel={lang === 'ar' ? 'رسالة نصية' : 'Text message'}
           />
           
-          {/* ✅ زر الميكروفون (STT) - يعمل في كل الباقات */}
+          {/* زر الميكروفون (STT) */}
           <TouchableOpacity
-            onPress={handleVoicePress}
+            onPress={onMicPress || (() => {})}
             style={[styles.micBtn, isRecording && styles.micActive]}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={lang === 'ar' ? 'تسجيل صوتي' : 'Voice record'}
           >
             {isRecording ? (
               <MicOff size={18} stroke="#FF3B30" />
@@ -167,6 +131,8 @@ export const ChatInput = memo(({
             }
           ]}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={lang === 'ar' ? 'إرسال' : 'Send'}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#FFF" />
@@ -176,18 +142,20 @@ export const ChatInput = memo(({
         </TouchableOpacity>
       </View>
 
-      {/* ✅ نافذة الإرفاق والأدوات المحسّنة */}
+      {/* نافذة الإرفاق والأدوات المحسّنة */}
       <Modal
         visible={showAttach}
         transparent
         animationType="none"
         onRequestClose={() => setShowAttach(false)}
       >
-        <TouchableOpacity
-          style={styles.attachOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAttach(false)}
-        >
+        {/* ✅ منع انتشار الضغط من الخلفية إلى الداخل */}
+        <View style={styles.attachOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowAttach(false)}
+          />
           <Animated.View style={[
             styles.attachContainer,
             {
@@ -213,6 +181,8 @@ export const ChatInput = memo(({
                   style={[styles.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]}
                   onPress={() => handleToolSelect(item)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={lang === 'ar' ? item.label_ar : item.label_en}
                 >
                   <View style={[styles.attachIconWrap, { backgroundColor: item.color + '15' }]}>
                     <item.icon size={24} stroke={item.color} />
@@ -229,7 +199,7 @@ export const ChatInput = memo(({
               {lang === 'ar' ? 'اختر أداة أو أرفق ملف' : 'Select a tool or attach a file'}
             </Text>
           </Animated.View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </>
   );
@@ -238,18 +208,7 @@ export const ChatInput = memo(({
 // ==================== STYLES ====================
 
 const styles = StyleSheet.create({
-  // Chips
   chipsRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-
-  // Quick Replies
-  quickRepliesRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  quickReplyChip: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: 20, borderWidth: 1,
-  },
-  quickReplyText: { fontSize: 14, fontWeight: '500' },
-
-  // Input Bar
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: 12, paddingTop: 10, paddingBottom: 16,
@@ -280,9 +239,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-
-  // Attach Modal
-  attachOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  attachOverlay: {
+    flex: 1, justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   attachContainer: {
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40,
@@ -300,9 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   attachItem: {
-    width: (SCREEN_WIDTH - 72) / 3,
-    alignItems: 'center', paddingVertical: 18, borderRadius: 18,
-    gap: 8,
+    flexBasis: '30%', alignItems: 'center', paddingVertical: 18, borderRadius: 18, gap: 8,
   },
   attachIconWrap: {
     width: 56, height: 56, borderRadius: 18,

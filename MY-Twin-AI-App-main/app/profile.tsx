@@ -127,7 +127,7 @@ const TEXTS: Record<string, TextSet> = {
 export default function Profile() {
   const {
     userId, tier, lang, theme, logout: storeLogout,
-    bondLevel, journeyPhase, attachmentStyle, energy, totalMessages
+    bondLevel, journeyPhase, attachmentStyle, twinEnergy, totalMessages
   } = useTwinStore();
 
   const [profile, setProfile] = useState<ProfileData>({});
@@ -432,7 +432,7 @@ export default function Profile() {
           <View style={[styles.statCard, { backgroundColor: card, borderColor: border }]}>
             <Zap size={18} stroke="#F59E0B" />
             <Text style={[styles.statValue, { color: txt }]}>
-              {Math.round(energy)}%
+              {Math.round(twinEnergy)}%
             </Text>
             <Text style={[styles.statLabel, { color: sub }]}>{t('energy')}</Text>
           </View>

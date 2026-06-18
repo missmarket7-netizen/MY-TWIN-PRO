@@ -1,6 +1,23 @@
 import * as Speech from "expo-speech";
-import { Audio } from "expo-av";
-import { useTwinStore, VoiceConfig } from "../store/useTwinStore";
+import { useTwinStore } from "../store/useTwinStore";
+import { API } from "../lib/api";
+
+// ==================== TYPES ====================
+
+interface VoiceOption {
+  identifier: string;
+  name: string;
+  language: string;
+  gender: 'male' | 'female' | 'unknown';
+  quality: number;
+}
+
+// ==================== VOICE MAPS ====================
+
+const GENDER_VOICES: Record<string, string> = {
+  male: 'ar-SA-HamedNeural',
+  female: 'ar-SA-ZariyahNeural',
+};
 
 // ==================== HELPERS ====================
 
@@ -17,7 +34,6 @@ function cleanTextForSpeech(text: string): string {
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
-  // أسرع من loop عادي بـ 3x
   const len = bytes.byteLength;
   for (let i = 0; i < len; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -25,222 +41,143 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// ==================== TTS PROVIDERS ====================
+// ==================== MAIN TTS ====================
 
-/**
- * ✅ Expo Speech - محلي، مجاني، يعمل بدون إنترنت
- */
-async function speakWithExpoSpeech(text: string, config: VoiceConfig): Promise<void> {
-  await Speech.stop();
-  
-  return new Promise((resolve, reject) => {
-    Speech.speak(text, {
-      language: config.language,
-      pitch: config.pitch,
-      rate: config.rate,
-      onDone: () => resolve(),
-      onError: (err) => reject(err),
-    });
-  });
-}
-
-/**
- * ✅ Edge TTS - عبر الخادم (أو مباشر إذا كان لديك proxy)
- */
-async function speakWithEdgeTTS(text: string, config: VoiceConfig): Promise<void> {
-  try {
-    // إذا كان لديك endpoint محلي للـ Edge TTS
-    const response = await fetch('/api/edge-tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        voice: config.voiceId,
-        pitch: config.pitch,
-        rate: config.rate,
-      }),
-    });
-
-    if (!response.ok) throw new Error(`Edge TTS failed: ${response.status}`);
-
-    const blob = await response.blob();
-    const reader = new FileReader();
-
-    return new Promise((resolve, reject) => {
-      reader.onloadend = async () => {
-        try {
-          const base64 = (reader.result as string).split(',')[1];
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: `data:audio/mp3;base64,${base64}` },
-            { shouldPlay: true }
-          );
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync();
-              resolve();
-            }
-          });
-        } catch (e) {
-          reject(e);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    console.warn("Edge TTS failed, falling back to Expo Speech");
-    throw e; // سيتم التقاطه في الدالة الرئيسية
-  }
-}
-
-/**
- * ✅ ElevenLabs - عبر الخادم (يتطلب API key)
- */
-async function speakWithElevenLabs(text: string, config: VoiceConfig): Promise<void> {
-  try {
-    const response = await fetch('/api/elevenlabs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        voice_id: config.voiceId,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.3,
-        },
-      }),
-    });
-
-    if (!response.ok) throw new Error(`ElevenLabs failed: ${response.status}`);
-
-    const blob = await response.blob();
-    const reader = new FileReader();
-
-    return new Promise((resolve, reject) => {
-      reader.onloadend = async () => {
-        try {
-          const base64 = (reader.result as string).split(',')[1];
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: `data:audio/mp3;base64,${base64}` },
-            { shouldPlay: true }
-          );
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync();
-              resolve();
-            }
-          });
-        } catch (e) {
-          reject(e);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    console.warn("ElevenLabs failed, falling back to Expo Speech");
-    throw e;
-  }
-}
-
-// ==================== MAIN EXPORT ====================
-
-/**
- * ✅ يتحدث بناءً على إعدادات الصوت من الـ Store
- * - يختار المزود تلقائياً
- * - يرتبط بنوع التوأم (ذكر/أنثى/غير محدد)
- * - يحاول الخادم أولاً، ثم يرجع للمحلي
- */
 export async function speakResponse(
   text: string,
-  options?: { onDone?: () => void; onStart?: () => void }
+  options?: { onDone?: () => void; onStart?: () => void; emotion?: string }
 ): Promise<void> {
   try {
     const clean = cleanTextForSpeech(text);
-    if (!clean) return;
-
-    const store = useTwinStore.getState();
-    
-    // ✅ استخدام getVoiceConfig() من الـ Store
-    const voiceConfig = store.getVoiceConfig();
-    
-    options?.onStart?.();
-
-    // ✅ اختيار المزود حسب الإعداد
-    switch (voiceConfig.provider) {
-      case 'edge_tts':
-        try {
-          await speakWithEdgeTTS(clean, voiceConfig);
-        } catch {
-          await speakWithExpoSpeech(clean, voiceConfig);
-        }
-        break;
-
-      case 'elevenlabs':
-        try {
-          await speakWithElevenLabs(clean, voiceConfig);
-        } catch {
-          await speakWithExpoSpeech(clean, voiceConfig);
-        }
-        break;
-
-      case 'expo_speech':
-      default:
-        await speakWithExpoSpeech(clean, voiceConfig);
-        break;
+    if (!clean) {
+      options?.onDone?.();
+      return;
     }
 
-    options?.onDone?.();
+    const store = useTwinStore.getState();
+    const twinGender = store.twinGender || 'female';
+    const lang = store.lang || 'ar';
+    const tier = store.tier || 'free';
+
+    options?.onStart?.();
+
+    // ✅ الباقات المدفوعة: نستخدم الخادم (ElevenLabs/Edge TTS)
+    if (tier && ['premium', 'pro', 'yearly'].includes(tier)) {
+      try {
+        const response = await API.post('/api/voice/speak', {
+          text: clean,
+          tier,
+          gender: twinGender,
+          language: lang === 'ar' ? 'ar' : 'en',
+          emotion: options?.emotion || 'neutral',
+        }, { responseType: 'arraybuffer' });
+
+        if (response.data?.byteLength > 0) {
+          const { Audio } = require('expo-av');
+          const sound = new Audio.Sound();
+          await sound.loadAsync({ uri: `data:audio/mp3;base64,${arrayBufferToBase64(response.data)}` });
+          await new Promise<void>((resolve) => {
+            sound.setOnPlaybackStatusUpdate((status: any) => {
+              if (status.isLoaded && status.didJustFinish) {
+                sound.unloadAsync();
+                resolve();
+              }
+            });
+            sound.playAsync();
+          });
+          options?.onDone?.();
+          return;
+        }
+      } catch (e) {
+        console.warn("Server voice failed, falling back to local TTS");
+      }
+    }
+
+    // ✅ الباقات المجانية: Edge TTS عبر الخادم أولاً، ثم Expo Speech
+    try {
+      const response = await API.post('/api/voice/speak', {
+        text: clean,
+        tier: 'free',
+        gender: twinGender,
+        language: lang === 'ar' ? 'ar' : 'en',
+        emotion: options?.emotion || 'neutral',
+      }, { responseType: 'arraybuffer' });
+
+      if (response.data?.byteLength > 0) {
+        const { Audio } = require('expo-av');
+        const sound = new Audio.Sound();
+        await sound.loadAsync({ uri: `data:audio/mp3;base64,${arrayBufferToBase64(response.data)}` });
+        await new Promise<void>((resolve) => {
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.isLoaded && status.didJustFinish) {
+              sound.unloadAsync();
+              resolve();
+            }
+          });
+          sound.playAsync();
+        });
+        options?.onDone?.();
+        return;
+      }
+    } catch (e) {
+      console.warn("Edge TTS failed, using Expo Speech");
+    }
+
+    // ✅ Fallback: Expo Speech محلي مع صوت مناسب للجنس
+    const defaultVoice = GENDER_VOICES[twinGender] || GENDER_VOICES.female;
+    await Speech.stop();
+    Speech.speak(clean, {
+      language: lang === 'ar' ? "ar-SA" : "en-US",
+      pitch: twinGender === 'female' ? 1.1 : 0.9,
+      rate: 0.9,
+      voice: defaultVoice,
+      onDone: () => options?.onDone?.(),
+      onError: () => options?.onDone?.(),
+    });
   } catch (e) {
     console.warn("speakResponse error:", e);
     options?.onDone?.();
   }
 }
 
-// ==================== STT (Speech-to-Text) ====================
+// ==================== STT (Whisper) ====================
 
 export async function transcribeAudio(audioBase64: string): Promise<string> {
-  try {
-    const store = useTwinStore.getState();
-    const lang = store.lang === 'ar' ? 'ar-SA' : 'en-US';
+  const MAX_RETRIES = 3;
+  const TIMEOUT = 30000;
 
-    const response = await fetch('/api/stt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const store = useTwinStore.getState();
+      const lang = store.lang === 'ar' ? 'ar' : 'en';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+      const response = await API.post('/api/stt', {
         audio: audioBase64,
         language: lang,
-      }),
-    });
+      }, { signal: controller.signal });
 
-    if (!response.ok) throw new Error(`STT failed: ${response.status}`);
-    
-    const data = await response.json();
-    return data.text || '';
-  } catch (e) {
-    console.warn("STT failed:", e);
-    return '';
+      clearTimeout(timeoutId);
+
+      if (!response.data?.text) throw new Error('No text returned');
+      return response.data.text;
+    } catch (e) {
+      console.warn(`STT attempt ${attempt} failed:`, e);
+      if (attempt === MAX_RETRIES) return '';
+      await new Promise(r => setTimeout(r, attempt * 1000));
+    }
   }
+  return '';
 }
 
 // ==================== CONTROLS ====================
 
-export async function stopSpeaking(): Promise<void> {
-  await Speech.stop();
+export function stopSpeaking(): void {
+  Speech.stop();
 }
 
-export async function isSpeaking(): Promise<boolean> {
+export function isSpeaking(): Promise<boolean> {
   return Speech.isSpeakingAsync();
-}
-
-export async function pauseSpeaking(): Promise<void> {
-  // Expo Speech لا يدعم pause مباشرة
-  await Speech.stop();
-}
-
-export async function resumeSpeaking(): Promise<void> {
-  // يتطلب إعادة التشغيل من البداية
-  console.warn("Resume not supported in Expo Speech");
 }

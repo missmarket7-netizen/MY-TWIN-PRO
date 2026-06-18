@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useRef, useState, useEffect, useMemo } from 'react';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity, Share,
   Linking, TextInput, Animated, Dimensions,
@@ -7,7 +7,7 @@ import { ChatMessage } from '../../store/useTwinStore';
 import {
   Copy, Share2, RotateCcw, Edit3, Check, ThumbsUp,
   ThumbsDown, ExternalLink, Film, X, Brain, Sparkles,
-  Zap, MessageCircle, User as UserIcon, Bot,
+  Zap, MessageCircle, User as UserIcon, Bot, Cpu, Shield,
 } from 'lucide-react-native';
 import Markdown from 'react-native-markdown-display';
 import * as WebBrowser from 'expo-web-browser';
@@ -15,8 +15,6 @@ import * as Clipboard from 'expo-clipboard';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const APP_ICON = require('../../assets/icon.png');
-
-// ==================== COLORS ====================
 
 export const COLORS = {
   light: {
@@ -39,8 +37,6 @@ export const COLORS = {
   },
 };
 
-// ==================== HELPERS ====================
-
 const emotionEmoji: Record<string, string> = {
   joy: '😊', sadness: '😢', anger: '😠', fear: '😨', love: '❤️',
   surprise: '😮', neutral: '😌', excited: '🤩', calm: '😌',
@@ -54,71 +50,40 @@ const providerLabels: Record<string, { ar: string; en: string; icon: any }> = {
   openai: { ar: 'GPT', en: 'GPT', icon: Bot },
   claude: { ar: 'Claude', en: 'Claude', icon: MessageCircle },
   gemini: { ar: 'Gemini', en: 'Gemini', icon: Sparkles },
+  groq: { ar: 'Groq', en: 'Groq', icon: Cpu },
+  council: { ar: 'مجلس', en: 'Council', icon: Sparkles },
+  agent_loop: { ar: 'وكيل', en: 'Agent', icon: Zap },
+  fallback: { ar: 'احتياطي', en: 'Fallback', icon: X },
+  safety_engine: { ar: 'أمان', en: 'Safety', icon: Shield },
 };
 
-// ==================== MARKDOWN RENDERER ====================
-
+// ✅ تم إصلاح MarkdownRenderer: useMemo للـ styles + تحسين الأداء
 export const MarkdownRenderer = memo(({ content, isDark }: { content: string; isDark: boolean }) => {
   const c = isDark ? COLORS.dark : COLORS.light;
 
-  const markdownStyles: any = {
+  const markdownStyles: any = useMemo(() => ({
     body: { color: c.twinText, fontSize: 16, lineHeight: 26, fontFamily: 'System' },
     paragraph: { marginBottom: 12, marginTop: 4 },
     heading1: { fontSize: 24, fontWeight: '800', marginBottom: 16, marginTop: 8, color: c.accent, letterSpacing: -0.5 },
     heading2: { fontSize: 20, fontWeight: '700', marginBottom: 12, marginTop: 8, color: c.accent, letterSpacing: -0.3 },
     heading3: { fontSize: 18, fontWeight: '700', marginBottom: 10, marginTop: 6, color: c.text },
-    heading4: { fontSize: 16, fontWeight: '700', marginBottom: 8, color: c.text },
-    heading5: { fontSize: 15, fontWeight: '600', marginBottom: 6, color: c.subtext },
-    heading6: { fontSize: 14, fontWeight: '600', marginBottom: 6, color: c.subtext },
-
     bullet_list: { marginBottom: 12, marginLeft: 8 },
     ordered_list: { marginBottom: 12, marginLeft: 8 },
     list_item: { marginBottom: 8, flexDirection: 'row', alignItems: 'flex-start' },
-    bullet_list_icon: { marginRight: 10, marginTop: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
-    ordered_list_icon: { marginRight: 10, marginTop: 2, color: c.accent, fontWeight: '700', fontSize: 14 },
-
     table: { marginVertical: 16, borderWidth: 1, borderColor: c.tableBorder, borderRadius: 12, overflow: 'hidden' },
     thead: { backgroundColor: c.codeBg },
-    th: { padding: 12, fontWeight: '700', color: c.text, fontSize: 14, borderRightWidth: 1, borderColor: c.tableBorder },
-    td: { padding: 12, color: c.subtext, fontSize: 14, borderRightWidth: 1, borderTopWidth: 1, borderColor: c.tableBorder },
-    tr: { borderBottomWidth: 1, borderColor: c.tableBorder },
-
-    code_inline: {
-      backgroundColor: c.codeBg, color: '#FF375F', paddingHorizontal: 8, paddingVertical: 3,
-      borderRadius: 6, fontSize: 14, fontFamily: 'Courier', fontWeight: '600',
-    },
-    code_block: {
-      backgroundColor: c.codeBg, padding: 16, borderRadius: 12, marginVertical: 12,
-      borderWidth: 1, borderColor: c.border,
-    },
-    fence: {
-      backgroundColor: c.codeBg, padding: 16, borderRadius: 12, marginVertical: 12,
-      borderWidth: 1, borderColor: c.border,
-    },
-    code_block_content: { color: '#34C759', fontFamily: 'Courier', fontSize: 14, lineHeight: 22 },
-
-    blockquote: {
-      borderLeftWidth: 4, borderLeftColor: c.accent, paddingLeft: 16, paddingVertical: 12,
-      marginVertical: 12, backgroundColor: c.blockquoteBg, borderRadius: 8,
-    },
-
+    th: { padding: 12, fontWeight: '700', color: c.text, fontSize: 14 },
+    td: { padding: 12, color: c.subtext, fontSize: 14, borderTopWidth: 1, borderColor: c.tableBorder },
+    code_inline: { backgroundColor: c.codeBg, color: '#FF375F', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, fontSize: 14, fontFamily: 'Courier', fontWeight: '600' },
+    code_block: { backgroundColor: c.codeBg, padding: 16, borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: c.border },
+    blockquote: { borderLeftWidth: 4, borderLeftColor: c.accent, paddingLeft: 16, paddingVertical: 12, marginVertical: 12, backgroundColor: c.blockquoteBg, borderRadius: 8 },
     link: { color: c.link, textDecorationLine: 'none', fontWeight: '600' },
-    autolink: { color: c.link, textDecorationLine: 'none' },
-
-    hr: { borderBottomWidth: 1, borderBottomColor: c.border, marginVertical: 20 },
-
     strong: { fontWeight: '700', color: c.text },
     em: { fontStyle: 'italic', color: c.subtext },
-    s: { textDecorationLine: 'line-through', color: c.subtext },
-    del: { textDecorationLine: 'line-through', color: c.subtext },
+    image: { borderRadius: 12, marginVertical: 12, width: SCREEN_W - 80, height: 200 } as any,
+  }), [isDark]);
 
-    image: { borderRadius: 12, marginVertical: 12, width: SCREEN_W - 80, height: 200 },
-
-    tasklist: { marginLeft: 8 },
-    tasklist_checkbox: { marginRight: 8, marginTop: 4 },
-  };
-
-  // ✅ إصلاح الخطأ 2: onLinkPress يجب أن يرجع boolean وليس Promise
+  // ✅ إصلاح: onLinkPress يُرجع boolean فوراً
   const handleLinkPress = (url: string): boolean => {
     WebBrowser.openBrowserAsync(url, {
       toolbarColor: isDark ? '#1C1C1E' : '#FFFFFF',
@@ -126,7 +91,7 @@ export const MarkdownRenderer = memo(({ content, isDark }: { content: string; is
     }).catch(() => {
       Linking.openURL(url);
     });
-    return true; // ✅ نرجع boolean فوراً
+    return true;
   };
 
   return (
@@ -136,10 +101,24 @@ export const MarkdownRenderer = memo(({ content, isDark }: { content: string; is
   );
 });
 
-// ==================== COPY TOAST ====================
-
+// ✅ CopyToast مع إصلاح Memory Leak
 const CopyToast = memo(({ visible, isDark }: { visible: boolean; isDark: boolean }) => {
-  if (!visible) return null;
+  const [show, setShow] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (visible) {
+      setShow(true);
+      timeoutRef.current = setTimeout(() => setShow(false), 2000);
+    } else {
+      setShow(false);
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [visible]);
+
+  if (!show) return null;
   return (
     <View style={[styles.toastContainer, { backgroundColor: isDark ? '#2C2C2E' : '#1C1C1E' }]}>
       <Check size={16} stroke="#34C759" />
@@ -148,15 +127,14 @@ const CopyToast = memo(({ visible, isDark }: { visible: boolean; isDark: boolean
   );
 });
 
-// ==================== USER BUBBLE ====================
-
+// ✅ UserBubble مع إصلاح Animated.Value + إصلاح onStartEdit(null)
 export const UserBubble = memo(({
   item, isDark, isRTL, onStartEdit, onSaveEdit,
-  isEditing, editContent, setEditContent, onEditInInput,
+  isEditing, editContent, setEditContent, onEditInInput, onCancelEdit,
 }: any) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }, []);
 
@@ -186,7 +164,7 @@ export const UserBubble = memo(({
                 placeholderTextColor="rgba(255,255,255,0.5)"
               />
               <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
-                <TouchableOpacity onPress={() => onStartEdit?.(null)} style={styles.editCancelBtn}>
+                <TouchableOpacity onPress={onCancelEdit || (() => onStartEdit?.(null))} style={styles.editCancelBtn}>
                   <Text style={{ color: '#FFF', fontSize: 13 }}>إلغاء</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => onSaveEdit(item, editContent)} style={styles.editSaveBtn}>
@@ -216,29 +194,33 @@ export const UserBubble = memo(({
   );
 });
 
-
-// ==================== TWIN BUBBLE ====================
-
+// ✅ TwinBubble مع إصلاحات: Animated.Value، Provider Labels باللغة، YouTube try/catch، Memory Dot border
 export const TwinBubble = memo(({
   item, isDark, isRTL, isLast, onCopy, onRetry,
-  onRegenerate, onLike, onDislike, liked, disliked, provider,
+  onRegenerate, onLike, onDislike, liked, disliked, provider, lang,
 }: any) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showToast, setShowToast] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, []);
 
   const c = isDark ? COLORS.dark : COLORS.light;
   const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // ✅ إصلاح الخطأ 3: استخدام Clipboard.setStringAsync من expo-clipboard
   const handleCopy = async (text: string) => {
     try {
       await Clipboard.setStringAsync(text);
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
+      timeoutRef.current = setTimeout(() => setShowToast(false), 2000);
       onCopy?.(text);
     } catch (e) {
       console.warn('Copy failed:', e);
@@ -249,27 +231,36 @@ export const TwinBubble = memo(({
   const emoji = emotionEmoji[emotion] || '😌';
   const prov = providerLabels[provider || 'multi_ai'] || providerLabels.multi_ai;
   const ProvIcon = prov.icon;
+  const displayProv = lang === 'ar' ? prov.ar : prov.en;
+
+  const handleYouTubePress = async () => {
+    try {
+      const supported = await Linking.canOpenURL(item.youtubeVideo);
+      if (supported) {
+        await Linking.openURL(item.youtubeVideo);
+      }
+    } catch (e) {
+      console.warn('YouTube open failed:', e);
+    }
+  };
 
   return (
     <Animated.View style={[styles.twinRow, { opacity: fadeAnim }]}>
       <View style={styles.twinRowInner}>
-        {/* Avatar */}
         <View style={styles.twinAvatarWrap}>
           <Image source={APP_ICON} style={styles.twinAvatar} />
           {item.memoryRecall && (
-            <View style={[styles.memoryDot, { backgroundColor: c.likeActive }]}>
+            <View style={[styles.memoryDot, { backgroundColor: c.likeActive, borderColor: isDark ? '#000' : '#FFF' }]}>
               <Brain size={10} stroke="#FFF" />
             </View>
           )}
         </View>
 
-        {/* Content */}
         <View style={[styles.twinContent, { backgroundColor: c.bubbleTwin }]}>
-          {/* Header */}
           <View style={[styles.twinHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.providerBadge, { backgroundColor: c.codeBg }]}>
               <ProvIcon size={12} stroke={c.accent} />
-              <Text style={[styles.providerText, { color: c.subtext }]}>{prov.ar}</Text>
+              <Text style={[styles.providerText, { color: c.subtext }]}>{displayProv}</Text>
             </View>
 
             {item.emotion && (
@@ -282,7 +273,6 @@ export const TwinBubble = memo(({
             <Text style={[styles.timestamp, { color: c.subtext }]}>{time}</Text>
           </View>
 
-          {/* Thinking Stage */}
           {item.thinkingStage && item.thinkingStage !== 'complete' && (
             <View style={[styles.thinkingBadge, { backgroundColor: c.blockquoteBg }]}>
               <Zap size={12} stroke={c.accent} />
@@ -294,10 +284,9 @@ export const TwinBubble = memo(({
             </View>
           )}
 
-          {/* YouTube Card */}
           {item.youtubeVideo && (
             <TouchableOpacity
-              onPress={() => Linking.openURL(item.youtubeVideo)}
+              onPress={handleYouTubePress}
               style={[styles.youtubeCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF0F0' }]}
               activeOpacity={0.8}
             >
@@ -312,39 +301,31 @@ export const TwinBubble = memo(({
             </TouchableOpacity>
           )}
 
-          {/* Content */}
           <View style={styles.contentWrap}>
             <MarkdownRenderer content={item.content} isDark={isDark} />
           </View>
 
-          {/* Actions */}
           <View style={[styles.actionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity onPress={() => handleCopy(item.content)} style={styles.actionBtn} activeOpacity={0.6}>
               <Copy size={16} stroke={c.subtext} />
             </TouchableOpacity>
-
             <TouchableOpacity onPress={() => Share.share({ message: item.content })} style={styles.actionBtn} activeOpacity={0.6}>
               <Share2 size={16} stroke={c.subtext} />
             </TouchableOpacity>
-
             {isLast && (
               <TouchableOpacity onPress={() => onRegenerate(item)} style={styles.actionBtn} activeOpacity={0.6}>
                 <RotateCcw size={16} stroke={c.subtext} />
               </TouchableOpacity>
             )}
-
             <View style={styles.divider} />
-
             <TouchableOpacity onPress={() => onLike(item)} style={[styles.actionBtn, liked && styles.activeLike]} activeOpacity={0.6}>
               <ThumbsUp size={16} stroke={liked ? c.likeActive : c.subtext} fill={liked ? c.likeActive : 'transparent'} />
             </TouchableOpacity>
-
             <TouchableOpacity onPress={() => onDislike(item)} style={[styles.actionBtn, disliked && styles.activeDislike]} activeOpacity={0.6}>
               <ThumbsDown size={16} stroke={disliked ? c.dislikeActive : c.subtext} fill={disliked ? c.dislikeActive : 'transparent'} />
             </TouchableOpacity>
           </View>
 
-          {/* Retry */}
           {item.failed && (
             <TouchableOpacity onPress={() => onRetry(item)} style={styles.retryBtn} activeOpacity={0.8}>
               <RotateCcw size={14} stroke={c.retryColor} />
@@ -359,8 +340,7 @@ export const TwinBubble = memo(({
   );
 });
 
-// ==================== TOOL CHIP ====================
-
+// ✅ ToolChip (بدون تغيير)
 export const ToolChip = memo(({ label, icon: Icon, color, onClose }: any) => (
   <View style={[styles.toolChip, { backgroundColor: color + '12', borderColor: color + '25' }]}>
     <Icon size={14} stroke={color} />
@@ -424,7 +404,7 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: -2, right: -2,
     width: 16, height: 16, borderRadius: 8,
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#000',
+    borderWidth: 2,
   },
   twinContent: {
     flex: 1, borderRadius: 16, padding: 14, gap: 10,

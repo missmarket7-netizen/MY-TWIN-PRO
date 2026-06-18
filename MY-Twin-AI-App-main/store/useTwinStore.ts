@@ -2,11 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-
-const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+import { Platform } from 'react-native';
 
 // ==================== TYPES ====================
-
 export interface EmotionState {
   primary: string; secondary: string; intensity: number; valence: number; arousal: number;
   trend?: 'improving' | 'worsening' | 'stable'; riskLevel?: 'low' | 'medium' | 'high'; needsSupport: boolean;
@@ -20,7 +18,7 @@ export interface ChatMessage {
   id: string; role: 'user' | 'twin'; content: string; image?: string; timestamp: number;
   failed?: boolean; emotion?: string; journeyPhase?: string; relationshipStage?: string;
   memoryRecall?: boolean; thinkingStage?: string;
-  youtubeVideo?: string; provider?: string;
+  youtubeVideo?: string; provider?: string; toolType?: string; 
 }
 
 export interface RelationshipDims {
@@ -78,7 +76,6 @@ export interface TwinStore {
   ttsProvider: TTSProvider;
   customVoiceId?: string;
   
-  energy: number; setEnergy: (value: number) => void;
   emotionState: EmotionState | null;
   journeyPhase: JourneyPhase;
   attachmentStyle: AttachmentStyle;
@@ -107,7 +104,7 @@ export interface TwinStore {
   
   recordInteraction: (minutes?: number) => void;
   addMemory: () => void;
-  calculateBond: () => number;
+  computeBond: () => number;
   
   getVoiceConfig: () => VoiceConfig;
   
@@ -155,8 +152,18 @@ export interface TwinStore {
 }
 
 // ==================== CONSTANTS ====================
-
+const STORE_VERSION = 1;
 const HOURS_20_MS = 20 * 60 * 60 * 1000;
+
+const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(val, max));
+
+const devLog = (...args: any[]) => {
+  if (__DEV__) console.log(...args);
+};
+
+const generateId = () => {
+  return 'msg_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+};
 
 const EDGE_TTS_VOICES: Record<string, VoiceConfig> = {
   'ar-male':    { provider: 'edge_tts', voiceId: 'ar-SA-HamedNeural',    language: 'ar-SA', pitch: 1.0, rate: 0.9, gender: 'male' },
@@ -189,11 +196,9 @@ const TIER_LIMITS: Record<Tier, { messages: number; tokens: number }> = {
   yearly:           { messages: 9999, tokens: 999999 },
 };
 
-// ==================== INITIAL STATE ====================
-
 const initialState = {
   userId: '', twinName: 'توأمك', twinGender: 'female' as TwinGender,
-  twinStyle: 'supportive' as TwinStyle, bondLevel: 0, energy: 50,
+  twinStyle: 'supportive' as TwinStyle, bondLevel: 0,
   relationshipDims: { trust: 0, attachment: 0, comfort: 0, openness: 0, romantic: 0, humor: 0, attStyle: 0 } as RelationshipDims,
   subscriptionTier: 'free',
   emotionState: null as EmotionState | null,
@@ -212,27 +217,25 @@ const initialState = {
   favoriteTopics: [], preferredResponseLength: 'medium' as const, tonePreference: 'emotional' as const,
 };
 
-
 export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   ...initialState,
 
-  setAuth: (userId) => { console.log('🔑 setAuth:', userId); set({ userId }); },
+  setAuth: (userId) => { devLog('🔑 setAuth:', userId); set({ userId }); },
   setTwinName: (name) => set({ twinName: name }),
-  setTwinGender: (gender) => { console.log('👤 setTwinGender:', gender); set({ twinGender: gender }); },
+  setTwinGender: (gender) => { devLog('👤 setTwinGender:', gender); set({ twinGender: gender }); },
   setTwinStyle: (style) => set({ twinStyle: style }),
-  setEnergy: (value) => set({ energy: Math.max(0, Math.min(value, 100)) }),
 
   incrementDailyMessage: (tokenCount = 0) => set((state) => {
     const now = Date.now();
     const newMessages = state.dailyMessagesUsed + 1;
-    const newTokens = state.dailyTokensUsed + tokenCount;
+    const newTokens = state.dailyTokensUsed + Math.max(0, tokenCount);
     
     const msgPercent = Math.min(1, newMessages / state.dailyMessagesLimit);
     const tokenPercent = Math.min(1, newTokens / state.dailyTokensLimit);
     const usedPercent = (msgPercent * 0.6) + (tokenPercent * 0.4);
     const newEnergy = Math.max(0, Math.round((1 - usedPercent) * 100));
     
-    console.log('⚡ Energy:', newEnergy, '| Messages:', newMessages, '| Tokens:', newTokens);
+    devLog('⚡ Energy:', newEnergy, '| Messages:', newMessages, '| Tokens:', newTokens);
     
     return {
       dailyMessagesUsed: newMessages,
@@ -253,7 +256,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
       const today = new Date().toISOString().split('T')[0];
       
       if (state.lastResetDate !== today) {
-        console.log('🔄 Resetting daily energy after 20h...');
+        devLog('🔄 Resetting daily energy after 20h...');
         set({
           dailyMessagesUsed: 0,
           dailyTokensUsed: 0,
@@ -301,14 +304,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     }
     
     const newTotalMinutes = state.totalMinutes + minutes;
-    const newTotalMessages = state.totalMessages;
-    
-    const msgFactor = Math.min(1, newTotalMessages / 500) * 40;
-    const timeFactor = Math.min(1, newTotalMinutes / 300) * 30;
-    const memoryFactor = Math.min(1, state.memoryCount / 50) * 20;
-    const streakFactor = Math.min(1, newStreak / 30) * 10;
-    
-    const newBond = Math.min(100, msgFactor + timeFactor + memoryFactor + streakFactor);
+    const newBond = get().computeBond();
     
     const badges = [...state.badges];
     if (newBond >= 20 && !badges.includes('acquaintance')) badges.push('acquaintance');
@@ -319,10 +315,10 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
     if (newStreak >= 7 && !badges.includes('week_streak')) badges.push('week_streak');
     if (newStreak >= 30 && !badges.includes('month_streak')) badges.push('month_streak');
     
-    console.log('💕 Bond:', Math.round(newBond), '| Streak:', newStreak, '| Memories:', state.memoryCount);
+    devLog('💕 Bond:', newBond, '| Streak:', newStreak, '| Memories:', state.memoryCount);
     
     return {
-      bondLevel: Math.round(newBond),
+      bondLevel: newBond,
       streakDays: newStreak,
       lastInteractionDate: now,
       totalMinutes: newTotalMinutes,
@@ -332,22 +328,17 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
 
   addMemory: () => set((state) => {
     const newCount = state.memoryCount + 1;
-    const msgFactor = Math.min(1, state.totalMessages / 500) * 40;
-    const timeFactor = Math.min(1, state.totalMinutes / 300) * 30;
-    const memoryFactor = Math.min(1, newCount / 50) * 20;
-    const streakFactor = Math.min(1, state.streakDays / 30) * 10;
-    const newBond = Math.min(100, msgFactor + timeFactor + memoryFactor + streakFactor);
-    
-    return { memoryCount: newCount, bondLevel: Math.round(newBond) };
+    const newBond = get().computeBond();
+    return { memoryCount: newCount, bondLevel: newBond };
   }),
 
-  calculateBond: () => {
+  computeBond: () => {
     const state = get();
     const msgFactor = Math.min(1, state.totalMessages / 500) * 40;
     const timeFactor = Math.min(1, state.totalMinutes / 300) * 30;
     const memoryFactor = Math.min(1, state.memoryCount / 50) * 20;
     const streakFactor = Math.min(1, state.streakDays / 30) * 10;
-    return Math.min(100, msgFactor + timeFactor + memoryFactor + streakFactor);
+    return clamp(Math.round(msgFactor + timeFactor + memoryFactor + streakFactor), 0, 100);
   },
 
   getVoiceConfig: () => {
@@ -378,7 +369,7 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   },
 
   updateBond: (newBond) => set((state) => {
-    const safeBond = Math.max(0, Math.min(newBond, 100));
+    const safeBond = clamp(Math.round(newBond), 0, 100);
     const badges = [...state.badges];
     if (safeBond >= 40 && !badges.includes('friend')) badges.push('friend');
     if (safeBond >= 60 && !badges.includes('trusted')) badges.push('trusted');
@@ -405,10 +396,12 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
       journeyPhase: msg.journeyPhase || undefined, relationshipStage: msg.relationshipStage || undefined,
       memoryRecall: msg.memoryRecall || undefined, thinkingStage: msg.thinkingStage || undefined,
       youtubeVideo: msg.youtubeVideo || undefined, provider: msg.provider || undefined,
-    }].slice(-200) 
+    }].slice(-200)
   })),
 
   clearHistory: () => set({ chatHistory: [] }),
+
+  restoreChatHistory: (messages: ChatMessage[]) => set({ chatHistory: messages.slice(-200) }),
   toggleCalmMode: () => set((s) => ({ calmMode: !s.calmMode })),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
   setLang: (lang) => set({ lang }),
@@ -436,25 +429,30 @@ export const useTwinStore = create<TwinStore>()(persist((set, get) => ({
   setStreakDays: (val) => set({ streakDays: val }),
   setDailyMessagesUsed: (val) => set({ dailyMessagesUsed: val }),
   setDailyMessagesLimit: (val) => set({ dailyMessagesLimit: val }),
-  setTwinEnergy: (val) => set({ twinEnergy: val }),
+  setTwinEnergy: (val) => set({ twinEnergy: clamp(Math.round(val), 0, 100) }),
+
+  setEnergy: (val: number) => set({ twinEnergy: clamp(Math.round(val), 0, 100) }),
   setPersonalityTraits: (traits) => set({ personalityTraits: traits }),
   setFavoriteTopics: (topics) => set({ favoriteTopics: topics }),
   setPreferredResponseLength: (len) => set({ preferredResponseLength: len }),
   setTonePreference: (tone) => set({ tonePreference: tone }),
 
   triggerHaptic: () => { 
-    if (!get().calmMode) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+    if (!get().calmMode && Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
   },
   
   logout: () => set({ ...initialState, chatHistory: [] }),
 }), {
   name: 'mytwin-store',
+  version: STORE_VERSION,
   storage: createJSONStorage(() => AsyncStorage),
   partialize: (state) => ({
     userId: state.userId, twinName: state.twinName, twinGender: state.twinGender,
     twinStyle: state.twinStyle, bondLevel: state.bondLevel, relationshipDims: state.relationshipDims,
     subscriptionTier: state.subscriptionTier,
-    energy: state.energy, emotionState: state.emotionState,
+    emotionState: state.emotionState,
     journeyPhase: state.journeyPhase, attachmentStyle: state.attachmentStyle,
     calmMode: state.calmMode, theme: state.theme, lang: state.lang,
     tier: state.tier, points: state.points, badges: state.badges,

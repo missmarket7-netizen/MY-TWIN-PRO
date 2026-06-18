@@ -1,6 +1,7 @@
 import { View, Image, Text, StyleSheet, Animated } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
+import { useTwinStore } from '../store/useTwinStore';
 
 const LOGO = require('../assets/icon.png');
 
@@ -67,7 +68,9 @@ export default function Splash() {
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        router.replace('/login');
+        // ✅ تنقل ذكي حسب حالة المستخدم
+        const hasUser = useTwinStore.getState().userId;
+        router.replace(hasUser ? '/welcome' : '/login');
       });
     }, 4500);
 
@@ -109,7 +112,7 @@ export default function Splash() {
         styles.copy,
         { opacity: copyOpacity }
       ]}>
-        2026©
+        © 2026 SOULSYNC
       </Animated.Text>
     </View>
   );

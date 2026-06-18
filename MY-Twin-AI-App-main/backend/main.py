@@ -412,16 +412,42 @@ async def generate_image(prompt: str = "A beautiful sunset", uid: str = Depends(
         if not image_key:
             return {"status": "error", "message": "Image API key not configured"}
         client = genai.Client(api_key=image_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        if response.parts and hasattr(response.parts[0], 'inline_data'):
-            return {"status": "success", "image_base64": response.parts[0].inline_data.data}
+        
+        # محاولة توليد الصورة باستخدام نموذج الصور المتاح
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp-image-generation",
+                contents=prompt,
+            )
+            if response.parts and hasattr(response.parts[0], 'inline_data'):
+                return {"status": "success", "image_base64": response.parts[0].inline_data.data}
+        except Exception as img_error:
+            logger.warning(f"Image model failed: {img_error}")
+            # Fallback: نص يصف الصورة بدلاً منها
+            fallback_prompt = f"""صف بصرياً وبالتفصيل كيف ستبدو هذه الصورة: {prompt}
+اجعل الوصف غنياً بالألوان والتفاصيل البصرية.
+أضف إيموجي مناسب في النهاية."""
+            try:
+                desc_response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=fallback_prompt,
+                    config={"max_output_tokens": 300, "temperature": 0.9}
+                )
+                if desc_response and desc_response.text:
+                    return {
+                        "status": "fallback_description",
+                        "description": desc_response.text,
+                        "message": "تم توليد وصف للصورة بدلاً منها (نموذج الصور غير متاح مؤقتاً)"
+                    }
+            except Exception as desc_error:
+                logger.warning(f"Fallback description also failed: {desc_error}")
+        
         return {"status": "error", "message": "No image generated"}
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         error_msg = str(e)
         if "quota" in error_msg.lower() or "resource_exhausted" in error_msg.lower():
             return JSONResponse(status_code=429, content={"status": "quota_exceeded", "message": "طاقة الصور استنفدت، جرب لاحقاً 💜"})
+        if "not found" in error_msg.lower() or "not supported" in error_msg.lower():
+            return {"status": "error", "message": "نموذج الصور غير متاح حالياً. جرب لاحقاً."}
         return {"status": "error", "message": error_msg}

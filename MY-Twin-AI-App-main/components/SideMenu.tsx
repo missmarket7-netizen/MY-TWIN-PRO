@@ -51,7 +51,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
     router.push('/chat');
   };
 
-  // ✅ مؤشر الطاقة مرتبط بـ twinEnergy
+  // مؤشر الطاقة
   const energy = Math.max(0, Math.min(100, twinEnergy || 100));
   
   const getEnergyColor = (val: number) => {
@@ -80,7 +80,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
   };
 
   const menuItems = [
-    { icon: Home, label: t('الرئيسية', 'Home'), route: '/chat' },
+    { icon: Home, label: t('الرئيسية', 'Home'), route: '/welcome' },
     { icon: PlusCircle, label: t('دردشة جديدة', 'New Chat'), onPress: startNewChat },
     { icon: Heart, label: t('علاقتي', 'My Relationship'), route: '/relationship' },
     { icon: Clock, label: t('سجل المحادثات', 'Chat History'), route: '/history' },
@@ -93,27 +93,30 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
   ];
 
   // دعم RTL/LTR كامل
-  const itemDirection = isAr ? 'row-reverse' : 'row';
+  const flexDirection = isAr ? 'row-reverse' : 'row';
   const textAlign = isAr ? 'right' : 'left';
   const closeBtnAlign = isAr ? 'flex-start' : 'flex-end';
   const activeBorderSide = isAr ? 'borderRightWidth' : 'borderLeftWidth';
   const activeBorderColor = isAr ? 'borderRightColor' : 'borderLeftColor';
+  const sidebarPosition = isAr ? { right: 0 } : { left: 0 };
 
   return (
     <ScrollView 
-      style={[styles.container, { paddingTop: insets.top + 20, backgroundColor: colors.bg }]} 
+      style={[
+        styles.container, 
+        { paddingTop: insets.top + 20, backgroundColor: colors.bg, alignItems: isAr ? 'flex-end' : 'flex-start' }
+      ]} 
       contentContainerStyle={{ paddingBottom: 40 }} 
       keyboardShouldPersistTaps="handled"
     >
       <TouchableOpacity 
         style={[styles.closeBtn, { alignSelf: closeBtnAlign }]} 
         onPress={onClose}
-        accessibilityLabel={t('إغلاق القائمة', 'Close menu')}
       >
         <X size={24} stroke={colors.primary} />
       </TouchableOpacity>
       
-      <View style={[styles.userCard, { borderBottomColor: colors.border, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.userCard, { borderBottomColor: colors.border, flexDirection }]}>
         <View style={styles.avatar}>
           <Sparkles size={28} stroke={colors.accent} />
         </View>
@@ -121,13 +124,13 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
           <Text style={[styles.userName, { color: colors.text, textAlign }]}>
             {twinName || t('توأمك', 'Your Twin')}
           </Text>
-          <View style={[styles.bondRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.bondRow, { flexDirection }]}>
             <Heart size={14} stroke={colors.bond} fill={colors.bond} />
             <Text style={[styles.bondValue, { color: colors.bond }]}>
               {t('رابطة', 'Bond')} {Math.round(bondLevel)}%
             </Text>
           </View>
-          <View style={[styles.energyRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.energyRow, { flexDirection }]}>
             {energyIcon}
             <Text style={[styles.energyValue, { color: colors.energyFill }]}>
               {Math.round(energy)}%
@@ -140,13 +143,8 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
       </View>
 
       <TouchableOpacity 
-        style={[
-          styles.backToChatBtn, 
-          { flexDirection: isAr ? 'row-reverse' : 'row' }, 
-          isDark && { backgroundColor: '#A855F722' }
-        ]} 
+        style={[styles.backToChatBtn, { flexDirection }, isDark && { backgroundColor: '#A855F722' }]} 
         onPress={() => navigate('/chat')}
-        accessibilityLabel={t('العودة للمحادثة', 'Back to Chat')}
       >
         <ArrowRight size={18} stroke={colors.accent} />
         <Text style={[styles.backToChatText, { color: colors.accent }]}>
@@ -156,7 +154,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
 
       {menuItems.map((item, idx) => {
         const Icon = item.icon;
-        const active = item.route ? (pathname === item.route || (item.route === '/chat' && pathname === '/')) : false;
+        const active = item.route ? (pathname === item.route) : false;
         const onPress = item.onPress || (item.route ? () => navigate(item.route) : () => {});
         
         return (
@@ -164,7 +162,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
             key={item.route || item.label} 
             style={[
               styles.item, 
-              { flexDirection: itemDirection }, 
+              { flexDirection }, 
               active && { 
                 backgroundColor: '#F3F0FF', 
                 [activeBorderSide]: 3, 
@@ -172,7 +170,6 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
               }
             ]} 
             onPress={onPress}
-            accessibilityLabel={item.label}
           >
             <Icon size={20} stroke={active ? colors.accent : colors.primary} />
             <Text style={[
@@ -187,7 +184,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
       })}
 
       <TouchableOpacity 
-        style={[styles.item, { flexDirection: itemDirection }, { marginTop: 20 }]} 
+        style={[styles.item, { flexDirection }, { marginTop: 20 }]} 
         onPress={() => {
           Alert.alert(
             t('تسجيل الخروج', 'Logout'), 
@@ -205,7 +202,6 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
             ]
           );
         }}
-        accessibilityLabel={t('تسجيل الخروج', 'Logout')}
       >
         <LogOut size={20} stroke={colors.danger} />
         <Text style={[styles.itemLabel, { color: colors.danger, textAlign }]}>
