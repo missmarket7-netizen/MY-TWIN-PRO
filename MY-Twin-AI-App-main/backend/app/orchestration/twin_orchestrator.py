@@ -2,7 +2,7 @@ import os, random, logging, time, asyncio
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.infrastructure.ai.provider_router import MultiAIClient, AIUnavailable
-from emotional_engine import EmotionalStateTracker
+from app.twin_state.emotional_service import EmotionalService
 from dialect_engine import get_dialect_for_user, get_dialect_prompt
 from reasoning_engine import ReasoningEngine
 from memory_graph import store_mem, extract_entities

@@ -6,7 +6,7 @@ MyTwin – Emotional Timeline v2.0 (متوافق مع Emotional Engine v8.0)
 import os, logging, asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone, timedelta
-from emotional_engine import EmotionalStateTracker
+from app.twin_state.emotional_service import EmotionalStateTracker
 
 logger = logging.getLogger(__name__)
 
