@@ -1,20 +1,24 @@
 """
-MyTwin API v12.1.0 – Complete Digital Twin Backend (Production Ready)
+MyTwin API v12.3.0 – Main Entry Point
+جميع نقاط النهاية في ملف واحد.
 """
-import logging, os, time
-from fastapi import FastAPI, Request
+import logging, sys, os
+
+# تأكد من أن مجلد backend في مسار Python
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# ========== الإعدادات والمراقبة ==========
 from app.core.config import config
 from app.observability.logging_service import setup_logging
 from app.infrastructure.monitoring.sentry_config import init_sentry
-from app.middleware.security_audit import security_audit
 
-# Import all route modules
+# ========== المسارات ==========
 from app.api.routes.chat import router as chat_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.profile import router as profile_router
@@ -35,40 +39,11 @@ setup_logging()
 init_sentry()
 
 logger = logging.getLogger("mytwin")
-logger.info("🚀 MyTwin API v12.1.0 starting...")
+logger.info("🚀 MyTwin API v12.3.0 starting...")
 
-app = FastAPI(title="MyTwin API", version="12.1.0")
+app = FastAPI(title="MyTwin API", version="12.3.0")
 
-# Global Security Middleware
-@app.middleware("http")
-async def security_middleware(request: Request, call_next):
-    # 1. Input sanitization for all routes
-    if request.method in ["POST", "PUT", "PATCH"]:
-        try:
-            body = await request.json()
-            for key, value in body.items():
-                if isinstance(value, str):
-                    threat = security_audit.scan_payload(value)
-                    if threat:
-                        return JSONResponse(status_code=400, content={"detail": threat})
-        except:
-            pass
-    # 2. Correlation ID for observability
-    request_id = request.headers.get("X-Request-ID", str(time.time()))
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    return response
-
-# Global Exception Handler (never leak internal errors)
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": security_audit.safe_error(exc)}
-    )
-
-# CORS
+# ========== CORS ==========
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
@@ -77,32 +52,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register all routes
-app.include_router(chat_router)
-app.include_router(auth_router)
-app.include_router(profile_router)
-app.include_router(memories_router)
-app.include_router(goals_router)
-app.include_router(feedback_router)
-app.include_router(referral_router)
-app.include_router(onboarding_router)
-app.include_router(account_router)
-app.include_router(push_router)
-app.include_router(tasks_router)
-app.include_router(calendar_router)
-app.include_router(ads_router)
-app.include_router(features_router)
-app.include_router(telegram_router)
+# ========== تسجيل كل المسارات ==========
+app.include_router(chat_router)          # /api/chat, /api/chat/stream
+app.include_router(auth_router)          # /api/auth/login, /api/auth/signup
+app.include_router(profile_router)        # /api/profile, /api/moods
+app.include_router(memories_router)       # /api/memories
+app.include_router(goals_router)          # /api/goals
+app.include_router(feedback_router)       # /api/feedback
+app.include_router(referral_router)       # /api/referral/*
+app.include_router(onboarding_router)     # /api/onboarding
+app.include_router(account_router)        # /api/account, /api/me/export
+app.include_router(push_router)           # /api/push-token
+app.include_router(tasks_router)          # /api/tasks
+app.include_router(calendar_router)       # /api/calendar/*
+app.include_router(ads_router)            # /api/ads/*
+app.include_router(features_router)       # /api/features/* (study, code, business, coach, image, dream, content, smart-home)
+app.include_router(telegram_router)       # /api/telegram/*
 
+# ========== فحص الصحة ==========
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "12.1.0", "name": "MyTwin Digital Twin API"}
+    return {"status": "ok", "version": "12.3.0", "name": "MyTwin API"}
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "12.1.0"}
+    return {"status": "healthy", "version": "12.3.0"}
 
+# ========== بدء التشغيل ==========
 @app.on_event("startup")
 async def startup():
     await setup_webhook()
-    logger.info("✅ MyTwin API v12.1.0 ready")
+    logger.info("✅ MyTwin API v12.3.0 ready – جميع المسارات نشطة")

@@ -11,7 +11,7 @@ from app.infrastructure.ai.self_critic import self_critic
 from app.infrastructure.ai.prompt_builder import prompt_builder
 from app.infrastructure.ai.dialect_service import get_dialect_for_user, get_dialect_prompt
 from app.domain.services.safety_service import check_safety, sanitize_input
-from app.domain.services.cost_service import get_best_provider
+from app.domain.services.cost_service import get_best_model, get_fallback_models, get_tier_limits
 from app.twin_state.relationship_service import detect_intent, load as load_relationship, update as update_relationship
 from app.twin_state.attachment_service import detect as detect_attachment, get_adjustments
 from app.twin_state.emotional_service import emotional_service

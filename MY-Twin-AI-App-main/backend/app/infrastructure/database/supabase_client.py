@@ -1,29 +1,27 @@
-"""
-MyTwin – Supabase Client (Singleton)
-=====================================
-عميل Supabase الوحيد في المشروع كله.
-يستخدم SERVICE_KEY (خاص، لا يُكشف أبداً).
-"""
-import logging
-from app.core.config import config
+"""Singleton Supabase client – the ONLY file that imports supabase-py."""
+import os, logging
+from supabase import create_client, Client
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("supabase_client")
 
-_db: Client = None
-
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+_db: Client | None = None
 
 def get_db() -> Client:
-    """
-    جلب عميل Supabase (نمط Singleton).
-    يُنشأ مرة واحدة ويعاد استخدامه.
-    """
     global _db
-    
     if _db is None:
-        if not config.SUPABASE_URL or not config.SUPABASE_SERVICE_KEY:
-            raise RuntimeError("❌ SUPABASE_URL و SUPABASE_SERVICE_KEY مطلوبان")
-        
-        _db = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
-        logger.info("✅ Supabase client initialized")
-    
+        if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY are required")
+        _db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        logger.info("Supabase client initialized")
     return _db
+
+async def get_profile(user_id: str) -> dict:
+    db = get_db()
+    try:
+        result = db.table("profiles").select("*").eq("id", user_id).execute()
+        return result.data[0] if result.data else {}
+    except Exception as e:
+        logger.error(f"Failed to fetch profile: {e}")
+        return {}

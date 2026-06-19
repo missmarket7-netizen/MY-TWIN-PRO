@@ -133,3 +133,12 @@ class MultiAIClient:
 
     async def health_check_all_providers(self):
         return await provider_router.health_check_all()
+
+# ========== OpenRouter Free Models ==========
+OPENROUTER_FREE_MODELS = [
+    "meta-llama/llama-4-maverick",      # عام، تفكير عميق
+    "qwen/qwen-2.5-72b-instruct",      # برمجة، تحليل
+    "deepseek/deepseek-v4-flash",       # برمجة، تلخيص
+    "mistralai/mistral-7b-instruct",    # محادثة سريعة
+    "google/gemma-4-9b",               # محادثة عامة
+]
