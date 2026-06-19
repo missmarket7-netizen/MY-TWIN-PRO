@@ -2,10 +2,10 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Act
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useTwinStore } from '../store/useTwinStore';
-import { sendChatFromStore } from '../lib/api';
+import { streamChat } from '../lib/httpClient';
 import {
   MessageSquare, Target, Heart, Music, Cloud, Newspaper,
-  Sparkles, Lightbulb, Brain, Zap
+  Sparkles, Zap
 } from 'lucide-react-native';
 
 const QUICK_STARTERS = [
@@ -16,8 +16,6 @@ const QUICK_STARTERS = [
     bgColor: '#7C3AED15',
     label_ar: 'دردشة حرة',
     label_en: 'Free Chat',
-    desc_ar: 'ابدأ محادثة مفتوحة مع توأمك',
-    desc_en: 'Start an open conversation with your Twin',
     message_ar: 'مرحباً! أنا مستعد للدردشة معك 💜',
     message_en: 'Hello! Ready to chat with you 💜',
   },
@@ -28,8 +26,6 @@ const QUICK_STARTERS = [
     bgColor: '#F59E0B15',
     label_ar: 'تحديد هدف',
     label_en: 'Set a Goal',
-    desc_ar: 'خطط لأهدافك مع توأمك',
-    desc_en: 'Plan your goals with your Twin',
     message_ar: 'دعنا نخطط لأهدافك! ما الذي تريد تحقيقه؟ 🎯',
     message_en: "Let's plan your goals! What do you want to achieve? 🎯",
   },
@@ -40,8 +36,6 @@ const QUICK_STARTERS = [
     bgColor: '#EC489915',
     label_ar: 'دعم نفسي',
     label_en: 'Emotional Support',
-    desc_ar: 'تحدث عن مشاعرك بحرية',
-    desc_en: 'Talk about your feelings freely',
     message_ar: 'أنا هنا لدعمك والاستماع لك 🫶',
     message_en: "I'm here to support and listen to you 🫶",
   },
@@ -52,8 +46,6 @@ const QUICK_STARTERS = [
     bgColor: '#10B98115',
     label_ar: 'موسيقى',
     label_en: 'Music',
-    desc_ar: 'اكتشف موسيقى تناسب مزاجك',
-    desc_en: 'Discover music that fits your mood',
     message_ar: 'ما نوع الموسيقى الذي يعجبك اليوم؟ 🎵',
     message_en: 'What kind of music do you like today? 🎵',
   },
@@ -64,8 +56,6 @@ const QUICK_STARTERS = [
     bgColor: '#3B82F615',
     label_ar: 'الطقس',
     label_en: 'Weather',
-    desc_ar: 'اعرف حالة الطقس في مدينتك',
-    desc_en: 'Check the weather in your city',
     message_ar: 'دعني أتحقق من الطقس لك ☀️',
     message_en: 'Let me check the weather for you ☀️',
   },
@@ -76,8 +66,6 @@ const QUICK_STARTERS = [
     bgColor: '#6366F115',
     label_ar: 'أخبار',
     label_en: 'News',
-    desc_ar: 'ابق على اطلاع بآخر الأخبار',
-    desc_en: 'Stay updated with the latest news',
     message_ar: 'هل تريد معرفة آخر الأخبار؟ 📰',
     message_en: 'Do you want to know the latest news? 📰',
   },
@@ -88,8 +76,6 @@ export default function HomeScreen() {
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
   const [loading, setLoading] = useState<string | null>(null);
-
-  const t = (ar: string, en: string) => (isAr ? ar : en);
 
   const bg = isDark ? '#1A1A1A' : '#F8F6F2';
   const txt = isDark ? '#FFF' : '#1A1A1A';
@@ -110,15 +96,12 @@ export default function HomeScreen() {
         timestamp: Date.now(),
       });
 
-      const response = await sendChatFromStore(userMessage);
-      
+      const twinMsgId = `twin-${Date.now()}`;
       addMessage({
-        id: `twin-${Date.now()}`,
+        id: twinMsgId,
         role: 'twin',
-        content: response.reply,
+        content: '',
         timestamp: Date.now(),
-        emotion: response.emotion?.primary,
-        provider: response.provider || 'multi_ai',
       });
 
       router.push('/chat');
@@ -144,22 +127,19 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <Sparkles size={28} stroke="#7C3AED" />
           <Text style={[styles.title, { color: txt }]}>
-            {t('مرحباً بك في', 'Welcome to')}
+            {isAr ? 'مرحباً بك في' : 'Welcome to'}
           </Text>
           <Text style={[styles.appName, { color: '#7C3AED' }]}>
             MyTwin
           </Text>
           <Text style={[styles.subtitle, { color: sub }]}>
-            {t(
-              'رفيقك الذكي - اختر كيف تريد أن تبدأ',
-              'Your AI companion - choose how to start'
-            )}
+            {isAr ? 'رفيقك الذكي - اختر كيف تريد أن تبدأ' : 'Your AI companion - choose how to start'}
           </Text>
         </View>
 
         {twinName && twinName !== 'توأمك' ? (
           <Text style={[styles.twinName, { color: sub }]}>
-            {twinName} {t('في انتظارك', 'is waiting for you')} 💜
+            {twinName} {isAr ? 'في انتظارك' : 'is waiting for you'} 💜
           </Text>
         ) : null}
 
@@ -170,13 +150,7 @@ export default function HomeScreen() {
             return (
               <TouchableOpacity
                 key={starter.id}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: card,
-                    borderColor: border,
-                  },
-                ]}
+                style={[styles.card, { backgroundColor: card, borderColor: border }]}
                 onPress={() => handleQuickStart(starter)}
                 disabled={!!loading}
                 activeOpacity={0.7}
@@ -189,10 +163,7 @@ export default function HomeScreen() {
                   )}
                 </View>
                 <Text style={[styles.cardTitle, { color: txt }]}>
-                  {t(starter.label_ar, starter.label_en)}
-                </Text>
-                <Text style={[styles.cardDesc, { color: sub }]}>
-                  {t(starter.desc_ar, starter.desc_en)}
+                  {isAr ? starter.label_ar : starter.label_en}
                 </Text>
               </TouchableOpacity>
             );
@@ -205,7 +176,7 @@ export default function HomeScreen() {
         >
           <Zap size={20} stroke="#FFF" />
           <Text style={styles.directChatText}>
-            {t('انتقل مباشرة للمحادثة', 'Go directly to chat')}
+            {isAr ? 'انتقل مباشرة للمحادثة' : 'Go directly to chat'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -239,7 +210,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
-  cardDesc: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
   directChat: {
     flexDirection: 'row',
     alignItems: 'center',

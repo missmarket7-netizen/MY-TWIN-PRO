@@ -1,11 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform, Alert } from 'react-native';
-import { supabase } from './supabase';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as Sentry from '@sentry/react-native';
+import { updatePushToken } from './httpClient';
 
-// ✅ معالج الإشعارات الأمامية
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -15,9 +14,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/**
- * تسجيل الجهاز للحصول على Push Token وتخزينه في Supabase
- */
 export async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
     Sentry.captureMessage('⚠️ الإشعارات تحتاج جهازاً حقيقياً', 'warning');
@@ -41,19 +37,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
     const projectId = 'b5e2baa3-6015-40a5-9f31-115298d3b0c9';
     const token = await Notifications.getExpoPushTokenAsync({ projectId });
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const { error } = await supabase.from('profiles').update({
-        push_token: token.data,
-        device_platform: Platform.OS,
-        push_token_updated_at: new Date().toISOString(),
-      }).eq('id', session.user.id);
-
-      if (error) {
-        Sentry.captureException(error);
-      } else {
-        console.log('✅ Push Token مخزن بنجاح');
-      }
+    if (token.data) {
+      await updatePushToken(token.data, Platform.OS);
+      console.log('✅ Push Token مخزن بنجاح');
     }
 
     return token.data;
@@ -63,9 +49,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-/**
- * معالجة الإشعارات الواردة والتنقل عند الضغط
- */
 export function setupNotificationHandlers() {
   Notifications.addNotificationResponseReceivedListener(response => {
     const data = response.notification.request.content.data;
@@ -86,9 +69,6 @@ export function setupNotificationHandlers() {
   });
 }
 
-/**
- * إعداد قنوات الإشعارات (Android)
- */
 export async function setupAndroidChannels() {
   if (Platform.OS === 'android') {
     try {

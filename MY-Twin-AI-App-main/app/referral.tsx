@@ -1,22 +1,10 @@
-import {
-  SafeAreaView, View, Text, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Share, ActivityIndicator, ScrollView, RefreshControl
-} from 'react-native';
+import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, Share, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { useTwinStore } from '../store/useTwinStore';
-import { API } from '../lib/api';
-import { supabase } from '../lib/supabase';
+import { generateReferralCode, activateReferralCode, getReferralStats } from '../lib/httpClient';
 import Header from '../components/Header';
 import { Stack } from 'expo-router';
-import {
-  Gift, Copy, Share2, Users, Zap, Crown, CheckCircle2,
-  UserPlus, Sparkles, TrendingUp, ArrowRight, Ticket
-} from 'lucide-react-native';
-
-interface ReferralStats {
-  invitedCount: number;
-  earnedTokens: number;
-}
+import { Gift, Copy, Share2, Users, Zap, Crown, CheckCircle2, UserPlus, Sparkles, ArrowRight, Ticket } from 'lucide-react-native';
 
 const REWARD_TIERS = [
   { count: 5, reward_ar: 'أسبوع Premium', reward_en: 'Premium Week', icon: Zap, color: '#F59E0B' },
@@ -25,15 +13,14 @@ const REWARD_TIERS = [
 ];
 
 export default function Referral() {
-  const { lang, theme, userId } = useTwinStore();
-  const isAr = lang === 'ar';
-  const isDark = theme === 'dark';
+  const { lang, theme } = useTwinStore();
+  const isAr = lang === 'ar'; const isDark = theme === 'dark';
   const t = (ar: string, en: string) => (isAr ? ar : en);
 
   const [code, setCode] = useState('');
   const [myCode, setMyCode] = useState('');
   const [myLink, setMyLink] = useState('');
-  const [stats, setStats] = useState<ReferralStats>({ invitedCount: 0, earnedTokens: 0 });
+  const [stats, setStats] = useState({ invitedCount: 0, earnedTokens: 0 });
   const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [loadingActivate, setLoadingActivate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,19 +34,15 @@ export default function Referral() {
   const primary = isDark ? '#D8B4FE' : '#6B21A8';
 
   const fetchReferralData = useCallback(async (showRefresh = false) => {
-    if (!userId) return;
     if (showRefresh) setRefreshing(true);
     try {
-      const { data: profile } = await supabase.from('profiles').select('referral_code').eq('id', userId).single();
-      if (profile?.referral_code) {
-        setMyCode(profile.referral_code);
-        setMyLink(`https://mytwin.app/join?ref=${profile.referral_code}`);
-      }
-      const { data: referrals, error } = await supabase.from('referral_usage').select('id, activated_at').eq('inviter_id', userId);
-      if (!error && referrals) {
+      const data = await getReferralStats();
+      if (data) {
+        setMyCode(data.code || '');
+        setMyLink(data.link || '');
         setStats({
-          invitedCount: referrals.length,
-          earnedTokens: referrals.length * 500,
+          invitedCount: data.invitedCount || 0,
+          earnedTokens: data.earnedTokens || 0,
         });
       }
     } catch (e) {
@@ -67,17 +50,14 @@ export default function Referral() {
     } finally {
       if (showRefresh) setRefreshing(false);
     }
-  }, [userId]);
+  }, []);
 
-  useEffect(() => {
-    fetchReferralData();
-  }, [fetchReferralData]);
+  useEffect(() => { fetchReferralData(); }, [fetchReferralData]);
 
-  const generateCode = async () => {
-    if (!userId) return;
+  const handleGenerateCode = async () => {
     setLoadingGenerate(true);
     try {
-      const { data } = await API.post('/api/referral/generate');
+      const data = await generateReferralCode();
       if (data.code) {
         setMyCode(data.code);
         setMyLink(`https://mytwin.app/join?ref=${data.code}`);
@@ -89,20 +69,16 @@ export default function Referral() {
     }
   };
 
-  const activateCode = async () => {
+  const handleActivateCode = async () => {
     if (!code.trim() || code.trim().length < 6) {
-      Alert.alert(t('خطأ', 'Error'), t('أدخل كوداً صحيحاً (6 أحرف على الأقل).', 'Enter a valid code (min 6 chars).'));
+      Alert.alert(t('خطأ', 'Error'), t('أدخل كوداً صحيحاً.', 'Enter a valid code.'));
       return;
     }
-    if (!userId) return;
     setLoadingActivate(true);
     try {
-      const { data } = await API.post('/api/referral/activate', { code: code.trim().toUpperCase() });
+      const data = await activateReferralCode(code.trim().toUpperCase());
       if (data.success) {
-        Alert.alert(
-          t('🎉 تم!', '🎉 Success!'),
-          t(`حصلت على ${data.bonus_tokens || 500} توكن!`, `You earned ${data.bonus_tokens || 500} tokens!`)
-        );
+        Alert.alert(t('🎉 تم!', '🎉 Success!'), t(`حصلت على ${data.bonus || 500} توكن!`, `You earned ${data.bonus || 500} tokens!`));
         setCode('');
         fetchReferralData(true);
       } else {
@@ -140,21 +116,13 @@ export default function Referral() {
     }
   };
 
-  const onRefresh = () => fetchReferralData(true);
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <Header />
-
-      <ScrollView
-        contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6B21A8']} />}
-      >
+      <ScrollView contentContainerStyle={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchReferralData(true)} colors={['#6B21A8']} />}>
         <Text style={[styles.title, { color: txt }]}>{t('نظام الدعوات', 'Referral System')}</Text>
-        <Text style={[styles.subtitle, { color: sub }]}>
-          {t('ادعُ أصدقاءك واربح مكافآت!', 'Invite friends and earn rewards!')}
-        </Text>
+        <Text style={[styles.subtitle, { color: sub }]}>{t('ادعُ أصدقاءك واربح مكافآت!', 'Invite friends and earn rewards!')}</Text>
 
         <View style={[styles.statsCard, { backgroundColor: card, borderColor: border }]}>
           <View style={styles.statItem}>
@@ -187,10 +155,9 @@ export default function Referral() {
                   <Text style={styles.actionBtnText}>{t('مشاركة', 'Share')}</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.link, { color: sub }]} numberOfLines={1}>{myLink}</Text>
             </>
           ) : (
-            <TouchableOpacity style={[styles.generateBtn, { backgroundColor: primary }]} onPress={generateCode} disabled={loadingGenerate}>
+            <TouchableOpacity style={[styles.generateBtn, { backgroundColor: primary }]} onPress={handleGenerateCode} disabled={loadingGenerate}>
               {loadingGenerate ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <Ticket size={20} stroke="#FFF" />
@@ -204,20 +171,8 @@ export default function Referral() {
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
           <Text style={[styles.sectionTitle, { color: txt }]}>{t('تفعيل كود صديق', 'Activate a Friend Code')}</Text>
           <View style={[styles.activateRow, isAr && { flexDirection: 'row-reverse' }]}>
-            <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt, borderColor: border }]}
-              placeholder="MTXXXXXX"
-              placeholderTextColor={sub}
-              value={code}
-              onChangeText={setCode}
-              autoCapitalize="characters"
-              maxLength={10}
-            />
-            <TouchableOpacity
-              style={[styles.activateBtn, { backgroundColor: code.trim().length >= 6 ? '#6B21A8' : border }]}
-              onPress={activateCode}
-              disabled={loadingActivate || code.trim().length < 6}
-            >
+            <TextInput style={[styles.input, { backgroundColor: isDark ? '#333' : '#F8F6F2', color: txt, borderColor: border }]} placeholder="MTXXXXXX" placeholderTextColor={sub} value={code} onChangeText={setCode} autoCapitalize="characters" maxLength={10} />
+            <TouchableOpacity style={[styles.activateBtn, { backgroundColor: code.trim().length >= 6 ? '#6B21A8' : border }]} onPress={handleActivateCode} disabled={loadingActivate || code.trim().length < 6}>
               {loadingActivate ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <ArrowRight size={18} stroke="#FFF" />
@@ -235,24 +190,12 @@ export default function Referral() {
             const achieved = stats.invitedCount >= tier.count;
             return (
               <View key={i} style={[styles.tierRow, { borderColor: border }]}>
-                <View style={[styles.tierIcon, { backgroundColor: tier.color + '20' }]}>
-                  <Icon size={20} stroke={tier.color} />
-                </View>
+                <View style={[styles.tierIcon, { backgroundColor: tier.color + '20' }]}><Icon size={20} stroke={tier.color} /></View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.tierReward, { color: txt }]}>
-                    {t(`ادعُ ${tier.count} أصدقاء`, `Invite ${tier.count} Friends`)}
-                  </Text>
-                  <Text style={[styles.tierDesc, { color: sub }]}>
-                    {t(`احصل على ${tier.reward_ar}`, `Get ${tier.reward_en}`)}
-                  </Text>
+                  <Text style={[styles.tierReward, { color: txt }]}>{t(`ادعُ ${tier.count} أصدقاء`, `Invite ${tier.count} Friends`)}</Text>
+                  <Text style={[styles.tierDesc, { color: sub }]}>{t(`احصل على ${tier.reward_ar}`, `Get ${tier.reward_en}`)}</Text>
                 </View>
-                {achieved ? (
-                  <CheckCircle2 size={22} stroke="#10B981" />
-                ) : (
-                  <Text style={[styles.tierProgress, { color: sub }]}>
-                    {stats.invitedCount}/{tier.count}
-                  </Text>
-                )}
+                {achieved ? <CheckCircle2 size={22} stroke="#10B981" /> : <Text style={[styles.tierProgress, { color: sub }]}>{stats.invitedCount}/{tier.count}</Text>}
               </View>
             );
           })}
@@ -263,8 +206,7 @@ export default function Referral() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  container: { padding: 20, paddingBottom: 40 },
+  safe: { flex: 1 }, container: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 24 },
   statsCard: { flexDirection: 'row', padding: 20, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
@@ -279,7 +221,6 @@ const styles = StyleSheet.create({
   codeActions: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12 },
   actionBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  link: { fontSize: 13, textAlign: 'center' },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, borderRadius: 14 },
   generateBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   activateRow: { flexDirection: 'row', gap: 10 },

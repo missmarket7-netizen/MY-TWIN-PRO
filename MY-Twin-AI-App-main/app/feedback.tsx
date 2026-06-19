@@ -1,25 +1,29 @@
 import { SafeAreaView, View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
-import { supabase } from '../lib/supabase';
+import { getFeedback } from '../lib/httpClient';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { ThumbsUp, ThumbsDown, ArrowLeft } from 'lucide-react-native';
 
 export default function FeedbackDashboard() {
-  const { lang, theme, userId } = useTwinStore();
+  const { lang, theme } = useTwinStore();
   const isAr = lang === 'ar'; const isDark = theme === 'dark';
   const t = (ar: string, en: string) => isAr ? ar : en;
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
     (async () => {
-      const { data } = await supabase.from('message_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50);
-      if (data) setFeedbacks(data);
-      setLoading(false);
+      try {
+        const data = await getFeedback();
+        if (data) setFeedbacks(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [userId]);
+  }, []);
 
   const bg = isDark ? '#1A1A1A' : '#F8F6F2';
   const card = isDark ? '#2A2A2A' : '#FFF';

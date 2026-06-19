@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/react-native';
-import { Stack, useRouter, usePathname } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useMemo } from "react";
-import { Pressable, StyleSheet, Animated, Modal, useWindowDimensions, TouchableOpacity, Text } from "react-native";
+import { Pressable, StyleSheet, Animated, Modal, useWindowDimensions } from "react-native";
 import { useTwinStore } from "../store/useTwinStore";
 import { initAnalytics } from "../lib/analytics";
 import SideMenu from "../components/SideMenu";
@@ -58,14 +58,40 @@ export default function RootLayout() {
           <Stack.Screen name="chat" />
           <Stack.Screen name="login" />
           <Stack.Screen name="onboarding" />
+          {/* الشاشات الأساسية */}
+          <Stack.Screen name="relationship" />
+          <Stack.Screen name="memories" />
+          <Stack.Screen name="mood" />
+          <Stack.Screen name="history" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen name="customize" />
+          <Stack.Screen name="subscription" />
+          <Stack.Screen name="referral" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="help" />
+          <Stack.Screen name="about" />
+          <Stack.Screen name="privacy" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="feedback" />
+          {/* شاشات الميزات الجديدة */}
+          <Stack.Screen name="features/index" />
+          <Stack.Screen name="features/study-mode" />
+          <Stack.Screen name="features/code-lab" />
+          <Stack.Screen name="features/business-analyzer" />
+          <Stack.Screen name="features/life-coach" />
+          <Stack.Screen name="features/image-creator" />
+          <Stack.Screen name="features/dreams" />
+          <Stack.Screen name="features/content-creator" />
+          <Stack.Screen name="features/smart-home" />
+          <Stack.Screen name="features/task-manager" />
         </Stack>
 
         {menuVisible && (
           <Modal visible transparent animationType="none" onRequestClose={closeMenu}>
-            <Pressable style={styles.overlay} onPress={closeMenu}>
+            <Pressable style={st.overlay} onPress={closeMenu}>
               <Animated.View
                 style={[
-                  styles.sidebar,
+                  st.sidebar,
                   {
                     backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
                     width: drawerWidth,
@@ -84,7 +110,7 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sidebar: { position: 'absolute', top: 0, bottom: 0, shadowColor: "#000", shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 15 },
 });

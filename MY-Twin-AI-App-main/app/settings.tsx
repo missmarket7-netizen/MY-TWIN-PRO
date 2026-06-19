@@ -3,8 +3,8 @@ import { router, Href } from 'expo-router';
 import { useState, useMemo } from 'react';
 import { useTwinStore } from '../store/useTwinStore';
 import Header from '../components/Header';
-import { supabase } from '../lib/supabase';
-import { API } from '../lib/api';
+import { deleteAccount, exportData } from '../lib/httpClient';
+import { removeToken } from '../lib/auth';
 import {
   Moon, Sun, Globe, Crown, HeartPulse, Shield, Download, LogOut, Trash2, Phone,
   BrainCircuit, Database, Cpu, HardDrive, Sparkles, Zap, HelpCircle, Info
@@ -54,13 +54,54 @@ export default function Settings() {
 
   const aiStats = useMemo(() => ({ models: 8, memories: Math.floor(bondLevel * 10), daily: 87, latency: '560ms' }), [bondLevel]);
 
-  const logout = async () => { setLoggingOut(true); try { await supabase.auth.signOut(); storeLogout(); router.replace('/login'); } catch { Alert.alert('Error', 'Logout failed'); } finally { setLoggingOut(false); } };
+  const logout = async () => {
+    setLoggingOut(true);
+    try {
+      await removeToken();
+      storeLogout();
+      router.replace('/login');
+    } catch {
+      Alert.alert('Error', 'Logout failed');
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
-  const deleteAccount = () => Alert.alert(t.deleteTitle, t.deleteMsg, [{ text: t.cancel, style: 'cancel' }, { text: t.confirmDelete, style: 'destructive', onPress: async () => { setDeleting(true); try { await API.delete('/api/account'); await supabase.auth.signOut(); storeLogout(); router.replace('/login'); } catch { Alert.alert(t.deleteTitle, t.deleteFail); } finally { setDeleting(false); } } }]);
+  const handleDeleteAccount = () => Alert.alert(t.deleteTitle, t.deleteMsg, [
+    { text: t.cancel, style: 'cancel' },
+    { text: t.confirmDelete, style: 'destructive', onPress: async () => {
+      setDeleting(true);
+      try {
+        await deleteAccount();
+        await removeToken();
+        storeLogout();
+        router.replace('/login');
+      } catch {
+        Alert.alert(t.deleteTitle, t.deleteFail);
+      } finally {
+        setDeleting(false);
+      }
+    }}
+  ]);
 
-  const handleExport = async () => { setExporting(true); try { const { data } = await API.get('/api/me/export'); await Share.share({ message: JSON.stringify(data, null, 2), title: t.exportTitle }); } catch { Alert.alert(t.exportTitle, t.exportFail); } finally { setExporting(false); } };
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const data = await exportData();
+      await Share.share({ message: JSON.stringify(data, null, 2), title: t.exportTitle });
+    } catch {
+      Alert.alert(t.exportTitle, t.exportFail);
+    } finally {
+      setExporting(false);
+    }
+  };
 
-  const handleEmergency = async () => { const url = 'https://findahelpline.com'; const supported = await Linking.canOpenURL(url); if (supported) await Linking.openURL(url); else Alert.alert('Error', t.emergencyFail); };
+  const handleEmergency = async () => {
+    const url = 'https://findahelpline.com';
+    const supported = await Linking.canOpenURL(url);
+    if (supported) await Linking.openURL(url);
+    else Alert.alert('Error', t.emergencyFail);
+  };
 
   const menuItems = [
     { icon: Crown, label: t.upgrade, onPress: () => router.push('/subscription' as Href) },
@@ -134,7 +175,7 @@ export default function Settings() {
           </TouchableOpacity>
 
           <MenuButton Icon={LogOut} label={t.logout} onPress={logout} isDark={isDark} color="outline" loading={loggingOut} />
-          <MenuButton Icon={Trash2} label={t.delete} onPress={deleteAccount} isDark={isDark} color="danger" loading={deleting} />
+          <MenuButton Icon={Trash2} label={t.delete} onPress={handleDeleteAccount} isDark={isDark} color="danger" loading={deleting} />
         </View>
       </ScrollView>
     </SafeAreaView>

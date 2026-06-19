@@ -3,7 +3,6 @@
  * دوال مساعدة لحفظ واسترجاع الذكريات من Supabase.
  * مع Validation كامل، معالجة أخطاء، وتسجيل.
  */
-import { supabase } from '../lib/supabase';
 
 // ── الثوابت ──────────────────────────────────────
 const MAX_CONTENT_LENGTH = 300;

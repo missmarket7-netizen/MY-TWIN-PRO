@@ -8,12 +8,20 @@
     "restartPolicyMaxRetries": 10,
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
-    "command": "cd backend && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    "startCommand": "cd backend && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 --log-level info"
   },
   "cron": {
     "proactive-check": {
       "schedule": "*/30 * * * *",
       "command": "curl -s -X POST https://$RAILWAY_PUBLIC_DOMAIN/cron/proactive -H 'X-Cron-Key: $CRON_SECRET_KEY'"
+    },
+    "daily-summary": {
+      "schedule": "0 9 * * *",
+      "command": "curl -s -X POST https://$RAILWAY_PUBLIC_DOMAIN/api/proactive/trigger -H 'Authorization: Bearer $SYSTEM_API_KEY'"
     }
+  },
+  "env": {
+    "ENVIRONMENT": "production",
+    "PYTHONUNBUFFERED": "1"
   }
 }

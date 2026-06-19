@@ -1,11 +1,8 @@
-import {
-  SafeAreaView, View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Animated, Alert, ActivityIndicator, TextInput, Modal
-} from 'react-native';
+import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { router } from 'expo-router';
 import { useTwinStore, TwinGender } from '../store/useTwinStore';
-import { supabase } from '../lib/supabase';
+import { completeOnboarding } from '../lib/httpClient';
 import { Sparkles, ArrowLeft, ArrowRight, Check, Volume2 } from 'lucide-react-native';
 
 const QUESTIONS = {
@@ -29,88 +26,10 @@ const QUESTIONS = {
   ],
 };
 
-const TRAIT_INFO: Record<string, { ar: string; en: string; emoji: string; color: string; description: { ar: string; en: string } }> = {
-  analytical: { 
-    ar: 'تحليلي', en: 'Analytical', emoji: '🧠', color: '#3B82F6',
-    description: { ar: 'تميل للتفكير المنطقي والتحليل العميق قبل اتخاذ القرارات.', en: 'You tend toward logical thinking and deep analysis before making decisions.' }
-  },
-  emotional: { 
-    ar: 'عاطفي', en: 'Emotional', emoji: '❤️', color: '#EC4899',
-    description: { ar: 'تعتمد على مشاعرك وحدسك في فهم العالم من حولك.', en: 'You rely on your feelings and intuition to understand the world around you.' }
-  },
-  social: { 
-    ar: 'اجتماعي', en: 'Social', emoji: '🤝', color: '#10B981',
-    description: { ar: 'تجد طاقتك في العلاقات والتواصل مع الآخرين.', en: 'You find your energy in relationships and connecting with others.' }
-  },
-  independent: { 
-    ar: 'مستقل', en: 'Independent', emoji: '🦅', color: '#F59E0B',
-    description: { ar: 'تقدر حريتك الشخصية وتميل للاعتماد على نفسك.', en: 'You value your personal freedom and tend to rely on yourself.' }
-  },
-  ambitious: { 
-    ar: 'طموح', en: 'Ambitious', emoji: '🚀', color: '#8B5CF6',
-    description: { ar: 'تسعى دائماً لتحقيق الأهداف وترك بصمة في العالم.', en: 'You always strive to achieve goals and leave a mark on the world.' }
-  },
-  calm: { 
-    ar: 'هادئ', en: 'Calm', emoji: '😌', color: '#6366F1',
-    description: { ar: 'تسعى للسلام الداخلي والتوازن في حياتك.', en: 'You seek inner peace and balance in your life.' }
-  },
-};
-
-function generatePersonalitySummary(answers: Record<string, string>, lang: string) {
-  const isAr = lang === 'ar';
-  
-  const traitMap: Record<string, Record<string, string[]>> = {
-    ar: {
-      analytical: ['أحللها بهدوء','منجزاً ومليئاً بالمهام','أبحث عن حل مباشر','الذكاء والدهاء'],
-      emotional: ['أثق بحدسي','قضاء وقت مع الأحباء','أحياناً أقلق من فقدانهم','أتحدث مع أحدهم','السعادة العائلية'],
-      social: ['أطلب المساعدة','مستقرة وداعمة','مع العائلة والأصدقاء','أستمتع بها لكن أحتاج مساحتي','التأثير في العالم'],
-      independent: ['أتجنبها مؤقتاً','أفضل الاعتماد على نفسي','أبقى وحدي لأفكر','أشغل نفسي بشيء آخر','تحقيق السلام الداخلي','الحرية الشخصية'],
-      ambitious: ['تحقيق إنجاز','النجاح المهني','منجزاً ومليئاً بالمهام','أبحث عن حل مباشر'],
-      calm: ['أشغل نفسي بشيء آخر','في الطبيعة أو أسترخي','الراحة والاسترخاء'],
-    },
-    en: {
-      analytical: ['Analyze it calmly','Productive and full of tasks','Look for a direct solution','Intelligence and cleverness'],
-      emotional: ['Trust my intuition','Spending time with loved ones','Sometimes I worry about losing them','Talk to someone','Family happiness'],
-      social: ['Ask for help','Stable and supportive','With family and friends','I enjoy them but need my space','Making an impact on the world'],
-      independent: ['Avoid it temporarily','I prefer to rely on myself','Stay alone to think','Distract myself with something else','Achieving inner peace','Personal freedom'],
-      ambitious: ['Achieving a goal','Professional success','Productive and full of tasks','Look for a direct solution'],
-      calm: ['Distract myself with something else','In nature or relaxing','Rest and relaxation'],
-    },
-  };
-  
-  const map = traitMap[lang] || traitMap['ar'];
-  const traits: Record<string, number> = { analytical:0, emotional:0, social:0, independent:0, ambitious:0, calm:0 };
-  Object.values(answers).forEach(ans => { for (const [trait, options] of Object.entries(map)) { if (options.includes(ans)) traits[trait] += 2; } });
-  const sorted = Object.entries(traits).sort((a,b) => b[1] - a[1]);
-  
-  const dominant = sorted[0][0];
-  const secondary = sorted[1][0];
-  const dInfo = TRAIT_INFO[dominant];
-  const sInfo = TRAIT_INFO[secondary];
-  
-  let summary: string;
-  
-  if (isAr) {
-    summary = `أنت شخصية ${dInfo.ar} بشكل أساسي، مع طابع ${sInfo.ar} ثانوي. ${dInfo.description.ar} في الوقت نفسه، ${sInfo.description.ar} هذه المزيج يجعلك فريداً في طريقة تعاملك مع الحياة والآخرين.`;
-  } else {
-    summary = `You are primarily an ${dInfo.en} personality, with a secondary ${sInfo.en} trait. ${dInfo.description.en} At the same time, ${sInfo.description.en} This unique blend shapes how you approach life and relationships.`;
-  }
-  
-  return { 
-    traits, 
-    dominant, 
-    secondary, 
-    summary,
-    dominantInfo: dInfo,
-    secondaryInfo: sInfo
-  };
-}
-
 export default function Onboarding() {
   const { userId, twinName, twinGender, setTwinName, setTwinGender, addMessage, lang, theme } = useTwinStore();
   const isAr = lang === 'ar'; const isDark = theme === 'dark';
   const questions = QUESTIONS[lang as keyof typeof QUESTIONS] || QUESTIONS['ar'];
-
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [userName, setUserName] = useState('');
@@ -118,8 +37,6 @@ export default function Onboarding() {
   const [newTwinName, setNewTwinName] = useState(twinName || (isAr ? 'توأمك' : 'Your Twin'));
   const [newTwinGender, setNewTwinGender] = useState<TwinGender>(twinGender || 'female');
   const [loading, setLoading] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [showAnalysis, setShowAnalysis] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => { Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start(); }, [step]);
@@ -138,72 +55,20 @@ export default function Onboarding() {
     if (!userName.trim()) { Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'من فضلك أدخل اسمك' : 'Please enter your name'); return; }
     setLoading(true);
     try {
-      let analysis = generatePersonalitySummary(answers, lang);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        try {
-          const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/analyze-personality`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ answers, lang, userName: userName.trim() })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.summary) {
-              analysis = { ...analysis, summary: data.summary };
-            }
-          }
-        } catch {}
-      }
-
-      setAnalysisResult(analysis);
+      await completeOnboarding({
+        answers,
+        lang,
+        userName: userName.trim(),
+        twinName: newTwinName.trim(),
+        twinGender: newTwinGender,
+        freeInfo,
+      });
       setTwinName(newTwinName.trim() || (isAr ? 'توأمك' : 'Your Twin'));
       setTwinGender(newTwinGender);
-      
-      const { error } = await supabase.from('profiles').upsert({
-        id: userId, 
-        twin_name: newTwinName.trim() || (isAr ? 'توأمك' : 'Your Twin'),
-        twin_gender: newTwinGender,
-        full_name: userName.trim(), 
-        onboarded: true,
-        personality_analysis: analysis,
-        free_info: freeInfo,
-      });
-      if (error) throw error;
-
-      const memoryContent = isAr
-        ? `تحليل شخصية ${userName.trim()}: ${analysis.summary}`
-        : `Personality analysis for ${userName.trim()}: ${analysis.summary}`;
-      
-      await supabase.from('memories').insert({
-        user_id: userId,
-        content: memoryContent,
-        importance: 0.9,
-        emotion: 'neutral',
-        memory_type: 'core'
-      });
-      
-      setShowAnalysis(true);
-    } catch (e: any) { 
-      console.error('❌ فشل:', e);
-      Alert.alert(isAr ? 'خطأ' : 'Error', e.message || (isAr ? 'فشل الحفظ' : 'Save failed')); 
-    } finally { setLoading(false); }
-  };
-
-  const handleContinueToChat = () => {
-    setShowAnalysis(false);
-    const analysis = analysisResult;
-    if (!analysis) { router.replace('/chat'); return; }
-    
-    const genderEmoji = newTwinGender === 'male' ? '♂️' : '♀️';
-    
-    const welcomeMsg = isAr
-      ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'} ${genderEmoji}\n\n**تحليل شخصيتك:**\n\n${analysis.summary}\n\nأنا هنا لمساعدتك في رحلتك. اسألني أي شيء! 💜`
-      : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'} ${genderEmoji}\n\n**Your Personality Analysis:**\n\n${analysis.summary}\n\nI'm here to help you on your journey. Ask me anything! 💜`;
-    
-    addMessage({ role: 'twin', content: welcomeMsg, id: Math.random().toString(36).substr(2,9)+Date.now().toString(36), timestamp: Date.now() });
-    router.replace('/chat');
+      addMessage({ role: 'twin', content: isAr ? `🎯 مرحباً ${userName.trim()}!\n\nأنا ${newTwinName.trim() || 'توأمك'} 💜` : `🎯 Welcome ${userName.trim()}!\n\nI'm ${newTwinName.trim() || 'Your Twin'} 💜`, id: Date.now().toString(), timestamp: Date.now() });
+      router.replace('/chat');
+    } catch (e: any) { Alert.alert(isAr ? 'خطأ' : 'Error', e.message); }
+    finally { setLoading(false); }
   };
 
   const currentQ = questions[step];
@@ -242,28 +107,12 @@ export default function Onboarding() {
           </>)}
         </Animated.View>
       </ScrollView>
-      <Modal visible={showAnalysis} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isDark && { backgroundColor:'#2A2A2A' }]}>
-            <Sparkles size={40} stroke="#A855F7" style={{ alignSelf:'center', marginBottom:16 }} />
-            <Text style={[styles.modalTitle, isDark && { color:'#FFF' }]}>{isAr ? 'تم تحليل شخصيتك!' : 'Your Personality Analysis!'}</Text>
-            {analysisResult && (<>
-              <View style={styles.summaryContainer}>
-                <Text style={[styles.summaryText, isDark && { color:'#FFF' }]}>{analysisResult.summary}</Text>
-              </View>
-              <Text style={[styles.modalSubtext, isDark && { color:'#CCC' }]}>{isAr ? 'فهم شخصيتك يساعدني في أن أكون أقرب إليك 💜' : 'Understanding your personality helps me be closer to you 💜'}</Text>
-            </>)}
-            <TouchableOpacity style={styles.modalBtn} onPress={handleContinueToChat}><Check size={20} stroke="#FFF" /><Text style={styles.modalBtnText}>{isAr ? 'ابدأ المحادثة' : 'Start Chat'}</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
+  safe: { flex: 1 }, scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   card: { backgroundColor: '#FFF', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#F0F0F0', elevation: 2 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   progressBar: { flexDirection: 'row', gap: 6 },
@@ -289,26 +138,4 @@ const styles = StyleSheet.create({
   textArea: { backgroundColor: '#F8F6F2', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A', borderWidth: 1, borderColor: '#E0D9F5', minHeight: 100, textAlignVertical: 'top', marginBottom: 20 },
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B21A8', padding: 16, borderRadius: 12, gap: 8 },
   submitText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalCard: { backgroundColor: '#FFF', borderRadius: 24, padding: 28, margin: 24, alignItems: 'center' },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#1A1A1A', textAlign: 'center', marginBottom: 20 },
-  summaryContainer: { 
-    backgroundColor: '#F8F6F2', 
-    borderRadius: 16, 
-    padding: 20, 
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6B21A8',
-    width: '100%'
-  },
-  summaryText: { 
-    fontSize: 15, 
-    color: '#1A1A1A', 
-    textAlign: 'center',
-    lineHeight: 24,
-    fontWeight: '500'
-  },
-  modalSubtext: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
-  modalBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B21A8', padding: 16, borderRadius: 14, gap: 8, width: '100%' },
-  modalBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });

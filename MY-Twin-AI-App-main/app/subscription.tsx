@@ -7,8 +7,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initIAP, getProducts, purchaseSubscription, restorePurchases, TIER_MAP } from '../lib/iapService';
 import { Tier, useTwinStore } from '../store/useTwinStore';
 import Header from '../components/Header';
-import { CheckCircle2, Crown, Shield } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { CheckCircle2, Crown, Shield, Sparkles, GraduationCap, Code2, TrendingUp, Heart, Image as ImageIcon, Moon, PenLine, Home } from 'lucide-react-native';
+import { verifyReceipt } from '../lib/httpClient';
 
 interface StoreProduct {
   productId: string;
@@ -19,10 +19,6 @@ interface StoreProduct {
   description: string;
 }
 
-const TIER_RANK: Record<string, number> = {
-  free: 0, plus: 1, premium: 2, pro: 3, yearly: 4,
-};
-
 interface Plan {
   id: Tier;
   name: string;
@@ -32,42 +28,105 @@ interface Plan {
   trialDays: number;
   tagline: string;
   consciousnessLayers: number;
-  features: string[];
+  features: { icon?: any; text: string }[];
   popular?: boolean;
+  highlight?: boolean;
 }
 
 const PLANS: Plan[] = [
   {
-    id: 'free', name: 'Free', defaultPrice: '0', defaultPeriod: 'للأبد',
-    trialDays: 0, tagline: 'ابدأ رحلتك مع توأمك', consciousnessLayers: 1,
-    features: ['طبقة وعي واحدة', '15 رسالة يومياً', 'ذاكرة 3 أيام', 'عربي وإنجليزي']
+    id: 'free',
+    name: 'Free',
+    defaultPrice: '0',
+    defaultPeriod: 'للأبد',
+    trialDays: 0,
+    tagline: 'ابدأ رحلتك مع توأمك',
+    consciousnessLayers: 1,
+    features: [
+      { text: '١٠ رسائل يومياً' },
+      { text: 'ذاكرة ٣ أيام' },
+      { text: 'محادثة أساسية' },
+      { text: 'استخدام مرة واحدة للميزات' },
+      { text: 'يوتيوب، طقس، أخبار' },
+    ],
   },
   {
-    id: 'plus', name: 'Plus', defaultPrice: '9', defaultPeriod: '/شهر',
-    trialDays: 5, tagline: 'توأم يفهمك أكثر كل يوم', consciousnessLayers: 2,
+    id: 'plus',
+    name: 'Plus',
+    defaultPrice: '$5.99',
+    defaultPeriod: '/شهر',
+    trialDays: 5,
+    tagline: 'توأم يفهمك أكثر كل يوم',
+    consciousnessLayers: 2,
     productId: 'plus_monthly',
-    features: ['طبقتا وعي', '50 رسالة يومياً', 'ذاكرة 30 يوم', 'التحدث بصوتك', 'إشعارات يومية', 'تخصيص التوأم']
+    features: [
+      { text: '٣٠ رسالة يومياً' },
+      { text: 'ذاكرة ٣٠ يوم' },
+      { icon: GraduationCap, text: 'مذاكرة ذكية (٥/يوم)' },
+      { icon: PenLine, text: 'كتابة محتوى (٥/يوم)' },
+      { icon: ImageIcon, text: 'إنشاء صور (٣/يوم)' },
+      { icon: Moon, text: 'تفسير أحلام' },
+    ],
   },
   {
-    id: 'premium', name: 'Premium', defaultPrice: '19', defaultPeriod: '/شهر',
-    trialDays: 3, tagline: 'وعي حقيقي يرافقك', consciousnessLayers: 3,
+    id: 'premium',
+    name: 'Premium',
+    defaultPrice: '$14.99',
+    defaultPeriod: '/شهر',
+    trialDays: 3,
+    tagline: 'وعي حقيقي يرافقك',
+    consciousnessLayers: 3,
     productId: 'premium_monthly',
-    features: ['3 طبقات وعي', '150 رسالة يومياً', 'ذاكرة 6 أشهر', 'تحليل أحلامك', 'تدريب حياتي', 'موسيقى وترفيه', 'تقويم ذكي']
+    features: [
+      { text: '١٠٠ رسالة يومياً' },
+      { text: 'ذاكرة ٩٠ يوم' },
+      { icon: GraduationCap, text: 'مذاكرة ذكية (٢٠/يوم)' },
+      { icon: Code2, text: 'مختبر برمجة (١٠/يوم)' },
+      { icon: TrendingUp, text: 'تحليل أعمال (١٠/يوم)' },
+      { icon: Heart, text: 'مدرب حياة كامل' },
+      { icon: ImageIcon, text: 'إنشاء صور (١٠/يوم)' },
+      { text: 'صوت ElevenLabs' },
+    ],
+    popular: true,
   },
   {
-    id: 'pro', name: 'Pro', defaultPrice: '110', defaultPeriod: '/6 أشهر',
-    trialDays: 0, tagline: 'توأم بوعي متكامل', consciousnessLayers: 4,
+    id: 'pro',
+    name: 'Pro',
+    defaultPrice: '$110',
+    defaultPeriod: '/٦ أشهر',
+    trialDays: 0,
+    tagline: 'توأم بوعي متكامل',
+    consciousnessLayers: 4,
     productId: 'pro_semiannual',
-    features: ['4 طبقات وعي', '500 رسالة يومياً', 'ذاكرة عميقة', 'منزل ذكي', 'إدارة البريد', 'كاميرا مفتوحة']
+    features: [
+      { text: '٥٠٠ رسالة يومياً' },
+      { text: 'ذاكرة سنة كاملة' },
+      { text: 'كل الميزات بدون حدود' },
+      { icon: Home, text: 'منزل ذكي مفتوح' },
+      { text: 'صوت ElevenLabs فاخر' },
+      { text: 'أقصى سرعة وأداء' },
+    ],
   },
   {
-    id: 'yearly', name: 'Yearly', defaultPrice: '199', defaultPeriod: '/سنة',
-    trialDays: 0, popular: true, tagline: 'أعمق محاكاة للوعي', consciousnessLayers: 5,
+    id: 'yearly',
+    name: 'Yearly',
+    defaultPrice: '$199',
+    defaultPeriod: '/سنة',
+    trialDays: 0,
+    tagline: 'أعمق محاكاة للوعي',
+    consciousnessLayers: 5,
     productId: 'yearly_annual',
-    features: ['5 طبقات وعي كاملة', 'رسائل غير محدودة', 'ذاكرة دائمة', 'وعي استباقي', 'كل الميزات', 'أقصى سرعة', 'دعم VIP']
+    features: [
+      { text: 'رسائل غير محدودة' },
+      { text: 'ذاكرة دائمة' },
+      { text: 'كل الميزات ∞' },
+      { text: 'وعي استباقي كامل' },
+      { text: 'دعم VIP مباشر' },
+      { text: 'أولوية في كل شيء' },
+    ],
+    highlight: true,
   },
 ];
-
 function ConsciousnessBar({ layers, planId }: { layers: number; planId: string }) {
   const colors: Record<string, string> = {
     free: '#94A3B8', plus: '#F59E0B', premium: '#3B82F6', pro: '#8B5CF6', yearly: '#6B21A8'
@@ -111,10 +170,7 @@ export default function SubscriptionScreen() {
     let cancelled = false;
     const init = async () => {
       try {
-        if (!iapInitialized.current) {
-          await initIAP();
-          iapInitialized.current = true;
-        }
+        if (!iapInitialized.current) { await initIAP(); iapInitialized.current = true; }
         const fetched = await getProducts();
         if (!cancelled) {
           setProducts(fetched.map((p: any) => ({ ...p, price: Number(p.price) || 0 })));
@@ -133,96 +189,24 @@ export default function SubscriptionScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  const getPlanDisplay = useCallback((plan: Plan) => {
-    const product = products.find(p => p.productId === plan.productId);
-    if (product) {
-      return { price: product.localizedPrice || `$${plan.defaultPrice}`, period: '', currency: product.currency, originalPrice: '' };
-    }
-    return { price: `$${plan.defaultPrice}`, period: plan.defaultPeriod, currency: 'USD', originalPrice: '' };
-  }, [products]);
-
-  const verifyReceipt = async (receipt: string, productId: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-receipt', {
-        body: { receipt, productId, platform: Platform.OS },
-      });
-      if (error) throw error;
-      return data?.valid === true;
-    } catch (e) {
-      console.warn('⚠️ فشل التحقق من الإيصال:', e);
-      return __DEV__ ? true : false;
-    }
-  };
-
-  const checkPaymentMethod = async (): Promise<boolean> => {
-    return iapAvailable && products.length > 0;
-  };
-
   const handlePurchase = async (plan: Plan) => {
     if (loadingId || !plan.productId) return;
-    if (plan.id === 'free') {
-      Alert.alert('Free', isAr ? 'أنت على الباقة المجانية.' : 'You are on the free plan.');
-      return;
-    }
-    if (!iapAvailable) {
-      Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'خدمة الشراء غير متاحة' : 'Purchase unavailable');
-      return;
-    }
-
-    if (plan.trialDays > 0) {
-      const hasPayment = await checkPaymentMethod();
-      if (!hasPayment) {
-        Alert.alert(
-          isAr ? 'وسيلة دفع مطلوبة' : 'Payment Method Required',
-          isAr
-            ? 'يجب إضافة وسيلة دفع لتفعيل الفترة التجريبية. سيتم خصم المبلغ بعد انتهاء التجربة في حال عدم الإلغاء.'
-            : 'A payment method is required to activate the trial. You will be charged after the trial ends unless cancelled.',
-          [
-            { text: isAr ? 'إلغاء' : 'Cancel', style: 'cancel' },
-            { text: isAr ? 'متابعة' : 'Continue', onPress: async () => await executePurchase(plan) },
-          ]
-        );
-        return;
-      }
-    }
-
-    await executePurchase(plan);
-  };
-
-  const executePurchase = async (plan: Plan) => {
-    if (!plan.productId) return;
+    if (plan.id === 'free') return;
     setLoadingId(plan.id);
     try {
       const purchaseResult = await purchaseSubscription(plan.productId);
-      if (!purchaseResult) throw new Error('Purchase failed');
-
-      if (typeof purchaseResult === 'string') {
+      if (purchaseResult) {
         const verified = await verifyReceipt(purchaseResult, plan.productId);
-        if (!verified) {
-          Alert.alert(
-            isAr ? 'فشل التحقق' : 'Verification Failed',
-            isAr ? 'تعذر التحقق من عملية الشراء. تم إلغاء العملية.' : 'Could not verify purchase. Transaction cancelled.'
-          );
-          return;
+        if (verified.valid) {
+          const newTier = TIER_MAP[plan.productId];
+          if (newTier) { updateTier(newTier as Tier); if (plan.trialDays > 0) setHasUsedTrial(true); }
+          Alert.alert('✅', isAr ? 'تم تفعيل اشتراكك' : 'Subscription activated');
+          router.back();
         }
       }
-
-      const newTier = TIER_MAP[plan.productId];
-      if (newTier) {
-        updateTier(newTier as Tier);
-        if (plan.trialDays > 0) setHasUsedTrial(true);
-        Alert.alert(isAr ? '✅ تم!' : '✅ Done!', isAr ? 'تم تفعيل اشتراكك بنجاح' : 'Subscription activated successfully');
-        router.back();
-      }
     } catch (e: any) {
-      const msg = e?.message || '';
-      if (msg.includes('cancelled') || msg.includes('Cancel')) {
-        return;
-      }
-      Alert.alert(isAr ? 'خطأ' : 'Error', msg || (isAr ? 'فشل الشراء' : 'Purchase failed'));
-    } finally {
-      setLoadingId(null);
-    }
+      if (!e?.message?.includes('cancelled')) Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'فشل الشراء' : 'Purchase failed');
+    } finally { setLoadingId(null); }
   };
 
   const handleRestore = async () => {
@@ -230,29 +214,28 @@ export default function SubscriptionScreen() {
     try {
       const purchases = await restorePurchases();
       if (purchases.length > 0) {
-        const best = purchases
-          .map(p => ({ ...p, rank: TIER_RANK[TIER_MAP[p.productId] || 'free'] || 0 }))
-          .sort((a, b) => b.rank - a.rank)[0];
+        const best = purchases.sort((a, b) => (TIER_MAP[b.productId] || 'free').length - (TIER_MAP[a.productId] || 'free').length)[0];
         const restoredTier = TIER_MAP[best.productId];
-        if (restoredTier) {
-          updateTier(restoredTier as Tier);
-          Alert.alert(isAr ? '✅ تم' : '✅ Done', isAr ? 'تم استعادة اشتراكك!' : 'Subscription restored!');
-          router.back();
-        }
-      } else {
-        Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'لم يتم العثور على اشتراك.' : 'No subscription found.');
-      }
-    } catch (e) {
-      Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'فشلت الاستعادة.' : 'Restore failed.');
-    } finally {
-      setLoadingId(null);
-    }
+        if (restoredTier) { updateTier(restoredTier as Tier); Alert.alert('✅', isAr ? 'تم استعادة اشتراكك!' : 'Subscription restored!'); router.back(); }
+      } else Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'لم يتم العثور على اشتراك.' : 'No subscription found.');
+    } catch (e) { Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'فشلت الاستعادة.' : 'Restore failed.'); }
+    finally { setLoadingId(null); }
   };
 
+  if (initLoading) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: bg }, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </SafeAreaView>
+    );
+  }
+
   const planCards = useMemo(() => PLANS.map((plan) => {
-    const { price, period } = getPlanDisplay(plan);
     const isCurrent = tier === plan.id;
-    const showTrial: boolean = plan.trialDays > 0 && !isCurrent && !hasUsedTrial;
+    const product = products.find(p => p.productId === plan.productId);
+    const price = product?.localizedPrice || plan.defaultPrice;
+    const period = plan.defaultPeriod;
+
     return (
       <TouchableOpacity
         key={plan.id}
@@ -265,11 +248,23 @@ export default function SubscriptionScreen() {
         onPress={() => handlePurchase(plan)}
         activeOpacity={0.85}
         disabled={!!loadingId || plan.id === 'free'}
-        accessibilityRole="button"
-        accessibilityLabel={`${plan.name} ${price}`}
       >
-        {plan.popular && <View style={[styles.badge, { backgroundColor: '#F59E0B' }]}><Text style={styles.badgeText}>{isAr ? 'الأفضل قيمة' : 'Best Value'}</Text></View>}
-        {showTrial && <View style={[styles.badge, styles.trialBadge]}><Text style={styles.badgeText}>{isAr ? `تجربة ${plan.trialDays} يوم` : `${plan.trialDays}-day trial`}</Text></View>}
+        {plan.popular && (
+          <View style={[styles.badge, { backgroundColor: '#F59E0B' }]}>
+            <Text style={styles.badgeText}>{isAr ? 'الأكثر شيوعاً' : 'Most Popular'}</Text>
+          </View>
+        )}
+        {plan.highlight && (
+          <View style={[styles.badge, { backgroundColor: '#8B5CF6' }]}>
+            <Text style={styles.badgeText}>{isAr ? 'أفضل قيمة' : 'Best Value'}</Text>
+          </View>
+        )}
+        {plan.trialDays > 0 && !isCurrent && (
+          <View style={[styles.badge, styles.trialBadge]}>
+            <Text style={styles.badgeText}>{isAr ? `تجربة ${plan.trialDays} يوم مجاناً` : `${plan.trialDays}-day free trial`}</Text>
+          </View>
+        )}
+
         <View style={styles.planHeader}>
           <Text style={[styles.planName, { color: txt }]}>{plan.name}</Text>
           <Text style={[styles.tagline, { color: primary }]}>{plan.tagline}</Text>
@@ -278,40 +273,37 @@ export default function SubscriptionScreen() {
             {period ? <Text style={[styles.planPeriod, { color: sub }]}>{period}</Text> : null}
           </View>
         </View>
+
         <ConsciousnessBar layers={plan.consciousnessLayers} planId={plan.id} />
+
         <View style={styles.featuresList}>
-          {plan.features.map((f, i) => (
-            <View key={i} style={styles.featureRow}>
-              <CheckCircle2 size={15} stroke="#10B981" />
-              <Text style={[styles.feature, { color: sub }]}>{f}</Text>
-            </View>
-          ))}
+          {plan.features.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <View key={i} style={styles.featureRow}>
+                {Icon ? <Icon size={14} stroke="#10B981" /> : <CheckCircle2 size={14} stroke="#10B981" />}
+                <Text style={[styles.feature, { color: sub }]}>{f.text}</Text>
+              </View>
+            );
+          })}
         </View>
+
         <View style={[styles.selectBtn, { backgroundColor: isCurrent ? '#10B981' : primary }]}>
           {loadingId === plan.id ? (
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
             <Text style={styles.selectBtnText}>
-              {isCurrent ? (isAr ? 'مفعّل' : 'Active') : (isAr ? 'ابدأ الآن' : 'Start Now')}
+              {isCurrent ? (isAr ? 'مفعّل' : 'Active') : plan.id === 'free' ? (isAr ? 'الحالي' : 'Current') : (isAr ? 'ابدأ الآن' : 'Start Now')}
             </Text>
           )}
         </View>
       </TouchableOpacity>
     );
-  }), [PLANS, getPlanDisplay, tier, loadingId, isDark, isAr, hasUsedTrial, card, border, primary, txt, sub]);
-
-  if (initLoading) {
-    return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: bg }, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={primary} />
-      </SafeAreaView>
-    );
-  }
+  }), [PLANS, products, tier, loadingId, isDark, isAr, card, border, primary, txt, sub]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <Header />
-
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.titleSection}>
           <Crown size={40} stroke={primary} style={{ alignSelf: 'center', marginBottom: 16 }} />

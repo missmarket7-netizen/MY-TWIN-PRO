@@ -20,7 +20,7 @@ export const COLORS = {
   light: {
     bg: '#FFFFFF', headerBg: '#FAFAFA', border: '#E8E8E8', text: '#1A1A1A',
     subtext: '#8E8E93', bubbleUser: '#7C3AED', userText: '#FFFFFF',
-    bubbleTwin: '#F5F5F7', twinText: '#1A1A1A',
+    twinText: '#1A1A1A',
     inputBg: '#F2F2F7', inputBorder: '#E5E5EA', sendActive: '#7C3AED',
     sendInactive: '#C7C7CC', retryColor: '#FF3B30', likeActive: '#34C759',
     dislikeActive: '#FF3B30', accent: '#7C3AED', codeBg: '#1C1C1E',
@@ -29,7 +29,7 @@ export const COLORS = {
   dark: {
     bg: '#000000', headerBg: '#1C1C1E', border: '#38383A', text: '#FFFFFF',
     subtext: '#8E8E93', bubbleUser: '#7C3AED', userText: '#FFFFFF',
-    bubbleTwin: '#1C1C1E', twinText: '#FFFFFF',
+    twinText: '#FFFFFF',
     inputBg: '#2C2C2E', inputBorder: '#38383A', sendActive: '#A78BFA',
     sendInactive: '#48484A', retryColor: '#FF453A', likeActive: '#30D158',
     dislikeActive: '#FF453A', accent: '#A78BFA', codeBg: '#0A0A0A',
@@ -57,15 +57,13 @@ const providerLabels: Record<string, { ar: string; en: string; icon: any }> = {
   safety_engine: { ar: 'أمان', en: 'Safety', icon: Shield },
 };
 
-// ✅ تم إصلاح MarkdownRenderer: useMemo للـ styles + تحسين الأداء
 export const MarkdownRenderer = memo(({ content, isDark }: { content: string; isDark: boolean }) => {
   const c = isDark ? COLORS.dark : COLORS.light;
-
   const markdownStyles: any = useMemo(() => ({
-    body: { color: c.twinText, fontSize: 16, lineHeight: 26, fontFamily: 'System' },
+    body: { color: c.twinText, fontSize: 16, lineHeight: 26 },
     paragraph: { marginBottom: 12, marginTop: 4 },
-    heading1: { fontSize: 24, fontWeight: '800', marginBottom: 16, marginTop: 8, color: c.accent, letterSpacing: -0.5 },
-    heading2: { fontSize: 20, fontWeight: '700', marginBottom: 12, marginTop: 8, color: c.accent, letterSpacing: -0.3 },
+    heading1: { fontSize: 24, fontWeight: '800', marginBottom: 16, marginTop: 8, color: c.accent },
+    heading2: { fontSize: 20, fontWeight: '700', marginBottom: 12, marginTop: 8, color: c.accent },
     heading3: { fontSize: 18, fontWeight: '700', marginBottom: 10, marginTop: 6, color: c.text },
     bullet_list: { marginBottom: 12, marginLeft: 8 },
     ordered_list: { marginBottom: 12, marginLeft: 8 },
@@ -74,132 +72,51 @@ export const MarkdownRenderer = memo(({ content, isDark }: { content: string; is
     thead: { backgroundColor: c.codeBg },
     th: { padding: 12, fontWeight: '700', color: c.text, fontSize: 14 },
     td: { padding: 12, color: c.subtext, fontSize: 14, borderTopWidth: 1, borderColor: c.tableBorder },
-    code_inline: { backgroundColor: c.codeBg, color: '#FF375F', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, fontSize: 14, fontFamily: 'Courier', fontWeight: '600' },
+    code_inline: { backgroundColor: c.codeBg, color: '#FF375F', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, fontSize: 14 },
     code_block: { backgroundColor: c.codeBg, padding: 16, borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: c.border },
     blockquote: { borderLeftWidth: 4, borderLeftColor: c.accent, paddingLeft: 16, paddingVertical: 12, marginVertical: 12, backgroundColor: c.blockquoteBg, borderRadius: 8 },
-    link: { color: c.link, textDecorationLine: 'none', fontWeight: '600' },
+    link: { color: c.link, fontWeight: '600' },
     strong: { fontWeight: '700', color: c.text },
     em: { fontStyle: 'italic', color: c.subtext },
-    image: { borderRadius: 12, marginVertical: 12, width: SCREEN_W - 80, height: 200 } as any,
   }), [isDark]);
 
-  // ✅ إصلاح: onLinkPress يُرجع boolean فوراً
   const handleLinkPress = (url: string): boolean => {
-    WebBrowser.openBrowserAsync(url, {
-      toolbarColor: isDark ? '#1C1C1E' : '#FFFFFF',
-      controlsColor: c.accent,
-    }).catch(() => {
-      Linking.openURL(url);
-    });
+    WebBrowser.openBrowserAsync(url).catch(() => Linking.openURL(url));
     return true;
   };
 
-  return (
-    <Markdown style={markdownStyles} onLinkPress={handleLinkPress}>
-      {content}
-    </Markdown>
-  );
+  return <Markdown style={markdownStyles} onLinkPress={handleLinkPress}>{content}</Markdown>;
 });
 
-// ✅ CopyToast مع إصلاح Memory Leak
-const CopyToast = memo(({ visible, isDark }: { visible: boolean; isDark: boolean }) => {
-  const [show, setShow] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
-
-  useEffect(() => {
-    if (visible) {
-      setShow(true);
-      timeoutRef.current = setTimeout(() => setShow(false), 2000);
-    } else {
-      setShow(false);
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [visible]);
-
-  if (!show) return null;
-  return (
-    <View style={[styles.toastContainer, { backgroundColor: isDark ? '#2C2C2E' : '#1C1C1E' }]}>
-      <Check size={16} stroke="#34C759" />
-      <Text style={styles.toastText}>تم النسخ</Text>
-    </View>
-  );
-});
-
-// ✅ UserBubble مع إصلاح Animated.Value + إصلاح onStartEdit(null)
-export const UserBubble = memo(({
-  item, isDark, isRTL, onStartEdit, onSaveEdit,
-  isEditing, editContent, setEditContent, onEditInInput, onCancelEdit,
-}: any) => {
+export const UserBubble = memo(({ item, isDark, isRTL }: any) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-  }, []);
-
+  useEffect(() => { Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start(); }, []);
   const c = isDark ? COLORS.dark : COLORS.light;
   const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <Animated.View style={[styles.userRow, { opacity: fadeAnim }]}>
-      <View style={styles.userRowInner}>
+      <View style={styles.userBubbleWrapper}>
         <View style={[styles.userBubble, { backgroundColor: c.bubbleUser }]}>
-          {item.image && (
-            <Image
-              source={{ uri: item.image?.startsWith('data:') ? item.image : `data:image/jpeg;base64,${item.image}` }}
-              style={styles.chatImage}
-              resizeMode="cover"
-            />
-          )}
-          {isEditing ? (
-            <View style={{ gap: 10 }}>
-              <TextInput
-                style={[styles.editInput, { color: '#FFF', borderColor: 'rgba(255,255,255,0.3)' }]}
-                value={editContent}
-                onChangeText={setEditContent}
-                multiline
-                autoFocus
-                placeholder="تعديل الرسالة..."
-                placeholderTextColor="rgba(255,255,255,0.5)"
-              />
-              <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
-                <TouchableOpacity onPress={onCancelEdit || (() => onStartEdit?.(null))} style={styles.editCancelBtn}>
-                  <Text style={{ color: '#FFF', fontSize: 13 }}>إلغاء</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onSaveEdit(item, editContent)} style={styles.editSaveBtn}>
-                  <Check size={16} stroke="#FFF" />
-                  <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>حفظ</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <Text style={[styles.userText, { color: '#FFF' }]}>{item.content}</Text>
-          )}
-
-          <View style={[styles.metaRow, { justifyContent: 'flex-start' }]}>
-            <Text style={[styles.timestamp, { color: 'rgba(255,255,255,0.6)' }]}>{time}</Text>
-            {!isEditing && (
-              <TouchableOpacity onPress={() => onEditInInput ? onEditInInput(item) : onStartEdit(item)} style={styles.editBtn}>
-                <Edit3 size={12} stroke="rgba(255,255,255,0.6)" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-        <View style={[styles.avatarSmall, { backgroundColor: c.bubbleUser }]}>
-          <UserIcon size={14} stroke="#FFF" />
+          {item.image && <Image source={{ uri: item.image?.startsWith('data:') ? item.image : `data:image/jpeg;base64,${item.image}` }} style={styles.chatImage} />}
+          <Text style={[styles.userText, { color: '#FFF' }]}>{item.content}</Text>
+          <Text style={[styles.userTime, { color: 'rgba(255,255,255,0.6)' }]}>{time}</Text>
         </View>
       </View>
     </Animated.View>
   );
 });
 
-// ✅ TwinBubble مع إصلاحات: Animated.Value، Provider Labels باللغة، YouTube try/catch، Memory Dot border
-export const TwinBubble = memo(({
-  item, isDark, isRTL, isLast, onCopy, onRetry,
-  onRegenerate, onLike, onDislike, liked, disliked, provider, lang,
-}: any) => {
+export const ToolChip = memo(({ label, icon: Icon, color, onClose }: any) => (
+  <View style={[styles.toolChip, { backgroundColor: color + '12', borderColor: color + '25' }]}>
+    <Icon size={14} stroke={color} />
+    <Text style={[styles.toolChipText, { color }]}>{label}</Text>
+    {onClose && <TouchableOpacity onPress={onClose}><X size={12} stroke={color} /></TouchableOpacity>}
+  </View>
+));
+export const TwinBubble = memo(({ item, isDark, isRTL, isLast, onCopy, onRetry, onRegenerate, onLike, onDislike, liked, disliked, provider, lang }: any) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
   const [showToast, setShowToast] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout>();
 
@@ -207,265 +124,132 @@ export const TwinBubble = memo(({
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
 
+  const isThinking = item.thinkingStage && item.thinkingStage !== 'complete';
+  
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+    if (isThinking) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      glowAnim.setValue(0);
+      Animated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      setTimeout(() => glowAnim.setValue(0), 300);
+    }
+  }, [isThinking]);
 
   const c = isDark ? COLORS.dark : COLORS.light;
   const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const handleCopy = async (text: string) => {
-    try {
-      await Clipboard.setStringAsync(text);
-      setShowToast(true);
-      timeoutRef.current = setTimeout(() => setShowToast(false), 2000);
-      onCopy?.(text);
-    } catch (e) {
-      console.warn('Copy failed:', e);
-    }
-  };
-
   const emotion = item.emotion || 'neutral';
   const emoji = emotionEmoji[emotion] || '😌';
   const prov = providerLabels[provider || 'multi_ai'] || providerLabels.multi_ai;
   const ProvIcon = prov.icon;
   const displayProv = lang === 'ar' ? prov.ar : prov.en;
 
-  const handleYouTubePress = async () => {
-    try {
-      const supported = await Linking.canOpenURL(item.youtubeVideo);
-      if (supported) {
-        await Linking.openURL(item.youtubeVideo);
-      }
-    } catch (e) {
-      console.warn('YouTube open failed:', e);
-    }
+  const handleCopy = async (text: string) => {
+    await Clipboard.setStringAsync(text);
+    setShowToast(true);
+    timeoutRef.current = setTimeout(() => setShowToast(false), 2000);
   };
+
+  const glowColor = isDark ? '#A78BFA' : '#7C3AED';
 
   return (
     <Animated.View style={[styles.twinRow, { opacity: fadeAnim }]}>
-      <View style={styles.twinRowInner}>
-        <View style={styles.twinAvatarWrap}>
+      <View style={[styles.twinHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Animated.View style={[
+          styles.twinAvatarGlow,
+          { 
+            shadowColor: glowColor,
+            shadowOpacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.4] }),
+            shadowRadius: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 20] }),
+            transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) }]
+          }
+        ]}>
           <Image source={APP_ICON} style={styles.twinAvatar} />
-          {item.memoryRecall && (
-            <View style={[styles.memoryDot, { backgroundColor: c.likeActive, borderColor: isDark ? '#000' : '#FFF' }]}>
-              <Brain size={10} stroke="#FFF" />
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.twinContent, { backgroundColor: c.bubbleTwin }]}>
-          <View style={[styles.twinHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={[styles.providerBadge, { backgroundColor: c.codeBg }]}>
-              <ProvIcon size={12} stroke={c.accent} />
-              <Text style={[styles.providerText, { color: c.subtext }]}>{displayProv}</Text>
-            </View>
-
-            {item.emotion && (
-              <View style={[styles.emotionBadge, { backgroundColor: c.blockquoteBg }]}>
-                <Text style={styles.emotionEmoji}>{emoji}</Text>
-                <Text style={[styles.emotionText, { color: c.subtext }]}>{emotion}</Text>
-              </View>
-            )}
-
+        </Animated.View>
+        <View style={{ flex: 1 }}>
+          <View style={[styles.twinMeta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.twinName, { color: c.text }]}>MyTwin</Text>
+            {item.emotion && <Text style={styles.emotionEmoji}>{emoji}</Text>}
             <Text style={[styles.timestamp, { color: c.subtext }]}>{time}</Text>
           </View>
-
-          {item.thinkingStage && item.thinkingStage !== 'complete' && (
-            <View style={[styles.thinkingBadge, { backgroundColor: c.blockquoteBg }]}>
-              <Zap size={12} stroke={c.accent} />
-              <Text style={[styles.thinkingText, { color: c.accent }]}>
-                {item.thinkingStage === 'thinking' ? 'يفكر...' :
-                 item.thinkingStage === 'searching' ? 'يبحث...' :
-                 item.thinkingStage === 'reflecting' ? 'يتأمل...' : item.thinkingStage}
-              </Text>
+          <View style={[styles.twinBadges, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.providerBadge, { backgroundColor: c.codeBg }]}>
+              <ProvIcon size={10} stroke={c.accent} />
+              <Text style={[styles.providerText, { color: c.subtext }]}>{displayProv}</Text>
             </View>
-          )}
-
-          {item.youtubeVideo && (
-            <TouchableOpacity
-              onPress={handleYouTubePress}
-              style={[styles.youtubeCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF0F0' }]}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.youtubeIconWrap, { backgroundColor: '#FF000020' }]}>
-                <Film size={20} stroke="#FF0000" />
+            {item.thinkingStage && item.thinkingStage !== 'complete' && (
+              <View style={[styles.thinkingBadge, { backgroundColor: c.blockquoteBg }]}>
+                <Zap size={10} stroke={c.accent} />
+                <Text style={[styles.thinkingText, { color: c.accent }]}>
+                  {item.thinkingStage === 'thinking' ? 'يفكر...' : item.thinkingStage}
+                </Text>
               </View>
-              <View style={{ flex: 1, marginHorizontal: 10 }}>
-                <Text style={{ color: '#FF0000', fontWeight: '700', fontSize: 14 }}>▶️ شاهد الفيديو</Text>
-                <Text style={{ color: c.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{item.youtubeVideo}</Text>
-              </View>
-              <ExternalLink size={16} stroke="#FF0000" />
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.contentWrap}>
-            <MarkdownRenderer content={item.content} isDark={isDark} />
-          </View>
-
-          <View style={[styles.actionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <TouchableOpacity onPress={() => handleCopy(item.content)} style={styles.actionBtn} activeOpacity={0.6}>
-              <Copy size={16} stroke={c.subtext} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => Share.share({ message: item.content })} style={styles.actionBtn} activeOpacity={0.6}>
-              <Share2 size={16} stroke={c.subtext} />
-            </TouchableOpacity>
-            {isLast && (
-              <TouchableOpacity onPress={() => onRegenerate(item)} style={styles.actionBtn} activeOpacity={0.6}>
-                <RotateCcw size={16} stroke={c.subtext} />
-              </TouchableOpacity>
             )}
-            <View style={styles.divider} />
-            <TouchableOpacity onPress={() => onLike(item)} style={[styles.actionBtn, liked && styles.activeLike]} activeOpacity={0.6}>
-              <ThumbsUp size={16} stroke={liked ? c.likeActive : c.subtext} fill={liked ? c.likeActive : 'transparent'} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDislike(item)} style={[styles.actionBtn, disliked && styles.activeDislike]} activeOpacity={0.6}>
-              <ThumbsDown size={16} stroke={disliked ? c.dislikeActive : c.subtext} fill={disliked ? c.dislikeActive : 'transparent'} />
-            </TouchableOpacity>
           </View>
-
-          {item.failed && (
-            <TouchableOpacity onPress={() => onRetry(item)} style={styles.retryBtn} activeOpacity={0.8}>
-              <RotateCcw size={14} stroke={c.retryColor} />
-              <Text style={[styles.retryText, { color: c.retryColor }]}>إعادة المحاولة</Text>
-            </TouchableOpacity>
-          )}
-
-          <CopyToast visible={showToast} isDark={isDark} />
         </View>
       </View>
+
+      <View style={styles.twinContent}>
+        {item.youtubeVideo && (
+          <TouchableOpacity onPress={() => Linking.openURL(item.youtubeVideo)} style={[styles.youtubeCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF0F0' }]}>
+            <Film size={20} stroke="#FF0000" />
+            <Text style={{ color: '#FF0000', fontWeight: '700', flex: 1, marginHorizontal: 8 }}>▶️ شاهد الفيديو</Text>
+            <ExternalLink size={14} stroke="#FF0000" />
+          </TouchableOpacity>
+        )}
+        <MarkdownRenderer content={item.content} isDark={isDark} />
+      </View>
+
+      <View style={[styles.actionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <TouchableOpacity onPress={() => handleCopy(item.content)} style={styles.actionBtn}><Copy size={15} stroke={c.subtext} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => Share.share({ message: item.content })} style={styles.actionBtn}><Share2 size={15} stroke={c.subtext} /></TouchableOpacity>
+        {isLast && <TouchableOpacity onPress={() => onRegenerate(item)} style={styles.actionBtn}><RotateCcw size={15} stroke={c.subtext} /></TouchableOpacity>}
+        <TouchableOpacity onPress={() => onLike(item)} style={[styles.actionBtn, liked && styles.activeLike]}><ThumbsUp size={15} stroke={liked ? c.likeActive : c.subtext} fill={liked ? c.likeActive : 'transparent'} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => onDislike(item)} style={[styles.actionBtn, disliked && styles.activeDislike]}><ThumbsDown size={15} stroke={disliked ? c.dislikeActive : c.subtext} fill={disliked ? c.dislikeActive : 'transparent'} /></TouchableOpacity>
+      </View>
+
+      {item.failed && (
+        <TouchableOpacity onPress={() => onRetry(item)} style={styles.retryBtn}><RotateCcw size={14} stroke={c.retryColor} /><Text style={[styles.retryText, { color: c.retryColor }]}>إعادة المحاولة</Text></TouchableOpacity>
+      )}
     </Animated.View>
   );
 });
 
-// ✅ ToolChip (بدون تغيير)
-export const ToolChip = memo(({ label, icon: Icon, color, onClose }: any) => (
-  <View style={[styles.toolChip, { backgroundColor: color + '12', borderColor: color + '25' }]}>
-    <Icon size={14} stroke={color} />
-    <Text style={[styles.toolChipText, { color }]}>{label}</Text>
-    <TouchableOpacity onPress={onClose} style={styles.toolChipClose} activeOpacity={0.6}>
-      <X size={12} stroke={color} />
-    </TouchableOpacity>
-  </View>
-));
-
-// ==================== STYLES ====================
-
 const styles = StyleSheet.create({
-  toastContainer: {
-    position: 'absolute', top: -40, right: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20, zIndex: 100,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
-  },
-  toastText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
-
   userRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 20, paddingHorizontal: 12 },
-  userRowInner: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, maxWidth: '85%' },
-  userBubble: {
-    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20,
-    borderBottomRightRadius: 4, gap: 6,
-    shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 8, elevation: 3,
-  },
-  userText: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
+  userBubbleWrapper: { maxWidth: '85%' },
+  userBubble: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomRightRadius: 4 },
+  userText: { fontSize: 16, lineHeight: 24 },
+  userTime: { fontSize: 10, marginTop: 4, textAlign: 'right' },
   chatImage: { width: 220, height: 220, borderRadius: 14, marginBottom: 8 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  timestamp: { fontSize: 11, fontWeight: '500' },
-  editBtn: { padding: 4, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.15)' },
-  editInput: {
-    fontSize: 16, padding: 10, borderRadius: 10,
-    borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.1)',
-    minHeight: 60, textAlignVertical: 'top',
-  },
-  editCancelBtn: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  editSaveBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 8, backgroundColor: '#34C759',
-  },
-  avatarSmall: {
-    width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-
   twinRow: { marginBottom: 24, paddingHorizontal: 12 },
-  twinRowInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  twinAvatarWrap: { position: 'relative' },
-  twinAvatar: { width: 32, height: 32, borderRadius: 16 },
-  memoryDot: {
-    position: 'absolute', bottom: -2, right: -2,
-    width: 16, height: 16, borderRadius: 8,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2,
-  },
-  twinContent: {
-    flex: 1, borderRadius: 16, padding: 14, gap: 10,
-    borderWidth: 1, borderColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-  },
-  twinHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    flexWrap: 'wrap', marginBottom: 4,
-  },
-  providerBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-  },
-  providerText: { fontSize: 11, fontWeight: '600' },
-  emotionBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-  },
+  twinHeader: { alignItems: 'center', marginBottom: 8, gap: 10 },
+  twinAvatarGlow: { borderRadius: 22, padding: 3 },
+  twinAvatar: { width: 38, height: 38, borderRadius: 19 },
+  twinName: { fontSize: 14, fontWeight: '700' },
+  twinMeta: { alignItems: 'center', gap: 6 },
   emotionEmoji: { fontSize: 14 },
-  emotionText: { fontSize: 11, fontWeight: '500' },
-  thinkingBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  thinkingText: { fontSize: 12, fontWeight: '600' },
-  contentWrap: { marginTop: 4 },
-  youtubeCard: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: 12, borderRadius: 12, marginBottom: 8,
-    borderWidth: 1, borderColor: '#FF000020',
-  },
-  youtubeIconWrap: {
-    width: 40, height: 40, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center',
-  },
-
-  actionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    marginTop: 8, paddingTop: 8,
-    borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.1)',
-  },
-  actionBtn: { padding: 8, borderRadius: 8 },
+  timestamp: { fontSize: 11 },
+  twinBadges: { marginTop: 2, gap: 6 },
+  providerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  providerText: { fontSize: 10, fontWeight: '600' },
+  thinkingBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  thinkingText: { fontSize: 10, fontWeight: '600' },
+  twinContent: { marginBottom: 8 },
+  youtubeCard: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FF000020', marginBottom: 8 },
+  actionRow: { alignItems: 'center', gap: 4, marginBottom: 4 },
+  actionBtn: { padding: 6, borderRadius: 8 },
   activeLike: { backgroundColor: '#34C75915' },
   activeDislike: { backgroundColor: '#FF3B3015' },
-  divider: { width: 1, height: 20, backgroundColor: 'rgba(128,128,128,0.2)', marginHorizontal: 4 },
-
-  retryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: 8, padding: 10, borderRadius: 10,
-    backgroundColor: 'rgba(255,59,48,0.08)', alignSelf: 'flex-start',
-  },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: 10, backgroundColor: 'rgba(255,59,48,0.08)', alignSelf: 'flex-start' },
   retryText: { fontSize: 13, fontWeight: '600' },
-
-  toolChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1,
-  },
+  toolChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   toolChipText: { fontSize: 13, fontWeight: '600' },
-  toolChipClose: { marginLeft: 4, padding: 2 },
 });

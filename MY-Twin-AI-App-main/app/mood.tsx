@@ -1,8 +1,8 @@
-import { SafeAreaView, ScrollView, Text, StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, Platform, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView, ScrollView, Text, StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Alert, RefreshControl, Platform, KeyboardAvoidingView } from 'react-native';
 import { useTwinStore } from '../store/useTwinStore';
-import { supabase } from '../lib/supabase';
+import { getMoods, addMood } from '../lib/httpClient';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { HeartPulse, Plus, X, TrendingUp, TrendingDown, Minus, Heart, Shield, Star } from 'lucide-react-native';
+import { HeartPulse, Plus, X, Heart, Shield, Star } from 'lucide-react-native';
 import EmotionalAvatar from '../components/EmotionalAvatar';
 
 const MOOD_OPTIONS = [
@@ -16,7 +16,7 @@ const MOOD_OPTIONS = [
 ];
 
 export default function Mood() {
-  const { lang, theme, userId, relationshipDims } = useTwinStore();
+  const { lang, theme, relationshipDims } = useTwinStore();
   const isAr = lang==='ar'; const isDark = theme==='dark';
   const t = (ar:string,en:string)=>isAr?ar:en;
   const [recentMoods, setRecentMoods] = useState<any[]>([]);
@@ -25,29 +25,22 @@ export default function Mood() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState('joy');
   const [saving, setSaving] = useState(false);
-  const cancelledRef = useRef(false);
 
   const fetchMoods = useCallback(async (showRefresh=false)=>{
-    if(!userId){ setLoading(false); return; }
     if(showRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const { data } = await supabase.from('emotional_timeline').select('*').eq('user_id',userId).order('created_at',{ascending:false}).limit(7);
-      if(!cancelledRef.current) setRecentMoods(data||[]);
+      const data = await getMoods();
+      setRecentMoods(data || []);
     } catch(e){ console.error('Mood fetch error:',e); }
-    finally { if(!cancelledRef.current){ setLoading(false); setRefreshing(false); } }
-  },[userId]);
+    finally { setLoading(false); setRefreshing(false); }
+  },[]);
 
-  useEffect(()=>{ cancelledRef.current=false; fetchMoods(); return ()=>{cancelledRef.current=true;}; },[fetchMoods]);
+  useEffect(()=>{ fetchMoods(); }, [fetchMoods]);
 
   const handleAddMood = async ()=>{
-    if(!userId) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('emotional_timeline').insert({
-        user_id:userId, primary_emotion:selectedMood, intensity:0.7,
-        valence: selectedMood==='joy'||selectedMood==='love'?0.8: selectedMood==='sadness'||selectedMood==='anger'?-0.5:0.2,
-      });
-      if(error) throw error;
+      await addMood(selectedMood);
       setShowAddModal(false);
       fetchMoods(true);
     } catch(e:any){

@@ -1,43 +1,33 @@
-/**
- * MyTwin – Auth Module
- * إدارة جلسات المستخدم عبر Supabase Auth.
- */
-import { supabase } from './supabase';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
-/**
- * جلب الجلسة الحالية.
- * @returns كائن الجلسة أو null
- */
-export async function getSession() {
+const TOKEN_KEY = 'mytwin_auth_token';
+let memoryToken: string | null = null;
+
+export async function storeToken(token: string): Promise<void> {
   try {
-    const { data } = await supabase.auth.getSession();
-    return data.session ?? null;
-  } catch {
-    return null;
-  }
+    if (Platform.OS === 'web') { memoryToken = token; return; }
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  } catch { memoryToken = token; }
 }
 
-/**
- * جلب رمز الوصول (access token) من الجلسة الحالية.
- * @returns الرمز أو null
- */
-export async function getAccessToken() {
+export async function getToken(): Promise<string | null> {
   try {
-    const session = await getSession();
-    return session?.access_token || null;
-  } catch {
-    return null;
-  }
+    if (Platform.OS === 'web') return memoryToken;
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch { return memoryToken; }
 }
 
-/**
- * مراقبة تغيرات حالة المصادقة.
- * @param callback دالة تستدعى مع المستخدم عند كل تغير
- * @returns كائن الاشتراك لإلغاء المراقبة لاحقًا
- */
-export function onAuthStateChange(callback: (user: unknown) => void) {
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session?.user || null);
-  });
-  return data.subscription;
+export async function removeToken(): Promise<void> {
+  try {
+    if (Platform.OS === 'web') { memoryToken = null; return; }
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch { memoryToken = null; }
+}
+
+export function setTokenSync(token: string): void {
+  memoryToken = token;
+  if (Platform.OS !== 'web') {
+    SecureStore.setItemAsync(TOKEN_KEY, token).catch(() => {});
+  }
 }

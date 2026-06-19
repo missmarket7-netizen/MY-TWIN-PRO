@@ -1,0 +1,5 @@
+رحلة المستخدم:
+- المرحلة: {phase}
+- التقدم: {progress}%
+- السلوكيات: دفء {warmth}، فضول {curiosity}، فكاهة {humor}، عمق {depth}
+- التوصية: {recommendation}

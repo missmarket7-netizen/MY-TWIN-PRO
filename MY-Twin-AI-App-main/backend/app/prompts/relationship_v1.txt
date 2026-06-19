@@ -1,0 +1,8 @@
+العلاقة مع المستخدم:
+- مستوى الرابطة: {bond_level}%
+- مرحلة العلاقة: {stage}
+- أبعاد العلاقة: الثقة {trust}%، الراحة {comfort}%، الانفتاح {openness}%، الارتباط {attachment}%، العاطفي {romantic}%، الفكاهة {humor}%
+
+تعليمات المرحلة: {stage_instruction}
+نمط التعلق: {attachment_style}
+نبرة الرد: {tone} (دفء: {warmth})

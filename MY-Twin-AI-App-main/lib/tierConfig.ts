@@ -1,76 +1,85 @@
 export interface TierConfig {
-  tokens: number; conversations: number; memoryDays: number;
-  memoryTypes: number; images: number; files: number;
-  mic: boolean; camera: boolean | number;
-  notifications: { min: number; max: number };
-  dreamAnalysis: boolean; lifeCoaching: boolean; webSearch: boolean;
-  voiceQuality: 'none' | 'basic' | 'advanced';
-  customization: 'basic' | 'advanced' | 'full';
-  smartHome: boolean; mediaIntegration: boolean;
-  calendar: boolean; telegram: boolean; email: boolean;
-  hybridAI: 'gemini' | 'gemini+groq' | 'full';
-  support: 'community' | 'email' | 'priority' | 'vip';
-  earlyTokens?: number;   // أول أسبوع
-  week2Tokens?: number;   // الأسبوع الثاني
-  week3Tokens?: number;   // الأسبوع الثالث
+  name: string;
+  price: number;
+  billingPeriod?: string;
+  dailyMessages: number;
+  dailyFeatures: {
+    study: number;
+    content: number;
+    business: number;
+    code: number;
+    image: number;
+  };
+  adsRequired: boolean;
+  memoryDays: number;
+  models: string[];
+  voice: string;
+  coaching: boolean;
+  dreams: boolean;
 }
 
 export const TIERS: Record<string, TierConfig> = {
   free: {
-    tokens: 500, earlyTokens: 1500, week2Tokens: 1000, week3Tokens: 700,
-    conversations: 30, memoryDays: 3,
-    memoryTypes: 1, images: 1, files: 1,
-    mic: false, camera: false,
-    notifications: { min: 1, max: 3 },
-    dreamAnalysis: false, lifeCoaching: false, webSearch: false,
-    voiceQuality: 'none', customization: 'basic',
-    smartHome: false, mediaIntegration: false,
-    calendar: false, telegram: false, email: false,
-    hybridAI: 'gemini', support: 'community',
+    name: 'Free',
+    price: 0,
+    dailyMessages: 10,
+    dailyFeatures: { study: 1, content: 1, business: 0, code: 0, image: 1 },
+    adsRequired: true,
+    memoryDays: 3,
+    models: ['groq'],
+    voice: 'edge_tts',
+    coaching: false,
+    dreams: false,
   },
   plus: {
-    tokens: 1500, conversations: 50, memoryDays: 7,
-    memoryTypes: 3, images: 3, files: 2,
-    mic: true, camera: false,
-    notifications: { min: 3, max: 5 },
-    dreamAnalysis: false, lifeCoaching: false, webSearch: true,
-    voiceQuality: 'basic', customization: 'advanced',
-    smartHome: false, mediaIntegration: false,
-    calendar: false, telegram: false, email: false,
-    hybridAI: 'gemini', support: 'email',
+    name: 'Plus',
+    price: 5.99,
+    dailyMessages: 30,
+    dailyFeatures: { study: 5, content: 5, business: 2, code: 2, image: 3 },
+    adsRequired: false,
+    memoryDays: 30,
+    models: ['groq', 'gemini'],
+    voice: 'edge_tts',
+    coaching: false,
+    dreams: false,
   },
   premium: {
-    tokens: 4000, conversations: 150, memoryDays: 30,
-    memoryTypes: 5, images: 5, files: 5,
-    mic: true, camera: 2,
-    notifications: { min: 3, max: 7 },
-    dreamAnalysis: true, lifeCoaching: true, webSearch: true,
-    voiceQuality: 'advanced', customization: 'full',
-    smartHome: false, mediaIntegration: true,
-    calendar: true, telegram: true, email: false,
-    hybridAI: 'gemini+groq', support: 'priority',
+    name: 'Premium',
+    price: 14.99,
+    dailyMessages: 100,
+    dailyFeatures: { study: 20, content: 20, business: 10, code: 10, image: 10 },
+    adsRequired: false,
+    memoryDays: 90,
+    models: ['gemini', 'groq', 'openrouter'],
+    voice: 'elevenlabs',
+    coaching: true,
+    dreams: true,
   },
   pro: {
-    tokens: 7000, conversations: 300, memoryDays: 90,
-    memoryTypes: 5, images: 9, files: 7,
-    mic: true, camera: true,
-    notifications: { min: 3, max: 7 },
-    dreamAnalysis: true, lifeCoaching: true, webSearch: true,
-    voiceQuality: 'advanced', customization: 'full',
-    smartHome: true, mediaIntegration: true,
-    calendar: true, telegram: true, email: true,
-    hybridAI: 'full', support: 'priority',
+    name: 'Pro',
+    price: 110,
+    billingPeriod: '6_months',
+    dailyMessages: 500,
+    dailyFeatures: { study: 100, content: 100, business: 50, code: 50, image: 30 },
+    adsRequired: false,
+    memoryDays: 365,
+    models: ['gemini', 'groq', 'openrouter'],
+    voice: 'elevenlabs',
+    coaching: true,
+    dreams: true,
   },
   yearly: {
-    tokens: 15000, conversations: 999, memoryDays: 365,
-    memoryTypes: 5, images: 999, files: 999,
-    mic: true, camera: true,
-    notifications: { min: 5, max: 10 },
-    dreamAnalysis: true, lifeCoaching: true, webSearch: true,
-    voiceQuality: 'advanced', customization: 'full',
-    smartHome: true, mediaIntegration: true,
-    calendar: true, telegram: true, email: true,
-    hybridAI: 'full', support: 'vip',
+    name: 'Yearly',
+    price: 199,
+    billingPeriod: 'yearly',
+    dailyMessages: 9999,
+    dailyFeatures: { study: 999, content: 999, business: 999, code: 999, image: 999 },
+    adsRequired: false,
+    memoryDays: 999,
+    models: ['gemini', 'groq', 'openrouter'],
+    voice: 'elevenlabs',
+    coaching: true,
+    dreams: true,
   },
 };
 

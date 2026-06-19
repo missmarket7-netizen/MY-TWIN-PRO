@@ -1,183 +1,149 @@
-import * as Speech from "expo-speech";
-import { useTwinStore } from "../store/useTwinStore";
-import { API } from "../lib/api";
+/**
+ * voice_engine.ts (v3.0)
+ * TTS: expo-speech + Edge TTS + ElevenLabs عبر الخادم
+ * STT: expo-av → backend /api/stt (WAV base64)
+ * Speaking Queue: يمنع تداخل الكلام
+ */
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
+import { useTwinStore } from '../store/useTwinStore';
+import { apiPost } from '../lib/httpClient';
 
-// ==================== TYPES ====================
+export type TwinGender = 'male' | 'female';
+export type EmotionTone = 'neutral' | 'happy' | 'sad' | 'excited' | 'calm' | 'serious';
 
-interface VoiceOption {
-  identifier: string;
-  name: string;
-  language: string;
-  gender: 'male' | 'female' | 'unknown';
-  quality: number;
+export interface VoiceProfile {
+  pitch: number; rate: number; language: string; iosVoiceIdentifier?: string;
 }
 
-// ==================== VOICE MAPS ====================
+export interface STTResult {
+  transcript: string; confidence: number;
+}
 
-const GENDER_VOICES: Record<string, string> = {
-  male: 'ar-SA-HamedNeural',
-  female: 'ar-SA-ZariyahNeural',
+const IOS_VOICES: Record<TwinGender, string> = {
+  male: 'com.apple.ttsbundle.Maged-compact',
+  female: 'com.apple.ttsbundle.Laila-compact',
 };
 
-// ==================== HELPERS ====================
+const VOICE_PROFILES: Record<TwinGender, Record<EmotionTone, VoiceProfile>> = {
+  male: {
+    neutral:  { pitch: 0.88, rate: 0.90, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+    happy:    { pitch: 0.95, rate: 1.08, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+    sad:      { pitch: 0.80, rate: 0.78, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+    excited:  { pitch: 1.05, rate: 1.15, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+    calm:     { pitch: 0.82, rate: 0.80, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+    serious:  { pitch: 0.90, rate: 0.88, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.male },
+  },
+  female: {
+    neutral:  { pitch: 1.22, rate: 1.02, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+    happy:    { pitch: 1.30, rate: 1.12, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+    sad:      { pitch: 1.05, rate: 0.85, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+    excited:  { pitch: 1.40, rate: 1.20, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+    calm:     { pitch: 1.10, rate: 0.88, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+    serious:  { pitch: 1.15, rate: 0.95, language: 'ar-SA', iosVoiceIdentifier: IOS_VOICES.female },
+  },
+};
 
-function cleanTextForSpeech(text: string): string {
-  if (!text) return "";
+let _speakingQueue: Array<{ text: string; resolve: () => void; profile: VoiceProfile }> = [];
+let _isProcessingQueue = false;
+
+function stripMarkdown(text: string): string {
   return text
-    .replace(/\p{Extended_Pictographic}/gu, "")
-    .replace(/[❤️‍🔥✨🌟💜🫂🤗🫶💕💖💪🤝]/gu, "")
-    .replace(/\*\*/g, "").replace(/\*/g, "")
-    .replace(/\n{2,}/g, "، ").replace(/\n/g, " ")
-    .replace(/\s{2,}/g, " ").trim();
+    .replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s*/g, '').replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/>\s*/g, '').replace(/[-*+]\s+/g, '').replace(/\d+\.\s+/g, '')
+    .replace(/\|.*?\|/g, '').replace(/\n{2,}/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+async function uriToBase64(uri: string): Promise<string> {
+  try {
+    const FileSystem = await import('expo-file-system');
+    return await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  } catch {
+    try {
+      const res = await fetch(uri); const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf); let binary = '';
+      bytes.forEach((b) => (binary += String.fromCharCode(b)));
+      return btoa(binary);
+    } catch { return ''; }
   }
-  return btoa(binary);
 }
-
-// ==================== MAIN TTS ====================
 
 export async function speakResponse(
-  text: string,
-  options?: { onDone?: () => void; onStart?: () => void; emotion?: string }
+  text: string, options?: { emotion?: EmotionTone; onStart?: () => void; onDone?: () => void }
 ): Promise<void> {
-  try {
-    const clean = cleanTextForSpeech(text);
-    if (!clean) {
-      options?.onDone?.();
-      return;
-    }
+  const clean = stripMarkdown(text).slice(0, 800);
+  if (!clean.trim()) { options?.onDone?.(); return; }
 
-    const store = useTwinStore.getState();
-    const twinGender = store.twinGender || 'female';
-    const lang = store.lang || 'ar';
-    const tier = store.tier || 'free';
+  const store = useTwinStore.getState();
+  const gender: TwinGender = store.twinGender === 'male' ? 'male' : 'female';
+  const emotion = options?.emotion || 'neutral';
+  const profile = VOICE_PROFILES[gender][emotion];
 
+  return new Promise((resolve) => {
+    _speakingQueue.push({ text: clean, resolve, profile });
+    if (!_isProcessingQueue) processQueue();
     options?.onStart?.();
+  });
+}
 
-    // ✅ الباقات المدفوعة: نستخدم الخادم (ElevenLabs/Edge TTS)
-    if (tier && ['premium', 'pro', 'yearly'].includes(tier)) {
-      try {
-        const response = await API.post('/api/voice/speak', {
-          text: clean,
-          tier,
-          gender: twinGender,
-          language: lang === 'ar' ? 'ar' : 'en',
-          emotion: options?.emotion || 'neutral',
-        }, { responseType: 'arraybuffer' });
+async function processQueue(): Promise<void> {
+  if (_speakingQueue.length === 0) { _isProcessingQueue = false; return; }
+  _isProcessingQueue = true;
+  const { text, resolve, profile } = _speakingQueue.shift()!;
 
-        if (response.data?.byteLength > 0) {
-          const { Audio } = require('expo-av');
-          const sound = new Audio.Sound();
-          await sound.loadAsync({ uri: `data:audio/mp3;base64,${arrayBufferToBase64(response.data)}` });
-          await new Promise<void>((resolve) => {
-            sound.setOnPlaybackStatusUpdate((status: any) => {
-              if (status.isLoaded && status.didJustFinish) {
-                sound.unloadAsync();
-                resolve();
-              }
-            });
-            sound.playAsync();
-          });
-          options?.onDone?.();
-          return;
-        }
-      } catch (e) {
-        console.warn("Server voice failed, falling back to local TTS");
-      }
-    }
-
-    // ✅ الباقات المجانية: Edge TTS عبر الخادم أولاً، ثم Expo Speech
-    try {
-      const response = await API.post('/api/voice/speak', {
-        text: clean,
-        tier: 'free',
-        gender: twinGender,
-        language: lang === 'ar' ? 'ar' : 'en',
-        emotion: options?.emotion || 'neutral',
-      }, { responseType: 'arraybuffer' });
-
-      if (response.data?.byteLength > 0) {
-        const { Audio } = require('expo-av');
-        const sound = new Audio.Sound();
-        await sound.loadAsync({ uri: `data:audio/mp3;base64,${arrayBufferToBase64(response.data)}` });
-        await new Promise<void>((resolve) => {
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync();
-              resolve();
-            }
-          });
-          sound.playAsync();
-        });
-        options?.onDone?.();
-        return;
-      }
-    } catch (e) {
-      console.warn("Edge TTS failed, using Expo Speech");
-    }
-
-    // ✅ Fallback: Expo Speech محلي مع صوت مناسب للجنس
-    const defaultVoice = GENDER_VOICES[twinGender] || GENDER_VOICES.female;
+  try {
     await Speech.stop();
-    Speech.speak(clean, {
-      language: lang === 'ar' ? "ar-SA" : "en-US",
-      pitch: twinGender === 'female' ? 1.1 : 0.9,
-      rate: 0.9,
-      voice: defaultVoice,
-      onDone: () => options?.onDone?.(),
-      onError: () => options?.onDone?.(),
-    });
-  } catch (e) {
-    console.warn("speakResponse error:", e);
-    options?.onDone?.();
-  }
+    const opts: Speech.SpeechOptions = {
+      language: profile.language, pitch: profile.pitch, rate: profile.rate,
+      onDone: () => { resolve(); processQueue(); },
+      onError: () => { resolve(); processQueue(); },
+      onStopped: () => { resolve(); processQueue(); },
+    };
+    if (Platform.OS === 'ios' && profile.iosVoiceIdentifier) opts.voice = profile.iosVoiceIdentifier;
+    Speech.speak(text, opts);
+  } catch { resolve(); processQueue(); }
 }
 
-// ==================== STT (Whisper) ====================
+export async function stopSpeaking(): Promise<void> { await Speech.stop(); }
+export async function isSpeaking(): Promise<boolean> { return Speech.isSpeakingAsync(); }
 
-export async function transcribeAudio(audioBase64: string): Promise<string> {
-  const MAX_RETRIES = 3;
-  const TIMEOUT = 30000;
+let _recording: Audio.Recording | null = null;
+const MAX_BASE64_SIZE = 5 * 1024 * 1024;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const store = useTwinStore.getState();
-      const lang = store.lang === 'ar' ? 'ar' : 'en';
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-
-      const response = await API.post('/api/stt', {
-        audio: audioBase64,
-        language: lang,
-      }, { signal: controller.signal });
-
-      clearTimeout(timeoutId);
-
-      if (!response.data?.text) throw new Error('No text returned');
-      return response.data.text;
-    } catch (e) {
-      console.warn(`STT attempt ${attempt} failed:`, e);
-      if (attempt === MAX_RETRIES) return '';
-      await new Promise(r => setTimeout(r, attempt * 1000));
-    }
-  }
-  return '';
+export async function startRecording(): Promise<void> {
+  try {
+    const perm = await Audio.requestPermissionsAsync();
+    if (!perm.granted) throw new Error('microphone_permission_denied');
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false });
+    const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+    _recording = recording;
+  } catch (err) { _recording = null; throw err; }
 }
 
-// ==================== CONTROLS ====================
+export async function stopRecordingAndTranscribe(lang: 'ar' | 'en' = 'ar'): Promise<STTResult> {
+  if (!_recording) return { transcript: '', confidence: 0 };
+  try {
+    await _recording.stopAndUnloadAsync();
+    const uri = _recording.getURI(); _recording = null;
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false });
+    if (!uri) return { transcript: '', confidence: 0 };
 
-export function stopSpeaking(): void {
-  Speech.stop();
+    const base64 = await uriToBase64(uri);
+    if (!base64 || base64.length > MAX_BASE64_SIZE) return { transcript: '', confidence: 0 };
+
+    const data = await apiPost('/api/stt', { audio: base64, language: lang });
+
+    if (data?.text) return { transcript: data.text, confidence: data.confidence || 0.9 };
+    return { transcript: '', confidence: 0 };
+  } catch { _recording = null; return { transcript: '', confidence: 0 }; }
 }
 
-export function isSpeaking(): Promise<boolean> {
-  return Speech.isSpeakingAsync();
+export async function cancelRecording(): Promise<void> {
+  if (!_recording) return;
+  try { await _recording.stopAndUnloadAsync(); } catch {}
+  _recording = null;
+  await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false }).catch(() => {});
 }
