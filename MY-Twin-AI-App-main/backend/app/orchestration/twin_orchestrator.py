@@ -25,11 +25,8 @@ from app.features.agent_metrics import agent_metrics
 from app.infrastructure.ai.provider_router import model_router
 from app.infrastructure.ai.council import LLMCouncil
 from app.infrastructure.ai.self_critic import SelfCritic
- profile_extractor
 from intent_engine import intent_engine
-
 logger = logging.getLogger("twin_brain")
-
 class TwinBrain:
     FALLBACK_REPLIES = [
         "والله إني معاك، كمل كلامك متوقفش 💜",
@@ -39,7 +36,6 @@ class TwinBrain:
         "أفهمك والله، أنا معاك في اللي بتمر بيه 💜",
         "كلامك مهم جداً بالنسبة لي، كمّل 🌸",
     ]
-
     def __init__(self, gemini_key=None):
         self.multi = MultiAIClient()
         self.emotion_tracker = EmotionalStateTracker()
@@ -51,7 +47,6 @@ class TwinBrain:
         self.user_join_dates = {}
         self.self_critic = SelfCritic()
         self.council = LLMCouncil(self.multi)
-        
         # ✅ Supabase Singleton لتجنب إعادة إنشائه في كل رسالة
         self._db = None
         try:
@@ -62,17 +57,13 @@ class TwinBrain:
                 logger.info("✅ Supabase client initialized in TwinBrain")
         except Exception as e:
             logger.warning(f"Supabase init failed: {e}")
-
     async def health_check_all_providers(self) -> Dict[str, bool]:
         return await self.multi.health_check()
-
     async def detect_emotion(self, text: str) -> Dict[str, Any]:
         return await self.emotion_tracker.analyze(text)
-
     async def respond(self, message, twin_name, bond_level, dims, memories, history,
                       calm=False, personality=None, country_code="SA", user_id=None, tier="free",
                       join_date=None, recent_messages=None, user_profile=None):
-
         # ✅ تعريف المتغيرات الأساسية في البداية لتجنب locals().get()
         formatted_context = ""
         context_summary = ""
@@ -83,7 +74,6 @@ class TwinBrain:
         latency = 0
         formatted_context = ""
         formatted_context = ""
-
         # 1. الفحص الأمني
         safety_check = safety_engine.check_safety(message)
         if not safety_check["safe"] and safety_check["severity"] == "critical":
@@ -92,12 +82,10 @@ class TwinBrain:
                 "emotion": {"primary": "concern", "intensity": 1.0}, "provider": "safety_engine",
                 "latency_ms": 0, "dialect": get_dialect_for_user(country_code, message), "safety_alert": True
             }
-
         # 2. تحليل المشاعر واللغة
         emotion = await self.detect_emotion(message)
         dialect = get_dialect_for_user(country_code, message)
         dialect_prompt = get_dialect_prompt(dialect)
-
         # 2.5 اكتشاف النية (محرك مستقل)
         intent_result = intent_engine.detect(message, lang="ar", emotion=emotion.get("primary", "neutral"))
         quick_intent = intent_result.get("primary", "general")
@@ -107,7 +95,6 @@ class TwinBrain:
             quick_intent = "general"
         else:
             logger.info(f"⚡ Quick Intent Detected: {quick_intent} (confidence: {intent_conf:.2f})")
-
         # 3. الأدوات - نجمع النتائج فقط
         if user_id:
             try:
@@ -124,7 +111,6 @@ class TwinBrain:
                     )
             except Exception as e:
                 logger.warning(f"Tool routing failed: {e}")
-
         # 4. التخطيط (مبكراً)
         plan = {}
         if user_id:
@@ -139,10 +125,8 @@ class TwinBrain:
             except Exception as e:
                 logger.warning(f"Planning failed: {e}")
                 plan = {"needs_tool": False, "goal": "general_chat"}
-
         # ✅ النية النهائية
         final_intent = plan.get("intent", quick_intent) or "general"
-
         # 5. بناء السياق (يعتمد على النية)
         full_context = {}
         if user_id:
@@ -158,7 +142,6 @@ class TwinBrain:
                     context_summary = full_context.get("planner_summary", "")
             except Exception as e:
                 logger.warning(f"Context building failed: {e}")
-
         # ✅ تحسين الخطة للمهام المهمة (وتحديث final_intent بعدها)
         if final_intent in ["coaching", "emotional", "decision"] and context_summary:
             try:
@@ -172,7 +155,6 @@ class TwinBrain:
                     logger.info(f"📝 Plan refined for intent: {final_intent}")
             except Exception as e:
                 logger.warning(f"Plan refinement failed: {e}")
-
         # 6. Feedback loop
         last_feedback = ""
         if user_id and self._db:
@@ -183,7 +165,6 @@ class TwinBrain:
                     logger.info("📊 Feedback Loop: dislike detected")
             except Exception as e:
                 logger.warning(f"Feedback fetch failed: {e}")
-
         # 7. تحديث العلاقة
         journey_info = {}
         attachment_info = {}
@@ -211,7 +192,6 @@ class TwinBrain:
                     logger.info(f"🎉 Stage Up! Message: {stage_up_message}")
             except Exception as e:
                 logger.warning(f"Relationship update failed: {e}")
-
         # 8. Agent Loop (مدعوم بالنية)
         if plan.get("needs_tool") and plan.get("tool_confidence", 0) >= 0.6:
             try:
@@ -235,7 +215,6 @@ class TwinBrain:
                     )
             except Exception as e:
                 logger.error(f"Agent loop failed: {e}")
-
         # 9. بناء الـ Prompt للـ LLM (مع تصفية ذكية)
         if not final_reply:
             rel_stage = self.relationship.get_stage_instruction()
@@ -249,7 +228,6 @@ class TwinBrain:
                 relationship_for_prompt = {
                     "label": "Friend", "bond_level": bond_level, "instruction": str(rel_stage)
                 }
-
             if attachment_info and attachment_info.get("style") != "unknown":
                 att_style = attachment_info.get("style")
                 att_confidence = attachment_info.get("confidence", 0)
@@ -257,19 +235,15 @@ class TwinBrain:
                     att_adjustments = attachment_engine.get_response_adjustments(att_style)
                     relationship_for_prompt["attachment_style"] = att_style
                     relationship_for_prompt["attachment_guidance"] = att_adjustments
-
             formatted_context = context_manager.filter_by_intent(full_context, final_intent)
             if tool_results:
                 formatted_context = "<TOOL_RESULTS>\n" + "\n".join(tool_results) + "\n</TOOL_RESULTS>\n\n" + (formatted_context or "")
             if tool_context:
                 formatted_context = tool_context + "\n\n" + (formatted_context or "")
             formatted_context = (formatted_context or "") + last_feedback
-
             if not context_summary:
                 context_summary = (formatted_context or "")[:500]
-
             filtered_history = context_manager.filter_history_by_intent(history, final_intent) if history else None
-
             prompt = await self.prompt_builder.build(
                 twin_name=twin_name, user_name="صديقي", relationship=relationship_for_prompt,
                 emotion=emotion, voice={"style": "Warm", "pitch": 1.0, "rate": 1.0},
@@ -284,7 +258,6 @@ class TwinBrain:
                 history=filtered_history,
                 intent=final_intent
             )
-
             task_type = plan.get("response_style", "general")
             start = time.time()
             try:
@@ -303,20 +276,16 @@ class TwinBrain:
                 reply = random.choice(self.FALLBACK_REPLIES)
                 provider = "fallback"
             latency = (time.time() - start) * 1000
-
             final_reply = reply
-
         # 10. Self-critic
         try:
             if final_reply and len(final_reply) > 10:
                 final_reply = await self.self_critic.evaluate_and_repair(
                     reply=final_reply,
                     context=context_summary,
-                    
                 )
         except Exception as e:
             logger.warning(f"Self-critic failed: {e}")
-
         # 11. Response validator
         validation = response_validator.validate(
             reply=final_reply,
@@ -329,7 +298,6 @@ class TwinBrain:
         if not validation.get("valid", True):
             final_reply = "أنا هنا لدعمك، لكن لا يمكنني الرد على هذا. 💜"
             provider = "safety_validator"
-
         # 12. Final Synthesizer
         try:
             final_reply = await final_synthesizer.synthesize(
@@ -339,16 +307,13 @@ class TwinBrain:
             )
         except Exception as e:
             logger.warning(f"Final synthesizer failed: {e}")
-
         # 13. تنسيق الرد
         final_reply = response_engine.process(final_reply, intent=final_intent, lang="ar")
-
         # 14. رسالة مرحلة العلاقة
         if stage_up_message:
             stage_up_text = stage_up_message.get("ar", "") if isinstance(stage_up_message, dict) else ""
             if stage_up_text:
                 final_reply = f"🎉 **{stage_up_text}**\n\n{final_reply}"
-
         # 15. المهام الخلفية (مع حماية من الاستثناءات المفقودة)
         if user_id:
             # ✅ تغليف كل مهمة بمعالج أخطاء
@@ -359,21 +324,16 @@ class TwinBrain:
                         logger.warning(f"Background task failed: {exc}")
                 except:
                     pass
-
             task1 = asyncio.create_task(store_mem(user_id, message, emotion.get("intensity", 0.5), emotion.get("primary", "neutral")))
             task1.add_done_callback(safe_callback)
-            
             task2 = asyncio.create_task(extract_entities(user_id, message))
             task2.add_done_callback(safe_callback)
-            
             task3 = asyncio.create_task(track_growth(user_id, {"journey_phase": journey_info.get("phase", "unknown"), "attachment_style": attachment_info.get("style", "unknown"), "emotion": emotion.get("primary", "neutral")}))
             task3.add_done_callback(safe_callback)
-
             await memory_summarizer.increment_counter(user_id)
             if await memory_summarizer.should_summarize(user_id):
                 task4 = asyncio.create_task(memory_summarizer.summarize_and_store(user_id=user_id, messages=history or [], twin_brain_instance=self))
                 task4.add_done_callback(safe_callback)
-
             await profile_extractor.increment_counter(user_id)
             if await profile_extractor.should_extract(user_id):
                 user_messages = [h.get("content", "") for h in (history or [])[-30:] if h.get("role") == "user"]
@@ -381,18 +341,15 @@ class TwinBrain:
                     task5 = asyncio.create_task(profile_extractor.extract_from_conversation(messages=user_messages, multi_client=self.multi, user_id=user_id))
                     task5.add_done_callback(safe_callback)
                 await profile_extractor.reset_counter(user_id)
-
             task6 = asyncio.create_task(self.consciousness.update_user_profile(user_id, {
                 "relationship_dims": self.relationship.dims, "journey_phase": journey_info.get("phase"),
                 "journey_day": journey_info.get("day"), "attachment_style": attachment_info.get("style"),
                 "bond_level": self.relationship.bond_level,
             }))
             task6.add_done_callback(safe_callback)
-
             if self.relationship.bond_level > 30:
                 task7 = asyncio.create_task(self.consciousness.reflect(user_id=user_id, conversation_summary=message[:200], lang="ar"))
                 task7.add_done_callback(safe_callback)
-
         return {
             "reply": final_reply, "new_bond": self.relationship.bond_level,
             "emotion": emotion, "provider": provider, "latency_ms": latency,
@@ -400,5 +357,4 @@ class TwinBrain:
             "journey_day": journey_info.get("day", 1), "attachment_style": attachment_info.get("style", "unknown"),
             "relationship_dims": self.relationship.dims
         }
-
 twin_brain = TwinBrain()
