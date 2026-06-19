@@ -117,3 +117,19 @@ class ProviderRouter:
             raise AIUnavailable(str(e))
 
 provider_router = ProviderRouter()
+
+# ========== التوافق مع الكود القديم ==========
+class MultiAIClient:
+    """غلاف للتوافق مع الاستيرادات القديمة."""
+    def __init__(self):
+        pass
+
+    async def get_best(self, prompt: str, preferred_providers=None, task: str = "general") -> tuple:
+        return await provider_router.route(prompt, task=task)
+
+    async def get_best_reply(self, prompt: str, task: str = "general") -> str:
+        text, _ = await provider_router.route(prompt, task=task)
+        return text
+
+    async def health_check_all_providers(self):
+        return await provider_router.health_check_all()
