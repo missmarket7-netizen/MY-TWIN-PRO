@@ -12,13 +12,12 @@ export function useStreamingChat() {
     isStreaming: false,
     error: null,
   });
-  
+
   const abortRef = useRef<AbortController | null>(null);
   const { addMessage, setStreamingText, setThinking, setThinkingStage } = useTwinStore();
 
   const sendStreamingMessage = useCallback(
     async (message: string, image?: string) => {
-      // Abort any existing stream
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -30,7 +29,6 @@ export function useStreamingChat() {
       setThinking(true);
       setThinkingStage('thinking');
 
-      // Add user message to store immediately
       const userMsgId = `msg_${Date.now().toString(36)}_user`;
       addMessage({
         id: userMsgId,
@@ -40,7 +38,6 @@ export function useStreamingChat() {
         image,
       });
 
-      // Create a placeholder for the twin's response
       const twinMsgId = `msg_${Date.now().toString(36)}_twin`;
       addMessage({
         id: twinMsgId,
@@ -50,50 +47,32 @@ export function useStreamingChat() {
         thinkingStage: 'thinking',
       });
 
-      // Initialize streaming text for this message
       setStreamingText('');
       setThinkingStage('generating');
 
       try {
         const store = useTwinStore.getState();
-        
         const fullText = await streamChat(
-          '/api/chat/stream',
-          {
-            message,
-            twin_name: store.twinName,
-            bond_level: store.bondLevel,
-            relationship_dims: store.relationshipDims,
-            history: store.chatHistory.slice(-10).map((h) => ({
-              role: h.role,
-              content: h.content,
-            })),
-            lang: store.lang,
-            twin_gender: store.twinGender,
-            calm_mode: store.calmMode,
-          },
+          message,
+          store.chatHistory.slice(-10).map((h) => ({
+            role: h.role,
+            content: h.content,
+          })),
+          store.lang,
           (chunk: string) => {
-            // Update streaming text chunk by chunk
-            setStreamingText((prev) => prev + chunk);
+            setStreamingText((prev: string) => prev + chunk);
           },
           controller.signal
         );
 
-        // Update the placeholder message with full text
         setThinking(false);
         setThinkingStage('complete');
-        setStreamingText(''); // Clear streaming state
-        
-        // Update message in store with full content
-        useTwinStore.setState((state) => ({
-          chatHistory: state.chatHistory.map((msg) =>
+        setStreamingText('');
+
+        useTwinStore.setState((s) => ({
+          chatHistory: s.chatHistory.map((msg) =>
             msg.id === twinMsgId
-              ? {
-                  ...msg,
-                  content: fullText,
-                  thinkingStage: 'complete',
-                  provider: 'gemini',
-                }
+              ? { ...msg, content: fullText, thinkingStage: 'complete', provider: 'gemini' }
               : msg
           ),
         }));
@@ -105,18 +84,18 @@ export function useStreamingChat() {
           setState({ isStreaming: false, error: null });
           return '';
         }
-        
+
         setThinking(false);
         setThinkingStage('complete');
         setStreamingText('');
-        
-        const errorMsg = error.message === 'SESSION_EXPIRED'
-          ? 'انتهت الجلسة، الرجاء تسجيل الدخول مجدداً'
-          : 'حدث خطأ في الاتصال';
-        
-        // Update placeholder with error
-        useTwinStore.setState((state) => ({
-          chatHistory: state.chatHistory.map((msg) =>
+
+        const errorMsg =
+          error.message === 'SESSION_EXPIRED'
+            ? 'انتهت الجلسة، الرجاء تسجيل الدخول مجدداً'
+            : 'حدث خطأ في الاتصال';
+
+        useTwinStore.setState((s) => ({
+          chatHistory: s.chatHistory.map((msg) =>
             msg.id === twinMsgId
               ? { ...msg, content: errorMsg, failed: true, thinkingStage: 'complete' }
               : msg

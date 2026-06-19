@@ -8,6 +8,8 @@ import { ArrowLeft, Heart, Brain, Users, Briefcase, Sparkles, Send, Copy, Refres
 import * as Clipboard from 'expo-clipboard';
 import Markdown from 'react-native-markdown-display';
 
+const PRIMARY = '#6B21A8';
+
 const DOMAINS = [
   { id: 'psychological', label_ar: 'نفسي', label_en: 'Psychological', icon: Brain, desc_ar: 'الصحة النفسية والعاطفية', desc_en: 'Mental & emotional health' },
   { id: 'social', label_ar: 'اجتماعي', label_en: 'Social', icon: Users, desc_ar: 'العلاقات والتواصل', desc_en: 'Relationships & communication' },
@@ -15,12 +17,22 @@ const DOMAINS = [
   { id: 'personal', label_ar: 'شخصي', label_en: 'Personal', icon: Sparkles, desc_ar: 'النمو والتطوير الذاتي', desc_en: 'Personal growth' },
 ];
 
+const markdownStyles = {
+  body: { color: '#1A1226', fontSize: 15, lineHeight: 26 },
+  heading1: { fontSize: 20, fontWeight: '800', color: PRIMARY, marginBottom: 10, marginTop: 16 },
+  heading2: { fontSize: 17, fontWeight: '700', color: PRIMARY, marginBottom: 8, marginTop: 14 },
+  heading3: { fontSize: 15, fontWeight: '600', color: PRIMARY, marginBottom: 6, marginTop: 12 },
+  bullet_list: { marginBottom: 8 },
+  ordered_list: { marginBottom: 8 },
+  list_item: { marginBottom: 4 },
+  blockquote: { borderLeftWidth: 4, borderLeftColor: PRIMARY, paddingLeft: 12, marginVertical: 8, backgroundColor: '#FAFAFE', padding: 10, borderRadius: 8 },
+};
+
 export default function LifeCoach() {
   const insets = useSafeAreaInsets();
   const { lang } = useTwinStore();
   const isAr = lang === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
-  const primary = '#6B21A8';
 
   const [goal, setGoal] = useState('');
   const [domain, setDomain] = useState('psychological');
@@ -61,7 +73,7 @@ export default function LifeCoach() {
   return (
     <View style={[st.container, { paddingTop: insets.top }]}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => router.back()} style={st.backBtn}><ArrowLeft size={24} stroke={primary} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={st.backBtn}><ArrowLeft size={24} stroke={PRIMARY} /></TouchableOpacity>
         <Text style={st.headerTitle}>{t('مدرب الحياة', 'Life Coach')}</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -80,9 +92,9 @@ export default function LifeCoach() {
               const Icon = dm.icon;
               const active = domain === dm.id;
               return (
-                <TouchableOpacity key={dm.id} style={[st.domainCard, active && { borderColor: primary, backgroundColor: '#F5F3FF' }]} onPress={() => setDomain(dm.id)}>
-                  <Icon size={28} stroke={active ? primary : '#7C6B99'} />
-                  <Text style={[st.domainLabel, active && { color: primary, fontWeight: '700' }]}>{isAr ? dm.label_ar : dm.label_en}</Text>
+                <TouchableOpacity key={dm.id} style={[st.domainCard, active && { borderColor: PRIMARY, backgroundColor: '#F5F3FF' }]} onPress={() => setDomain(dm.id)}>
+                  <Icon size={28} stroke={active ? PRIMARY : '#7C6B99'} />
+                  <Text style={[st.domainLabel, active && { color: PRIMARY, fontWeight: '700' }]}>{isAr ? dm.label_ar : dm.label_en}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -96,7 +108,7 @@ export default function LifeCoach() {
           </TouchableOpacity>
 
           <TouchableOpacity style={st.weeklyBtn} onPress={handleWeeklyPlan} disabled={loading}>
-            <Calendar size={18} stroke={primary} />
+            <Calendar size={18} stroke={PRIMARY} />
             <Text style={st.weeklyBtnText}>{t('خطة أسبوعية', 'Weekly Plan')}</Text>
           </TouchableOpacity>
         </View>
@@ -106,8 +118,8 @@ export default function LifeCoach() {
             <View style={st.resultHeader}>
               <Text style={st.resultTitle}>{t('النصيحة', 'Advice')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity onPress={handleCopy}><Copy size={18} stroke={copied ? '#10B981' : primary} /></TouchableOpacity>
-                <TouchableOpacity onPress={handleCoach}><RefreshCw size={18} stroke={primary} /></TouchableOpacity>
+                <TouchableOpacity onPress={handleCopy}><Copy size={18} stroke={copied ? '#10B981' : PRIMARY} /></TouchableOpacity>
+                <TouchableOpacity onPress={handleCoach}><RefreshCw size={18} stroke={PRIMARY} /></TouchableOpacity>
               </View>
             </View>
             <Markdown style={markdownStyles}>{reply}</Markdown>
@@ -118,7 +130,7 @@ export default function LifeCoach() {
           <Animated.View style={[st.resultCard, { opacity: fadeAnim, marginTop: 16 }]}>
             <View style={st.resultHeader}>
               <Text style={st.resultTitle}>{t('الخطة الأسبوعية', 'Weekly Plan')}</Text>
-              <TouchableOpacity onPress={handleCopy}><Copy size={18} stroke={copied ? '#10B981' : primary} /></TouchableOpacity>
+              <TouchableOpacity onPress={handleCopy}><Copy size={18} stroke={copied ? '#10B981' : PRIMARY} /></TouchableOpacity>
             </View>
             <Markdown style={markdownStyles}>{weeklyPlan}</Markdown>
           </Animated.View>
@@ -128,22 +140,11 @@ export default function LifeCoach() {
   );
 }
 
-const markdownStyles = {
-  body: { color: '#1A1226', fontSize: 15, lineHeight: 26 },
-  heading1: { fontSize: 20, fontWeight: '800', color: '#6B21A8', marginBottom: 10, marginTop: 16 },
-  heading2: { fontSize: 17, fontWeight: '700', color: '#6B21A8', marginBottom: 8, marginTop: 14 },
-  heading3: { fontSize: 15, fontWeight: '600', color: '#6B21A8', marginBottom: 6, marginTop: 12 },
-  bullet_list: { marginBottom: 8 },
-  ordered_list: { marginBottom: 8 },
-  list_item: { marginBottom: 4 },
-  blockquote: { borderLeftWidth: 4, borderLeftColor: '#6B21A8', paddingLeft: 12, marginVertical: 8, backgroundColor: '#FAFAFE', padding: 10, borderRadius: 8 },
-};
-
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#EDE9F6' },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#6B21A8' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: PRIMARY },
   content: { padding: 20, paddingBottom: 40 },
   heroCard: { backgroundColor: '#FFF5F8', borderRadius: 24, padding: 28, marginBottom: 20, borderWidth: 1, borderColor: '#FCE7F3' },
   heroTitle: { fontSize: 22, fontWeight: '800', color: '#1A1226', textAlign: 'center', marginBottom: 8 },
@@ -154,11 +155,11 @@ const st = StyleSheet.create({
   domainCard: { width: '47%', padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#EDE9F6', alignItems: 'center', gap: 6 },
   domainLabel: { fontSize: 14, fontWeight: '600', color: '#1A1226' },
   input: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, fontSize: 15, color: '#1A1226', borderWidth: 1, borderColor: '#EDE9F6', minHeight: 100, textAlignVertical: 'top', marginTop: 12 },
-  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B21A8', padding: 16, borderRadius: 16, marginTop: 20, gap: 8 },
+  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: PRIMARY, padding: 16, borderRadius: 16, marginTop: 20, gap: 8 },
   btnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  weeklyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: primary, marginTop: 10 },
-  weeklyBtnText: { fontSize: 14, fontWeight: '600', color: primary },
+  weeklyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: PRIMARY, marginTop: 10 },
+  weeklyBtnText: { fontSize: 14, fontWeight: '600', color: PRIMARY },
   resultCard: { marginTop: 24, backgroundColor: '#FAFAFE', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#EDE9F6' },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  resultTitle: { fontSize: 16, fontWeight: '700', color: '#6B21A8' },
+  resultTitle: { fontSize: 16, fontWeight: '700', color: PRIMARY },
 });

@@ -12,23 +12,21 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { useTwinStore } from '../../store/useTwinStore';
 import { apiPost, apiGet } from '../../lib/httpClient';
+import { speakResponse, stopSpeaking } from '../../utils/voice_engine';
 import TypingIndicator from '../../components/TypingIndicator';
 import {
   Menu, Volume2, VolumeX, Mic, MicOff, Sparkles, Brain, Cpu, Search, Cloud, Music,
   Film, DollarSign, TrendingUp, Zap, BatteryCharging, Play, ExternalLink,
 } from 'lucide-react-native';
-import { speakResponse, stopSpeaking } from ../utils/voice_engine';
 import { COLORS, UserBubble, TwinBubble, ToolChip } from './ChatBubbles';
 import { ChatInput } from './ChatInput';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const APP_ICON = require('../../assets/icon.png');
 
-// ==================== ثوابت ====================
 const MAX_FREE_ADS_PER_DAY = 2;
 const ENERGY_PER_AD = 20;
 
-// ==================== مكونات بصرية ====================
 const ThinkingBar = memo(({ stage, isDark }: { stage: string; isDark: boolean }) => {
   const stages: Record<string, { icon: any; text_ar: string; text_en: string; color: string }> = {
     thinking: { icon: Brain, text_ar: 'يفكر...', text_en: 'Thinking...', color: '#8B5CF6' },
@@ -84,7 +82,6 @@ const WelcomeState = memo(({ isDark, lang, twinName, onSuggestion }: any) => {
   );
 });
 
-// ==================== مودال الطاقة ====================
 const EnergyModal = memo(({ visible, onClose, onWatchAd, adStatus, lang }: any) => {
   const isAr = lang === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
@@ -118,7 +115,6 @@ const EnergyModal = memo(({ visible, onClose, onWatchAd, adStatus, lang }: any) 
     </Modal>
   );
 });
-// ==================== المكون الرئيسي ====================
 export default function Chat() {
   const insets = useSafeAreaInsets();
   const {

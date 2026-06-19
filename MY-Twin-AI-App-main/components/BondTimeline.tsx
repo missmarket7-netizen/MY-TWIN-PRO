@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { usetypeof useTwinStore } from '../store/usetypeof useTwinStore';
-import { type RelationshipDims } from '../store/usetypeof useTwinStore';
+import { useTwinStore } from '../store/useTwinStore';
 import { Shield, Heart, Users, Brain, Smile, Handshake } from 'lucide-react-native';
 
 const STAGES = [
@@ -13,7 +12,7 @@ const STAGES = [
   { label_ar: 'توأم روح', label_en: 'Soulmates', min: 90 },
 ];
 
-const DIMENSIONS: { key: keyof RelationshipDims; label_ar: string; label_en: string; icon: any; color: string }[] = [
+const DIMENSIONS: { key: string; label_ar: string; label_en: string; icon: any; color: string }[] = [
   { key: 'trust', label_ar: 'ثقة', label_en: 'Trust', icon: Shield, color: '#3B82F6' },
   { key: 'affection', label_ar: 'مودة', label_en: 'Affection', icon: Heart, color: '#EC4899' },
   { key: 'dependency', label_ar: 'اعتمادية', label_en: 'Dependency', icon: Users, color: '#F59E0B' },
@@ -35,10 +34,10 @@ function getRelationshipSummary(bondLevel: number, dims: any, isAr: boolean) {
 }
 
 export default function BondTimeline() {
-  const bondLevel = usetypeof useTwinStore((s: typeof useTwinStore) => s.bondLevel);
-  const dims = usetypeof useTwinStore((s: typeof useTwinStore) => s.relationshipDims);
-  const lang = usetypeof useTwinStore((s: typeof useTwinStore) => s.lang);
-  const theme = usetypeof useTwinStore((s: typeof useTwinStore) => s.theme);
+  const bondLevel = useTwinStore((s) => s.bondLevel);
+  const dims = useTwinStore((s) => s.relationshipDims);
+  const lang = useTwinStore((s) => s.lang);
+  const theme = useTwinStore((s) => s.theme);
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
