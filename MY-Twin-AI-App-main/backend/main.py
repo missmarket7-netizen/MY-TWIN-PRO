@@ -32,6 +32,8 @@ from app.api.routes.push import router as push_router
 from app.api.routes.tasks import router as tasks_router
 from app.api.routes.calendar import router as calendar_router
 from app.api.routes.ads import router as ads_router
+from app.api.routes.dev import router as dev_router
+from app.api.routes.stats import router as stats_router
 from app.api.routes.features import router as features_router
 from app.infrastructure.integrations.telegram_webhook import router as telegram_router, setup_webhook
 
@@ -66,6 +68,8 @@ app.include_router(push_router)           # /api/push-token
 app.include_router(tasks_router)          # /api/tasks
 app.include_router(calendar_router)       # /api/calendar/*
 app.include_router(ads_router)            # /api/ads/*
+app.include_router(dev_router)
+app.include_router(stats_router)
 app.include_router(features_router)       # /api/features/* (study, code, business, coach, image, dream, content, smart-home)
 app.include_router(telegram_router)       # /api/telegram/*
 
