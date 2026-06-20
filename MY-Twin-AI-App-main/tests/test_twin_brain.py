@@ -1,4 +1,54 @@
-import sys
+curl -s -X POST https://my-twin-pro-production-b744.up.railway.app/api/auth/login \
+  -H "Content-Type: application/json" \
+    -d '{"email":"sir.market7@gmail.com","password":"M#m2606.1307"}' | \
+    python3 -c "
+    import sys, json, urllib.request
+    
+    data = json.load(sys.stdin)
+    token = data.get('token', '')
+    if not token:
+        print('❌ فشل تسجيل الدخول')
+            sys.exit(1)
+            
+            print('✅ تم تسجيل الدخول')
+            print('━' * 50)
+            
+            tests = [
+                ('محادثة', '/api/chat', {'message':'مرحباً، كيف حالك؟','lang':'ar'}, 'reply'),
+                    ('مذاكرة', '/api/features/study', {'topic':'نظرية فيثاغورس','level':'intermediate','type':'explain','lang':'ar'}, 'reply'),
+                        ('برمجة', '/api/features/code', {'task':'print hello world','language':'python','action':'write','lang':'ar'}, 'reply'),
+                            ('أعمال', '/api/features/business', {'text':'مبيعات 1M','analysis_type':'general','lang':'ar'}, 'reply'),
+                                ('مدرب', '/api/features/coach', {'topic':'زيادة الثقة','domain':'personal','lang':'ar'}, 'reply'),
+                                    ('محتوى', '/api/features/content', {'topic':'التسويق','platform':'instagram','tone':'professional','lang':'ar'}, 'reply'),
+                                        ('حلم', '/api/features/dream', {'dream':'حلمت أني أطير','lang':'ar'}, 'interpretation'),
+                                        ]
+                                        
+                                        passed = 0
+                                        failed = 0
+                                        
+                                        for name, path, body, key in tests:
+                                            try:
+                                                    req = urllib.request.Request(
+                                                                f'https://my-twin-pro-production-b744.up.railway.app{path}',
+                                                                            data=json.dumps(body).encode(),
+                                                                                        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
+                                                                                                )
+                                                                                                        resp = urllib.request.urlopen(req)
+                                                                                                                data = json.loads(resp.read())
+                                                                                                                        val = data.get(key, '')
+                                                                                                                                if val and len(str(val)) > 10:
+                                                                                                                                            print(f'✅ {name}: {str(val)[:100]}...')
+                                                                                                                                                        passed += 1
+                                                                                                                                                                else:
+                                                                                                                                                                            print(f'⚠️  {name}: رد قصير - {str(data)[:100]}')
+                                                                                                                                                                                        failed += 1
+                                                                                                                                                                                            except Exception as e:
+                                                                                                                                                                                                    print(f'❌ {name}: {e}')
+                                                                                                                                                                                                            failed += 1
+                                                                                                                                                                                                            
+                                                                                                                                                                                                            print('━' * 50)
+                                                                                                                                                                                                            print(f'📊 النتيجة: {passed} ✅ / {failed} ❌')
+                                                                                                                                                                                                            "import sys
 sys.path.insert(0, '.')
 sys.path.insert(0, './backend')
 from twin_brain import TwinBrain
