@@ -56,26 +56,6 @@
           "defaultChannel": "mytwin_default"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "kotlinVersion": "1.9.24",
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 34,
-            "minSdkVersion": 23
-          },
-          "ios": {
-            "deploymentTarget": "15.1"
-          }
-        }
-      ],
-      [
-        "react-native-iap",
-        {
-          "store": "play"
-        }
-      ],
       "expo-localization"
     ],
     "extra": {
