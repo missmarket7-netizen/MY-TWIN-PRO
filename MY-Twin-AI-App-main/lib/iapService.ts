@@ -1,103 +1,70 @@
-import { Platform } from "react-native";
-import {
-  initConnection,
-  getProducts as iapGetProducts,
-  requestSubscription,
-  getAvailablePurchases,
-  acknowledgePurchaseAndroid,
-  finishTransaction,
-  endConnection,
-  type Product,
-  type Purchase,
-} from "react-native-iap";
+import { Platform, Linking, Alert } from "react-native";
+import { apiPost } from "./httpClient";
+
+const DEEP_LINK_BASE = "https://mytwin.app/subscribe";
 
 const PRODUCT_IDS: string[] = [
-  "plus_monthly",
-  "premium_monthly",
-  "pro_semiannual",
-  "yearly_annual",
+  "plus_monthly", "premium_monthly", "pro_semiannual", "yearly_annual",
 ];
 
 export const TIER_MAP: Record<string, string> = {
-  plus_monthly:    "plus",
+  plus_monthly: "plus",
   premium_monthly: "premium",
-  pro_semiannual:  "pro",
-  yearly_annual:   "yearly",
+  pro_semiannual: "pro",
+  yearly_annual: "yearly",
 };
 
-let isPurchasing = false;
-
 export async function initIAP(): Promise<boolean> {
+  return true;
+}
+
+export async function getProducts(): Promise<any[]> {
+  return PRODUCT_IDS.map(id => ({
+    productId: id,
+    localizedPrice: getPriceForProduct(id),
+    price: getNumericPrice(id),
+    currency: "USD",
+    title: id,
+    description: "",
+  }));
+}
+
+export async function purchaseSubscription(productId: string, userId: string): Promise<void> {
+  const url = `${DEEP_LINK_BASE}?product=${productId}&user=${userId}`;
+  
   try {
-    await initConnection();
-    return true;
-  } catch (e) {
-    console.error("initIAP error:", e);
-    return false;
+    await Linking.openURL(url);
+  } catch (error) {
+    Alert.alert("Error", "Could not open subscription page. Please try again.");
   }
 }
 
-export async function getProducts(): Promise<Product[]> {
-  try {
-    return await iapGetProducts({ skus: PRODUCT_IDS });
-  } catch (e) {
-    console.error("getProducts error:", e);
-    return [];
-  }
+export async function restorePurchases(): Promise<any[]> {
+  return [];
 }
 
-export async function purchaseSubscription(productId: string): Promise<string | null> {
-  if (isPurchasing) return null;
-  isPurchasing = true;
-  try {
-    const purchase = await requestSubscription({ sku: productId });
-    if (!purchase) return null;
-
-    const p = purchase as any;
-    const token = p.purchaseToken || p.transactionReceipt || "";
-    if (!token) return null;
-
-    // Android: acknowledge - token وليس purchaseToken
-    if (Platform.OS === "android" && p.purchaseToken) {
-      try {
-        await acknowledgePurchaseAndroid({ token: p.purchaseToken });
-      } catch (e) {
-        console.warn("acknowledge error:", e);
-      }
-    }
-
-    // iOS: finish - purchase object كاملاً
-    if (Platform.OS === "ios") {
-      try {
-        await finishTransaction({ purchase: purchase as Purchase });
-      } catch (e) {
-        console.warn("finishTransaction error:", e);
-      }
-    }
-
-    return token;
-  } catch (err: any) {
-    if (err?.code === "E_USER_CANCELLED") return null;
-    console.error("purchase error:", err);
-    return null;
-  } finally {
-    isPurchasing = false;
-  }
-}
-
-export async function restorePurchases(): Promise<Purchase[]> {
-  try {
-    return await getAvailablePurchases();
-  } catch (e) {
-    console.error("restorePurchases error:", e);
-    return [];
-  }
-}
-
-export function disconnectIAP(): void {
-  try { endConnection(); } catch {}
-}
+export function disconnectIAP(): void {}
 
 export function getTierFromProductId(productId: string): string {
   return TIER_MAP[productId] || "free";
+}
+
+function getPriceForProduct(id: string): string {
+  const prices: Record<string, string> = {
+    plus_monthly: "$5.99",
+    premium_monthly: "$14.99", 
+    pro_semiannual: "$110",
+    yearly_annual: "$199",
+  };
+  return prices[id] || "$0";
+}
+
+function getNumericPrice(id: string): number {
+  const prices: Record<string, number> = {
+    plus_monthly: 5.99,
+    premium_monthly: 14.99,
+    pro_semiannual: 110,
+    yearly_annual: 199,
+  };
+  return prices[id] || 0;
 }

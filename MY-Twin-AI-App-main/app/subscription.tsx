@@ -8,7 +8,6 @@ import { initIAP, getProducts, purchaseSubscription, restorePurchases, TIER_MAP 
 import { Tier, useTwinStore } from '../store/useTwinStore';
 import Header from '../components/Header';
 import { CheckCircle2, Crown, Shield, Sparkles, GraduationCap, Code2, TrendingUp, Heart, Image as ImageIcon, Moon, PenLine, Home } from 'lucide-react-native';
-import { verifyReceipt } from '../lib/httpClient';
 
 interface StoreProduct {
   productId: string;
@@ -127,6 +126,7 @@ const PLANS: Plan[] = [
     highlight: true,
   },
 ];
+
 function ConsciousnessBar({ layers, planId }: { layers: number; planId: string }) {
   const colors: Record<string, string> = {
     free: '#94A3B8', plus: '#F59E0B', premium: '#3B82F6', pro: '#8B5CF6', yearly: '#6B21A8'
@@ -150,7 +150,7 @@ const cbStyles = StyleSheet.create({
 });
 
 export default function SubscriptionScreen() {
-  const { tier, updateTier, lang, theme, hasUsedTrial, setHasUsedTrial } = useTwinStore();
+  const { tier, updateTier, lang, theme, hasUsedTrial, setHasUsedTrial, userId } = useTwinStore();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [initLoading, setInitLoading] = useState(true);
@@ -190,20 +190,16 @@ export default function SubscriptionScreen() {
   }, []);
 
   const handlePurchase = async (plan: Plan) => {
-    if (loadingId || !plan.productId) return;
+    if (loadingId || !plan.productId || !userId) return;
     if (plan.id === 'free') return;
     setLoadingId(plan.id);
     try {
-      const purchaseResult = await purchaseSubscription(plan.productId);
-      if (purchaseResult) {
-        const verified = await verifyReceipt(purchaseResult, plan.productId);
-        if (verified.valid) {
-          const newTier = TIER_MAP[plan.productId];
-          if (newTier) { updateTier(newTier as Tier); if (plan.trialDays > 0) setHasUsedTrial(true); }
-          Alert.alert('✅', isAr ? 'تم تفعيل اشتراكك' : 'Subscription activated');
-          router.back();
-        }
-      }
+      // فتح صفحة الاشتراك الخارجية عبر deep link
+      await purchaseSubscription(plan.productId, userId);
+      Alert.alert(
+        isAr ? 'تم الفتح' : 'Opened',
+        isAr ? 'تم فتح صفحة الاشتراك. سيتم تفعيل اشتراكك تلقائياً بعد إتمام الدفع.' : 'Subscription page opened. Your subscription will be activated automatically after payment.'
+      );
     } catch (e: any) {
       if (!e?.message?.includes('cancelled')) Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'فشل الشراء' : 'Purchase failed');
     } finally { setLoadingId(null); }

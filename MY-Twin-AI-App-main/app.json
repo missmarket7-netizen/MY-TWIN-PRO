@@ -58,13 +58,7 @@
           "defaultChannel": "mytwin_default"
         }
       ],
-      "expo-localization",
-      [
-        "react-native-iap",
-        {
-          "store": "play"
-        }
-      ]
+      "expo-localization"
     ],
     "extra": {
       "router": {
