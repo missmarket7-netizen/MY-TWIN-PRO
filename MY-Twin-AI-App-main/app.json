@@ -3,7 +3,7 @@
     "name": "MyTwin",
     "slug": "mytwin",
     "scheme": "mytwin",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -12,9 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.soulsync.mytwin",
@@ -86,6 +84,9 @@
       },
       "eas": {
         "projectId": "f14afd24-5d0e-405a-9ca1-db5b41d431a2"
+      },
+      "cli": {
+        "appVersionSource": "local"
       }
     },
     "runtimeVersion": {

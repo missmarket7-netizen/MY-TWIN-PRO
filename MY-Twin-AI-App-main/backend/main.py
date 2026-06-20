@@ -77,3 +77,11 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy", "routes": loaded}
+
+@app.get("/ready")
+async def ready():
+    return {"status": "ready"}
+
+@app.get("/live")
+async def live():
+    return {"status": "live"}

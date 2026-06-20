@@ -1,0 +1,21 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r backend/requirements.txt
+      - run: cd backend && pytest tests/ -v --cov=app --cov-report=term
+      - run: cd backend && bandit -r app/ -ll || true
+      - run: cd backend && docker build -t mytwin .
+      - run: cd backend && python run.py &
+      - run: sleep 5 && curl -s http://localhost:8000/health
