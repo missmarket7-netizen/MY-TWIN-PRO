@@ -1,98 +1,40 @@
-"""
-Metrics Service – numeric counters and histograms.
-Tracks requests, latency, cost, provider distribution, intents.
-Sends aggregated metrics to Sentry and cache for dashboard.
-"""
-import time
-import logging
+"""Metrics Service – tracks KPIs for SaaS at scale."""
+import time, logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+from collections import defaultdict
 
 logger = logging.getLogger("metrics_service")
 
-# In‑memory store (migrate to Redis for multi‑worker)
-_metrics: Dict[str, Any] = {
-    "requests": 0,
-    "errors": 0,
-    "total_latency_ms": 0.0,
-    "latency_samples": [],
-    "providers": {},
-    "intents": {},
-    "cost_estimate": 0.0,
-    "last_reset": datetime.now(timezone.utc).isoformat(),
-}
+class MetricsService:
+    def __init__(self):
+        self._metrics = defaultdict(int)
+        self._latencies = []
+        self._errors = []
+        self._start_time = datetime.now(timezone.utc)
+    
+    def record_request(self, path: str, status_code: int, latency_ms: float, user_tier: str = "free"):
+        self._metrics[f"requests:{path}"] += 1
+        self._metrics[f"requests:{status_code}"] += 1
+        self._metrics[f"tier:{user_tier}"] += 1
+        self._latencies.append(latency_ms)
+        if status_code >= 500:
+            self._errors.append({"path": path, "status": status_code, "time": datetime.now(timezone.utc).isoformat()})
+    
+    def get_snapshot(self) -> Dict[str, Any]:
+        latencies = self._latencies[-1000:] if self._latencies else [0]
+        avg_latency = sum(latencies) / len(latencies)
+        sorted_lat = sorted(latencies)
+        p95 = sorted_lat[int(len(sorted_lat) * 0.95)] if len(sorted_lat) > 20 else max(sorted_lat)
+        uptime = (datetime.now(timezone.utc) - self._start_time).total_seconds()
+        
+        return {
+            "uptime_seconds": uptime,
+            "total_requests": self._metrics.get("requests:/api/chat", 0),
+            "avg_latency_ms": round(avg_latency, 2),
+            "p95_latency_ms": round(p95, 2),
+            "error_count": len(self._errors),
+            "by_tier": {k: v for k, v in self._metrics.items() if k.startswith("tier:")},
+        }
 
-MAX_LATENCY_SAMPLES = 200
-
-
-def record_request(
-    duration_ms: float,
-    provider: str = "unknown",
-    intent: str = "general",
-    tokens_used: int = 0,
-    error: bool = False,
-):
-    """Record a single request."""
-    _metrics["requests"] += 1
-    _metrics["total_latency_ms"] += duration_ms
-    _metrics["latency_samples"].append(duration_ms)
-    if len(_metrics["latency_samples"]) > MAX_LATENCY_SAMPLES:
-        _metrics["latency_samples"] = _metrics["latency_samples"][-MAX_LATENCY_SAMPLES:]
-
-    _metrics["providers"][provider] = _metrics["providers"].get(provider, 0) + 1
-    _metrics["intents"][intent] = _metrics["intents"].get(intent, 0) + 1
-
-    # Cost estimation (free providers → 0)
-    from app.domain.services.cost_service import estimate_cost
-    _metrics["cost_estimate"] += estimate_cost(provider, tokens_used)
-
-    if error:
-        _metrics["errors"] += 1
-
-    # Send to Sentry as breadcrumb for current transaction
-    try:
-        import sentry_sdk
-        sentry_sdk.add_breadcrumb(
-            category="metrics",
-            message=f"Request: {duration_ms:.0f}ms via {provider} intent={intent}",
-            level="info",
-        )
-    except Exception:
-        pass
-
-
-def get_snapshot() -> Dict[str, Any]:
-    """Return current metrics snapshot."""
-    samples = _metrics["latency_samples"]
-    avg = sum(samples) / len(samples) if samples else 0.0
-    return {
-        "requests": _metrics["requests"],
-        "errors": _metrics["errors"],
-        "avg_latency_ms": round(avg, 2),
-        "p95_latency_ms": round(_percentile(samples, 0.95), 2) if samples else 0.0,
-        "p99_latency_ms": round(_percentile(samples, 0.99), 2) if samples else 0.0,
-        "providers": dict(_metrics["providers"]),
-        "intents": dict(_metrics["intents"]),
-        "cost_estimate": round(_metrics["cost_estimate"], 6),
-        "last_reset": _metrics["last_reset"],
-    }
-
-
-def reset():
-    """Reset all metrics (e.g., daily)."""
-    _metrics["requests"] = 0
-    _metrics["errors"] = 0
-    _metrics["total_latency_ms"] = 0.0
-    _metrics["latency_samples"].clear()
-    _metrics["providers"].clear()
-    _metrics["intents"].clear()
-    _metrics["cost_estimate"] = 0.0
-    _metrics["last_reset"] = datetime.now(timezone.utc).isoformat()
-
-
-def _percentile(sorted_data: list, pct: float) -> float:
-    if not sorted_data:
-        return 0.0
-    data = sorted(sorted_data)
-    idx = int(len(data) * pct)
-    return data[min(idx, len(data) - 1)]
+metrics = MetricsService()

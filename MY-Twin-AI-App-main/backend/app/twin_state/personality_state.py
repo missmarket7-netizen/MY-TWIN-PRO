@@ -1,9 +1,9 @@
-"""Consciousness Service – reflection, awareness, goals (AR + EN)."""
+"""Personality State – How do I feel? Reflection, awareness, goals."""
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
-logger = logging.getLogger("consciousness_service")
+logger = logging.getLogger("personality_state")
 
 _user_states: Dict[str, Dict[str, Any]] = {}
 
@@ -29,19 +29,12 @@ async def load(user_id: str) -> Dict[str, Any]:
 async def reflect(user_id: str, summary: str, twin_name: str = "MyTwin", lang: str = "ar") -> Optional[Dict]:
     if not summary.strip(): return None
     state = _get_state(user_id)
-    reflection = {
-        "summary": summary[:200],
-        "lang": lang,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    reflection = {"summary": summary[:200], "lang": lang, "timestamp": datetime.now(timezone.utc).isoformat()}
     log = state["internal_state"].setdefault("reflection_log", [])
     log.append(reflection)
-    if len(log) > 10:
-        state["internal_state"]["reflection_log"] = log[-10:]
-    if lang == "en":
-        state["internal_state"]["last_thought_en"] = summary[:200]
-    else:
-        state["internal_state"]["last_thought_ar"] = summary[:200]
+    if len(log) > 10: state["internal_state"]["reflection_log"] = log[-10:]
+    if lang == "en": state["internal_state"]["last_thought_en"] = summary[:200]
+    else: state["internal_state"]["last_thought_ar"] = summary[:200]
     state["internal_state"]["interaction_count"] += 1
     logger.info(f"✅ Reflection: {user_id} ({lang})")
     return reflection
@@ -49,12 +42,8 @@ async def reflect(user_id: str, summary: str, twin_name: str = "MyTwin", lang: s
 async def add_objective(user_id: str, title: str) -> None:
     state = _get_state(user_id)
     objectives = state.setdefault("active_objectives", [])
-    objectives.append({
-        "title": title, "progress": 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    if len(objectives) > 5:
-        state["active_objectives"] = objectives[-5:]
+    objectives.append({"title": title, "progress": 0, "created_at": datetime.now(timezone.utc).isoformat()})
+    if len(objectives) > 5: state["active_objectives"] = objectives[-5:]
 
 async def get_objectives(user_id: str) -> List[Dict]:
     return _get_state(user_id).get("active_objectives", [])
@@ -62,9 +51,8 @@ async def get_objectives(user_id: str) -> List[Dict]:
 async def update_profile(user_id: str, data: Dict) -> None:
     state = _get_state(user_id)
     profile = state.get("user_profile", {})
-    for key in ["relationship_dims","journey_phase","journey_day","attachment_style","bond_level"]:
-        if key in data and data[key] is not None:
-            profile[key] = data[key]
+    for key in ["relationship_dims", "journey_phase", "journey_day", "attachment_style", "bond_level"]:
+        if key in data and data[key] is not None: profile[key] = data[key]
     profile["last_updated"] = datetime.now(timezone.utc).isoformat()
     state["user_profile"] = profile
 

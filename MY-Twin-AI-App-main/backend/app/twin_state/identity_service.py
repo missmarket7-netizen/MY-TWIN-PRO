@@ -12,37 +12,22 @@ IDENTITY_TEMPLATES = {
 
 _user_identities: Dict[str, Dict[str, Any]] = {}
 
-
 def _get_state(user_id: str) -> Dict[str, Any]:
     if user_id not in _user_identities:
         _user_identities[user_id] = {
             "traits": DEFAULT_TRAITS[:],
             "evolution_stage": 0,
-            "description_ar": IDENTITY_TEMPLATES["ar"].format(
-                twin_name="MyTwin", traits_desc="، ".join(DEFAULT_TRAITS)
-            ),
-            "description_en": IDENTITY_TEMPLATES["en"].format(
-                twin_name="MyTwin", traits_desc=", ".join(DEFAULT_TRAITS)
-            ),
+            "description_ar": IDENTITY_TEMPLATES["ar"].format(twin_name="MyTwin", traits_desc="، ".join(DEFAULT_TRAITS)),
+            "description_en": IDENTITY_TEMPLATES["en"].format(twin_name="MyTwin", traits_desc=", ".join(DEFAULT_TRAITS)),
         }
     return _user_identities[user_id]
-
 
 async def get_identity(user_id: str, twin_name: str = "MyTwin", lang: str = "ar") -> Dict[str, Any]:
     state = _get_state(user_id)
     if twin_name != "MyTwin":
-        state["description_ar"] = IDENTITY_TEMPLATES["ar"].format(
-            twin_name=twin_name, traits_desc="، ".join(state["traits"])
-        )
-        state["description_en"] = IDENTITY_TEMPLATES["en"].format(
-            twin_name=twin_name, traits_desc=", ".join(state["traits"])
-        )
-    return {
-        "traits": state["traits"],
-        "evolution_stage": state["evolution_stage"],
-        "description": state.get(f"description_{lang}", state["description_ar"]),
-    }
-
+        state["description_ar"] = IDENTITY_TEMPLATES["ar"].format(twin_name=twin_name, traits_desc="، ".join(state["traits"]))
+        state["description_en"] = IDENTITY_TEMPLATES["en"].format(twin_name=twin_name, traits_desc=", ".join(state["traits"]))
+    return {"traits": state["traits"], "evolution_stage": state["evolution_stage"], "description": state.get(f"description_{lang}", state["description_ar"])}
 
 async def evolve(user_id: str, new_trait: str, reflection: str) -> None:
     state = _get_state(user_id)
@@ -54,10 +39,8 @@ async def evolve(user_id: str, new_trait: str, reflection: str) -> None:
     state["description_en"] = IDENTITY_TEMPLATES["en"].format(twin_name="MyTwin", traits_desc=traits_str)
     logger.info(f"🎭 Identity evolved: stage {state['evolution_stage']}, traits: {state['traits']}")
 
-
 async def get_traits(user_id: str) -> List[str]:
     return _get_state(user_id)["traits"]
-
 
 async def get_evolution_stage(user_id: str) -> int:
     return _get_state(user_id)["evolution_stage"]
