@@ -98,7 +98,6 @@ export async function initAnalytics(): Promise<boolean> {
       posthog = new PostHog(apiKey, {
         host,
         // إعدادات إضافية للخصوصية
-        captureMode: 'json',
         flushAt: 5,
         flushInterval: 5000,
       });
