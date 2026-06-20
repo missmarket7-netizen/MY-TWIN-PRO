@@ -30,7 +30,6 @@ let isPurchasing = false;
 export async function initIAP(): Promise<boolean> {
   try {
     await initConnection();
-    console.log("Google Play Billing connected");
     return true;
   } catch (e) {
     console.error("initIAP error:", e);
@@ -58,19 +57,19 @@ export async function purchaseSubscription(productId: string): Promise<string | 
     const token = p.purchaseToken || p.transactionReceipt || "";
     if (!token) return null;
 
-    // Android: acknowledge
+    // Android: acknowledge - token وليس purchaseToken
     if (Platform.OS === "android" && p.purchaseToken) {
       try {
-        await acknowledgePurchaseAndroid({ purchaseToken: p.purchaseToken });
+        await acknowledgePurchaseAndroid({ token: p.purchaseToken });
       } catch (e) {
         console.warn("acknowledge error:", e);
       }
     }
 
-    // iOS: finish
-    if (Platform.OS === "ios" && p.transactionId) {
+    // iOS: finish - purchase object كاملاً
+    if (Platform.OS === "ios") {
       try {
-        await finishTransaction({ transactionId: p.transactionId });
+        await finishTransaction({ purchase: purchase as Purchase });
       } catch (e) {
         console.warn("finishTransaction error:", e);
       }
