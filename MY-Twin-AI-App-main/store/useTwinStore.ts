@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiPost } from '../lib/httpClient';
+import { cacheResponse, getCachedResponse, addToOfflineQueue, getNetworkStatus } from '../lib/offlineService';
 
-// ==================== TYPES ====================
 export interface ChatMessage {
   id: string;
   role: 'user' | 'twin';
@@ -15,21 +15,14 @@ export interface ChatMessage {
   provider?: string;
   thinkingStage?: string;
   memoryRecall?: boolean;
+  offline?: boolean;
 }
 
 export interface RelationshipDims {
-  trust: number;
-  attachment: number;
-  comfort: number;
-  openness: number;
-  romantic: number;
-  humor: number;
-  attStyle: number;
-  affection?: number;
-  support?: number;
-  empathy?: number;
-  communication?: number;
-  dependency?: number;
+  trust: number; attachment: number; comfort: number; openness: number;
+  romantic: number; humor: number; attStyle: number;
+  affection?: number; support?: number; empathy?: number;
+  communication?: number; dependency?: number;
   [key: string]: number | undefined;
 }
 
@@ -40,39 +33,17 @@ export type ReplyStyle = 'short' | 'medium' | 'long';
 export type Theme = 'dark' | 'light';
 export type Lang = 'ar' | 'en';
 
-// ==================== STORE ====================
 export interface TwinStore {
-  // State
-  userId: string;
-  twinName: string;
-  twinGender: TwinGender;
-  twinStyle: TwinStyle;
-  replyStyle: ReplyStyle;
-  twinTraits: string[];
-  bondLevel: number;
-  relationshipDims: RelationshipDims;
-  tier: Tier;
-  theme: Theme;
-  lang: Lang;
-  calmMode: boolean;
-  chatHistory: ChatMessage[];
-  isThinking: boolean;
-  thinkingStage: string;
-  streamingText: string;
-  twinEnergy: number;
-  totalMessages: number;
-  totalMinutes: number;
-  streakDays: number;
-  journeyPhase: string;
-  attachmentStyle: string;
-  menuVisible: boolean;
-  voiceEnabled: boolean;
-  voicePersonality: string;
-  hasUsedTrial: boolean;
-  points: number;
-  badges: string[];
+  userId: string; twinName: string; twinGender: TwinGender; twinStyle: TwinStyle;
+  replyStyle: ReplyStyle; twinTraits: string[]; bondLevel: number;
+  relationshipDims: RelationshipDims; tier: Tier; theme: Theme; lang: Lang;
+  calmMode: boolean; chatHistory: ChatMessage[]; isThinking: boolean;
+  thinkingStage: string; streamingText: string; twinEnergy: number;
+  totalMessages: number; totalMinutes: number; streakDays: number;
+  journeyPhase: string; attachmentStyle: string; menuVisible: boolean;
+  voiceEnabled: boolean; voicePersonality: string; hasUsedTrial: boolean;
+  points: number; badges: string[]; isOnline: boolean;
 
-  // Actions
   setAuth: (userId: string) => void;
   setTwinName: (name: string) => void;
   setTwinGender: (gender: TwinGender) => void;
@@ -107,6 +78,7 @@ export interface TwinStore {
   setHasUsedTrial: (val: boolean) => void;
   addPoints: (pts: number) => void;
   addBadge: (badge: string) => void;
+  setOnline: (online: boolean) => void;
 }
 
 const generateId = () => 'msg_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
@@ -121,7 +93,7 @@ const initialState = {
   streamingText: '', twinEnergy: 100, totalMessages: 0, totalMinutes: 0, streakDays: 0,
   journeyPhase: 'introduction', attachmentStyle: 'unknown', menuVisible: false,
   voiceEnabled: false, voicePersonality: 'friend', hasUsedTrial: false,
-  points: 0, badges: [] as string[],
+  points: 0, badges: [] as string[], isOnline: true,
 };
 
 export const useTwinStore = create<TwinStore>()(
@@ -141,6 +113,7 @@ export const useTwinStore = create<TwinStore>()(
       toggleCalmMode: () => set((s) => ({ calmMode: !s.calmMode })),
       setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
       setHasUsedTrial: (val) => set({ hasUsedTrial: val }),
+      setOnline: (online) => set({ isOnline: online }),
 
       addMessage: (msg) => set((s) => ({
         chatHistory: [...s.chatHistory, {
@@ -148,6 +121,7 @@ export const useTwinStore = create<TwinStore>()(
           content: msg.content || '', image: msg.image, timestamp: msg.timestamp || Date.now(),
           failed: msg.failed, emotion: msg.emotion, provider: msg.provider,
           thinkingStage: msg.thinkingStage, memoryRecall: msg.memoryRecall,
+          offline: msg.offline || false,
         }].slice(-200),
         totalMessages: s.totalMessages + 1,
       })),
@@ -155,9 +129,37 @@ export const useTwinStore = create<TwinStore>()(
       sendMessage: async (message: string) => {
         const state = get();
         set({ isThinking: true, thinkingStage: 'thinking', streamingText: '' });
+        
+        // Add user message immediately
         state.addMessage({ role: 'user', content: message });
+        
         const twinMsgId = generateId();
-        state.addMessage({ id: twinMsgId, role: 'twin', content: '' });
+        state.addMessage({ id: twinMsgId, role: 'twin', content: '', thinkingStage: 'thinking' });
+
+        // Check offline cache first
+        const cached = await getCachedResponse(message);
+        if (cached) {
+          set((s) => ({
+            chatHistory: s.chatHistory.map(m =>
+              m.id === twinMsgId ? { ...m, content: cached, provider: 'cache', thinkingStage: 'complete' } : m
+            ),
+            isThinking: false, thinkingStage: 'complete',
+          }));
+          return;
+        }
+
+        // Check if online
+        if (!getNetworkStatus()) {
+          // Add to offline queue
+          await addToOfflineQueue(message);
+          set((s) => ({
+            chatHistory: s.chatHistory.map(m =>
+              m.id === twinMsgId ? { ...m, content: '📡 سيتم إرسال رسالتك عند عودة الاتصال 💜', offline: true, thinkingStage: 'complete' } : m
+            ),
+            isThinking: false, thinkingStage: 'complete',
+          }));
+          return;
+        }
 
         try {
           const response = await apiPost('/api/chat', {
@@ -165,16 +167,24 @@ export const useTwinStore = create<TwinStore>()(
             history: state.chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content })),
             lang: state.lang,
           });
+          
+          // Cache the response
+          await cacheResponse(message, response.reply);
+          
           set((s) => ({
             chatHistory: s.chatHistory.map(m =>
-              m.id === twinMsgId ? { ...m, content: response.reply, emotion: response.emotion?.primary, provider: response.provider || 'multi_ai' } : m
+              m.id === twinMsgId ? { ...m, content: response.reply, emotion: response.emotion?.primary, provider: response.provider || 'multi_ai', thinkingStage: 'complete' } : m
             ),
             isThinking: false, thinkingStage: 'complete',
           }));
         } catch (error: any) {
+          // If network error, add to offline queue
+          if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+            await addToOfflineQueue(message);
+          }
           set((s) => ({
             chatHistory: s.chatHistory.map(m =>
-              m.id === twinMsgId ? { ...m, content: 'عذراً، حدث خطأ في الاتصال. حاول مرة أخرى 💜', failed: true, provider: 'error' } : m
+              m.id === twinMsgId ? { ...m, content: 'عذراً، حدث خطأ في الاتصال. حاول مرة أخرى 💜', failed: true, offline: true, thinkingStage: 'complete' } : m
             ),
             isThinking: false, thinkingStage: 'complete',
           }));
@@ -204,7 +214,7 @@ export const useTwinStore = create<TwinStore>()(
     }),
     {
       name: 'mytwin-store',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         userId: state.userId, twinName: state.twinName, twinGender: state.twinGender,

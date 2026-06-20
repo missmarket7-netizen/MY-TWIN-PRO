@@ -5,6 +5,7 @@ import { useTwinStore } from '../../store/useTwinStore';
 import { router } from 'expo-router';
 import { apiPost } from '../../lib/httpClient';
 import { ArrowLeft, BookOpen, Send, Clock, Target, Lightbulb, GraduationCap, Copy, RefreshCw } from 'lucide-react-native';
+import { speakResponse } from "../../utils/voice_engine";
 import * as Clipboard from 'expo-clipboard';
 import Markdown from 'react-native-markdown-display';
 
