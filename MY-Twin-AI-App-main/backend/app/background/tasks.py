@@ -1,6 +1,6 @@
 """
-Background Tasks v2.0 – متكاملة مع TCMA والمحركات الجديدة
-=============================================================
+Background Tasks v3.0 – متكاملة مع TCMA والمحركات الجديدة + Event Bus
+==========================================================================
 تستبدل الخدمات القديمة بطبقات TCMA والمحركات الاستباقية.
 """
 import logging
@@ -25,6 +25,7 @@ async def schedule_post_reply(
     await enqueue("process_reflections", _process_reflections, user_id, message)
     await enqueue("update_identity", _update_identity, user_id, message)
     await enqueue("proactive_check", _proactive_check, user_id)
+    await enqueue("emit_event", _emit_chat_event, user_id, message, reply, emotion)
 
 async def _update_relationship(user_id: str, message: str, emotion: Dict = None, context_data: Dict = None):
     try:
@@ -80,4 +81,18 @@ async def _proactive_check(user_id: str):
     except Exception as e:
         logger.warning(f"Proactive check failed: {e}")
 
-logger.info("✅ Background Tasks v2.0 with TCMA")
+async def _emit_chat_event(user_id: str, message: str, reply: str, emotion: Dict = None):
+    """إرسال حدث محادثة إلى Event Bus"""
+    try:
+        from app.events.event_bus import emit
+        await emit({
+            "type": "message_received",
+            "user_id": user_id,
+            "content": message[:200],
+            "reply": reply[:200],
+            "emotion": emotion.get("primary", "neutral") if emotion else "neutral"
+        })
+    except Exception as e:
+        logger.warning(f"Event emit failed: {e}")
+
+logger.info("✅ Background Tasks v3.0 with TCMA + Event Bus")

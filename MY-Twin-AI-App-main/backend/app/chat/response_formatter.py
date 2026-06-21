@@ -1,23 +1,80 @@
 """
-MyTwin – Unified Response Engine v1.0
-- Formatter + Styler مدمجين
-- دعم عربي عميق (RTL، علامات ترقيم)
-- تحويل ذكي للجداول والقوائم
+MyTwin – Response Formatter v3.0 (سياقي وذكي)
+================================================
+- تنسيق متكامل للغة العربية (RTL، علامات ترقيم)
+- نهايات ذكية سياقية (بدون أسئلة ثابتة)
+- دعم الإيموجي والقوائم والجداول
 """
-import re
-import logging
+import re, random, logging
+from typing import Optional
 
-logger = logging.getLogger("response_engine")
+logger = logging.getLogger("response_formatter")
 
+# ============================================================
+# 1. الإيموجي حسب الفئة
+# ============================================================
 EMOJI_MAP = {
     "weather": "🌤️", "music": "🎵", "news": "📰", "goals": "🎯",
     "support": "💜", "general": "💬", "search": "🔍",
     "coding": "💻", "comparison": "📊", "emotional": "💕",
+    "study": "📚", "business": "💼", "dream": "🌙", "food": "🥗",
+    "fitness": "🏋️", "smart_home": "🏠", "task": "✅",
 }
 
-class ResponseEngine:
+# ============================================================
+# 2. النهايات الذكية (بدون أسئلة ثابتة)
+# ============================================================
+SMART_ENDINGS = {
+    "study": {
+        "ar": [
+            "هل تحب نتعمق في نقطة معينة؟ 📚",
+            "تقدر تسألني أي سؤال عن الموضوع ده.",
+            "فهمت الشرح ولا أشرح بطريقة تانية؟",
+        ],
+        "en": [
+            "Want to dive deeper into this topic? 📚",
+            "Feel free to ask any questions about this.",
+            "Did this explanation make sense?",
+        ],
+    },
+    "business": {
+        "ar": [
+            "هل تحب نحلل الفكرة أكثر؟ 💼",
+            "تقدر تطلب دراسة جدوى كاملة.",
+            "عندك أي استفسار عن المشروع؟",
+        ],
+        "en": [
+            "Want me to analyze this idea further? 💼",
+            "You can request a full feasibility study.",
+        ],
+    },
+    "emotional": {
+        "ar": [
+            "أنا معك دايماً 💜",
+            "خد وقتك، أنا موجود.",
+            "حابب تحكي أكثر؟",
+        ],
+        "en": [
+            "I'm here with you always 💜",
+            "Take your time, I'm here.",
+        ],
+    },
+    "general": {
+        "ar": [
+            "إيه رأيك؟ 💭",
+            "فيه حاجة تانية أقدر أساعدك فيها؟",
+            "هل في نقطة معينة حابب تركز عليها؟",
+        ],
+        "en": [
+            "What do you think? 💭",
+            "Is there anything else I can help with?",
+        ],
+    },
+}
+
+class ResponseFormatter:
     def process(self, reply: str, intent: str = "general", lang: str = "ar") -> str:
-        """يعالج الرد بالكامل: تنسيق + تجميل"""
+        """يعالج الرد بالكامل: تنسيق + نهاية ذكية"""
         if not reply:
             return reply
 
@@ -25,67 +82,73 @@ class ResponseEngine:
         reply = re.sub(r'\n{3,}', '\n\n', reply)
         reply = re.sub(r' {2,}', ' ', reply)
 
-        # 2. تحسين الفقرات العربية
+        # 2. تحسين علامات الترقيم العربية
         if lang == "ar":
-            # مسافة بعد الفاصلة العربية
             reply = re.sub(r'،([^\s])', r'، \1', reply)
-            # مسافة بعد الفاصلة المنقوطة
             reply = re.sub(r'؛([^\s])', r'؛ \1', reply)
 
-        # 3. تحويل الجداول النصية إلى Markdown (إذا وجدت)
-        reply = self._text_to_table(reply)
+        # 3. تحويل الخطوات إلى Markdown
+        reply = self._format_steps(reply, lang)
 
-        # 4. تحويل الخطوات المرقمة إلى Markdown
-        reply = self._number_steps(reply)
-
-        # 5. إضافة إيموجي مناسب (حد أقصى 1)
+        # 4. إضافة إيموجي مناسب (واحد فقط)
         reply = self._add_emoji(reply, intent)
 
-        # 6. التأكد من وجود نهاية ذكية
-        reply = self._ensure_smart_ending(reply, lang)
+        # 5. نهاية ذكية سياقية (اختيارية)
+        reply = self._add_smart_ending(reply, intent, lang)
 
         return reply.strip()
 
-    def _text_to_table(self, text: str) -> str:
-        """تحويل نص يقارن بين شيئين إلى جدول Markdown"""
-        if "مقارنة" in text or "قارن" in text or "compare" in text.lower():
-            # المنطق هنا: إذا وجد كلمات مفتاحية، نضيف تلميحاً للجدول
-            # لكن النموذج هو من يقرر التنسيق النهائي
-            pass
-        return text
-
-    def _number_steps(self, text: str) -> str:
+    def _format_steps(self, text: str, lang: str) -> str:
         """تحويل الخطوات إلى Markdown مرقم"""
-        # إذا كان النص يحتوي على "الخطوة" أو "step"
-        if re.search(r'(الخطوة|خطوة|step)\s*\d', text, re.IGNORECASE):
-            text = re.sub(r'(الخطوة|خطوة|Step)\s*(\d)', r'\n**\1 \2:**', text)
+        patterns = [
+            (r'(الخطوة|خطوة)\s*(\d+)', r'\n**\1 \2:**'),
+            (r'(Step)\s*(\d+)', r'\n**\1 \2:**'),
+        ]
+        for pattern, replacement in patterns:
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
         return text
 
     def _add_emoji(self, text: str, intent: str) -> str:
-        """إضافة إيموجي واحد إذا لم يكن موجوداً"""
+        """إضافة إيموجي مناسب إذا لم يكن موجوداً"""
         emoji = EMOJI_MAP.get(intent)
-        if emoji and emoji not in text[-10:]:
-            # إضافة قبل آخر سطر
-            lines = text.split('\n')
-            if lines:
-                lines[-1] = lines[-1].rstrip() + f" {emoji}"
-            return '\n'.join(lines)
+        if not emoji:
+            return text
+
+        # لا نضيف إذا كان هناك إيموجي بالفعل في آخر 20 حرفاً
+        last_chars = text[-20:] if len(text) > 20 else text
+        if any(ord(c) > 127 for c in last_chars[-3:]):  # فحص وجود إيموجي
+            return text
+
+        lines = text.split('\n')
+        if lines:
+            lines[-1] = lines[-1].rstrip() + f" {emoji}"
+        return '\n'.join(lines)
+
+    def _add_smart_ending(self, text: str, intent: str, lang: str) -> str:
+        """إضافة نهاية سياقية ذكية (بدون أسئلة ثابتة)"""
+        # 1. لا نضيف نهاية إذا كان النص ينتهي بسؤال أصلاً
+        if text.rstrip().endswith('?'):
+            return text
+        if text.rstrip().endswith('؟'):
+            return text
+
+        # 2. لا نضيف نهاية إذا كان النص قصيراً جداً
+        if len(text) < 50:
+            return text
+
+        # 3. لا نضيف نهاية إذا كان هناك إيموجي في آخر سطر
+        last_line = text.split('\n')[-1].strip() if '\n' in text else text.strip()
+        if any(ord(c) > 127 for c in last_line[-3:]):
+            return text
+
+        # 4. اختيار نهاية ذكية حسب الفئة
+        endings = SMART_ENDINGS.get(intent, SMART_ENDINGS["general"]).get(lang, [])
+        if endings:
+            chosen = random.choice(endings)
+            return text + f"\n\n{chosen}"
+
         return text
 
-    def _ensure_smart_ending(self, text: str, lang: str) -> str:
-        """التأكد من وجود سؤال أو خطوة تالية"""
-        endings_ar = ["؟", "🎯", "💭", "🌟", "💜", "📝", "🎵", "🌤️"]
-        endings_en = ["?", "🎯", "💭", "🌟", "💜", "📝", "🎵", "🌤️"]
-        endings = endings_ar if lang == "ar" else endings_en
 
-        # إذا كان آخر حرف ليس استفهاماً أو إيموجي، نضيف سؤالاً عاماً
-        if not any(text.rstrip().endswith(e) for e in endings):
-            if lang == "ar":
-                text += "\n\nإيه رأيك في الموضوع ده؟ 💭"
-            else:
-                text += "\n\nWhat do you think about this? 💭"
-        return text
-
-
-response_engine = ResponseEngine()
-print("✅ Unified Response Engine v1.0")
+response_engine = ResponseFormatter()
+logger.info("✅ Response Formatter v3.0 initialized")
