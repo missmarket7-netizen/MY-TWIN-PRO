@@ -90,8 +90,6 @@ ROUTES_REGISTRY = {
     "onboarding":  "app.api.routes.onboarding",
     "account":     "app.api.routes.account",
     "push":        "app.api.routes.push",
-    "tasks":       "app.api.routes.tasks",
-    "calendar":    "app.api.routes.calendar",
     "ads":         "app.api.routes.ads",
     "features":    "app.api.routes.features",
     "stats":       "app.api.routes.stats",
@@ -108,14 +106,18 @@ ROUTES_REGISTRY = {
     "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
     "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
     "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
+    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
     "code_lab":    "app.api.routes.code_lab_routes",   # C.O.D.E. Lab
     "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
     "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
     "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
+    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
     "ai_trainer":  "app.api.routes.ai_trainer_routes",  # AI Trainer
     "dreams":      "app.api.routes.dreams",
     "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
+    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
     "smart_home":  "app.api.routes.smart_home",
+    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
     "reports":     "app.api.routes.reports",               # تقارير أسبوعية
     "graph":       "app.api.routes.graph_routes",           # تنقيب الرسم البياني
 }
