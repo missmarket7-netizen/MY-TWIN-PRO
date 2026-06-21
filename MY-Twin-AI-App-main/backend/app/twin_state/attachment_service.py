@@ -1,36 +1,39 @@
-"""Attachment Service – style detection, response tuning (AR + EN)."""
+"""
+Attachment Service – متكامل مع TCMA Attachment Model
+=====================================================
+يستخدم محرك TCMA المتطور إذا كان متاحاً.
+يعود للمنطق المحلي (الكلمات المفتاحية) كاحتياط.
+"""
 import logging
 from typing import Dict, List, Optional
 
 logger = logging.getLogger("attachment_service")
 
+try:
+    from app.memory.relationship.attachment_model import detect_attachment_style as tcma_detect
+    TCMA_ATTACHMENT_AVAILABLE = True
+except ImportError:
+    TCMA_ATTACHMENT_AVAILABLE = False
+
 INDICATORS = {
     "secure": {
-        "words": [
-            "أثق بك","أشعر بالراحة","شكراً لوجودك","أنت تفهمني","براحتك",
-            "i trust you","i feel comfortable","thank you for being here","you understand me","feel safe"
-        ],
+        "words": ["أثق بك","أشعر بالراحة","شكراً لوجودك","أنت تفهمني","براحتك",
+                  "i trust you","i feel comfortable","thank you for being here","you understand me","feel safe"],
         "emotions": ["joy","love","calm"]
     },
     "anxious": {
-        "words": [
-            "هل تحبني","أفتقدك","لماذا تأخرت","رد علي","بسرعة","لا تتركني","وينك",
-            "do you love me","i miss you","why are you late","reply","don't leave me","where are you"
-        ],
+        "words": ["هل تحبني","أفتقدك","لماذا تأخرت","رد علي","بسرعة","لا تتركني","وينك",
+                  "do you love me","i miss you","why are you late","reply","don't leave me","where are you"],
         "emotions": ["fear","sadness"]
     },
     "avoidant": {
-        "words": [
-            "لا أحتاج أحداً","أفضل وحدتي","ما لي خلق","لا يهم","خليني",
-            "i don't need anyone","i prefer being alone","not in the mood","doesn't matter","leave me"
-        ],
+        "words": ["لا أحتاج أحداً","أفضل وحدتي","ما لي خلق","لا يهم","خليني",
+                  "i don't need anyone","i prefer being alone","not in the mood","doesn't matter","leave me"],
         "emotions": ["neutral","calm"]
     },
     "disorganized": {
-        "words": [
-            "لا أعرف ما أشعر به","أحتاجك لكن أخاف","تعال لا تبتعد","أبيك بس ما أقدر",
-            "i don't know how i feel","i need you but i'm scared","come close don't go","i want you but i can't"
-        ],
+        "words": ["لا أعرف ما أشعر به","أحتاجك لكن أخاف","تعال لا تبتعد","أبيك بس ما أقدر",
+                  "i don't know how i feel","i need you but i'm scared","come close don't go","i want you but i can't"],
         "emotions": ["fear","love"]
     },
 }
@@ -43,8 +46,15 @@ ADJUSTMENTS = {
     "unknown":      {"warmth": 0.6, "challenge": 0.4, "support": "exploratory",       "humor": 0.5, "tone": "neutral"},
 }
 
+async def detect(messages: List[str] = None, user_id: str = None, emotion_history: Optional[List[Dict]] = None) -> Dict:
+    if TCMA_ATTACHMENT_AVAILABLE and user_id:
+        try:
+            tcma_result = await tcma_detect(user_id)
+            if tcma_result and tcma_result.get("style") and tcma_result["style"] != "unknown":
+                return tcma_result
+        except Exception as e:
+            logger.warning(f"TCMA attachment failed: {e}")
 
-async def detect(messages: List[str], emotion_history: Optional[List[Dict]] = None) -> Dict:
     if not messages:
         return {"style": "unknown", "confidence": 0.0}
     recent = messages[-20:]
@@ -68,28 +78,14 @@ async def detect(messages: List[str], emotion_history: Optional[List[Dict]] = No
     dominant = max(scores, key=scores.get)
     return {"style": dominant, "confidence": min(scores[dominant] / total, 1.0)}
 
-
 async def get_adjustments(style: str) -> Dict:
     return ADJUSTMENTS.get(style, ADJUSTMENTS["unknown"])
 
-
-def _anxiety(msg):
-    m = msg.lower()
-    return any(w in m for w in ["خائف","قلق","متوتر","هل تحبني","لا تتركني","أحتاجك","وينك","بسرعة","رد علي",
-                                "scared","worried","anxious","do you love me","don't leave","need you","reply fast"])
-
-def _avoidance(msg):
-    m = msg.lower()
-    return any(w in m for w in ["لا أريد التحدث","لست بحاجة","أفضل وحدي","خليني","ما لي خلق",
-                                "don't want to talk","don't need","prefer alone","leave me","not in the mood"])
-
+def _anxiety(msg): return any(w in msg.lower() for w in ["خائف","قلق","متوتر","هل تحبني","لا تتركني","أحتاجك","وينك","بسرعة","رد علي","scared","worried","anxious","do you love me","don't leave","need you","reply fast"])
+def _avoidance(msg): return any(w in msg.lower() for w in ["لا أريد التحدث","لست بحاجة","أفضل وحدي","خليني","ما لي خلق","don't want to talk","don't need","prefer alone","leave me","not in the mood"])
 def _contradiction(msg):
     m = msg.lower()
-    approach = any(w in m for w in ["أحتاجك","تعال","أقترب","أبيك","need you","come close","i want you"])
-    avoid = any(w in m for w in ["لكن لا","ابتعد","ما أقدر","but no","go away","i can't"])
-    return approach and avoid
+    return any(w in m for w in ["أحتاجك","تعال","أقترب","أبيك","need you","come close","i want you"]) and any(w in m for w in ["لكن لا","ابتعد","ما أقدر","but no","go away","i can't"])
+def _secure(msg): return any(w in msg.lower() for w in ["شكراً","فهمتني","أنت الأفضل","أنا مرتاح","thank you","you understand","you're the best","i'm comfortable","feel safe"])
 
-def _secure(msg):
-    m = msg.lower()
-    return any(w in m for w in ["شكراً","فهمتني","أنت الأفضل","أنا مرتاح",
-                                "thank you","you understand","you're the best","i'm comfortable","feel safe"])
+logger.info("✅ Attachment Service updated with TCMA integration")

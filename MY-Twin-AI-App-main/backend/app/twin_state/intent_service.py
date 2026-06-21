@@ -1,112 +1,62 @@
 """
-MyTwin – Intent Engine v2.1 (Production Ready)
-- Regex دقيق يدعم العربية والإنجليزية
-- نظام Scoring متوازن للرسائل القصيرة والطويلة
-- Memory Boost للأسئلة عن الذكريات
-- أسماء نوايا موحدة مع باقي النظام
+Intent Service v2.1 – متوافق مع TCMA
+=======================================
+يستخدم محرك النوايا المحلي (Regex). يتكامل مع ذاكرة العلاقات لتخصيص النوايا.
 """
 import logging, re
 from typing import Dict, Any, Optional
 
-logger = logging.getLogger("intent_engine")
+logger = logging.getLogger("intent_service")
 
 INTENT_RULES = {
     "emotional": {
-        "keywords": [
-            "حزين", "خايف", "مكتئب", "قلق", "محتار", "زعلان", "متضايق",
-            "مخنوق", "زهقان", "مش طايق", "تعبان نفسيا",
-            "ضايقة", "مضغوط", "مقهور",
-            "sad", "scared", "depressed", "anxious", "lonely", "worried", "stressed", "overwhelmed"
-        ],
+        "keywords": ["حزين","خايف","مكتئب","قلق","محتار","زعلان","متضايق","مخنوق","زهقان","مش طايق","تعبان نفسيا","ضايقة","مضغوط","مقهور","sad","scared","depressed","anxious","lonely","worried","stressed","overwhelmed"],
         "weight": 1.5,
-        "emotion_boost": ["sadness", "fear", "anger"]
+        "emotion_boost": ["sadness","fear","anger"]
     },
     "coaching": {
-        "keywords": [
-            "نصيحة", "نصائح", "أرشدني", "وجهني", "طور نفسي", "ساعدني",
-            "advice", "guide", "help me improve", "self-improvement", "growth"
-        ],
-        "weight": 1.3,
-        "emotion_boost": []
+        "keywords": ["نصيحة","نصائح","أرشدني","وجهني","طور نفسي","ساعدني","advice","guide","help me improve","self-improvement","growth"],
+        "weight": 1.3
     },
     "decision": {
-        "keywords": [
-            "قرار", "خيارات", "أختار", "محتار بين", "شور علي", "رأيك",
-            "decision", "choose", "options", "what should I do", "help me decide"
-        ],
-        "weight": 1.4,
-        "emotion_boost": ["fear", "anxiety"]
+        "keywords": ["قرار","خيارات","أختار","محتار بين","شور علي","رأيك","decision","choose","options","what should I do","help me decide"],
+        "weight": 1.4
     },
     "career": {
-        "keywords": [
-            "وظيفة", "شغل", "عمل", "راتب", "ترقية", "مقابلة", "سيرة ذاتية", "مهنة",
-            "job", "career", "salary", "promotion", "interview", "cv", "resume", "work"
-        ],
-        "weight": 1.2,
-        "emotion_boost": []
+        "keywords": ["وظيفة","شغل","عمل","راتب","ترقية","مقابلة","سيرة ذاتية","مهنة","job","career","salary","promotion","interview","cv","resume","work"],
+        "weight": 1.2
     },
     "coding": {
-        "keywords": [
-            "كود", "برمجة", "بايثون", "جافا", "تطبيق", "خطأ برمجي", "algorithm",
-            "code", "python", "javascript", "react", "bug", "debug", "function"
-        ],
-        "weight": 1.1,
-        "emotion_boost": []
+        "keywords": ["كود","برمجة","بايثون","جافا","تطبيق","خطأ برمجي","algorithm","code","python","javascript","react","bug","debug","function"],
+        "weight": 1.1
     },
     "greeting": {
-        "keywords": ["مرحبا", "اهلا", "صباح الخير", "مساء الخير", "هاي", "السلام عليكم", "hello", "hi", "hey"],
-        "weight": 0.5,
-        "emotion_boost": []
+        "keywords": ["مرحبا","اهلا","صباح الخير","مساء الخير","هاي","السلام عليكم","hello","hi","hey"],
+        "weight": 0.5
     },
     "goodbye": {
-        "keywords": ["مع السلامة", "باي", "سلام", "bye", "goodbye", "إلى اللقاء"],
-        "weight": 0.8,
-        "emotion_boost": []
+        "keywords": ["مع السلامة","باي","سلام","bye","goodbye","إلى اللقاء"],
+        "weight": 0.8
     },
     "gratitude": {
-        "keywords": ["شكرا", "تسلم", "ممنون", "thanks", "thank you", "appreciate"],
-        "weight": 0.8,
-        "emotion_boost": []
-    },
-    "weather": {
-        "keywords": ["طقس", "جو", "حرارة", "مطر", "شمس", "weather", "rain", "sunny", "temperature"],
-        "weight": 1.0,
-        "emotion_boost": []
-    },
-    "music": {
-        "keywords": ["أغنية", "موسيقى", "اسمع", "شغل", "song", "music", "playlist"],
-        "weight": 1.0,
-        "emotion_boost": []
-    },
-    "news": {
-        "keywords": ["أخبار", "حدث", "حصل", "news", "headlines"],
-        "weight": 1.0,
-        "emotion_boost": []
-    },
-    "memory": {
-        "keywords": ["ذكرت", "قلت", "اتذكر", "remember", "memory", "سابق"],
-        "weight": 1.2,
-        "emotion_boost": []
+        "keywords": ["شكرا","تسلم","ممنون","thanks","thank you","appreciate"],
+        "weight": 0.8
     },
     "goal": {
-        "keywords": ["هدف", "أخطط", "نفسي أحقق", "عايز أوصل", "goal", "plan", "achieve"],
-        "weight": 1.2,
-        "emotion_boost": []
+        "keywords": ["هدف","أخطط","نفسي أحقق","عايز أوصل","goal","plan","achieve"],
+        "weight": 1.2
     },
     "search": {
-        "keywords": ["بحث", "search", "google", "معلومات عن", "اعرف"],
-        "weight": 1.0,
-        "emotion_boost": []
+        "keywords": ["بحث","search","google","معلومات عن","اعرف"],
+        "weight": 1.0
     },
     "shopping": {
-        "keywords": ["اشتري", "شراء", "سعر", "منتج", "buy", "purchase", "price", "product"],
-        "weight": 1.0,
-        "emotion_boost": []
+        "keywords": ["اشتري","شراء","سعر","منتج","buy","purchase","price","product"],
+        "weight": 1.0
     },
     "planning": {
-        "keywords": ["خطة", "تنظيم", "جدول", "مواعيد", "schedule", "organize", "timeline"],
-        "weight": 1.1,
-        "emotion_boost": []
+        "keywords": ["خطة","تنظيم","جدول","مواعيد","schedule","organize","timeline"],
+        "weight": 1.1
     },
 }
 
@@ -117,16 +67,11 @@ class IntentEngine:
 
         text = message.lower().strip()
         scores = {}
-        
+
         for intent, config in INTENT_RULES.items():
-            score = 0.0
-            for kw in config["keywords"]:
-                pattern = rf'(?<!\S){re.escape(kw)}(?!\S)'
-                if re.search(pattern, text):
-                    score += 1.0
+            score = sum(1.0 for kw in config["keywords"] if re.search(rf'(?<!\S){re.escape(kw)}(?!\S)', text))
             if score > 0:
-                score = score * config["weight"]
-                scores[intent] = score
+                scores[intent] = score * config["weight"]
 
         if re.search(r'(?<!\S)(?:اتذكر|ذكرت|remember|memory)(?!\S)', text):
             scores["memory"] = scores.get("memory", 0) + 0.4
@@ -157,3 +102,4 @@ class IntentEngine:
         }
 
 intent_engine = IntentEngine()
+logger.info("✅ Intent Engine v2.1 ready")
