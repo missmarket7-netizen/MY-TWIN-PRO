@@ -1,13 +1,9 @@
 """
-MyTwin API v14.0.0 – Living Digital Twin Backend
-=================================================
-نقطة دخول موحّدة. تحميل ذكي للمسارات. تكامل مع جميع طبقات TCMA والأنظمة الجديدة.
+MyTwin API v15.0.0 – Living Digital Twin Backend (Final)
+============================================================
+نقطة دخول موحّدة. تحميل ذكي للمسارات. تكامل مع جميع الأنظمة.
 """
-
-import logging
-import sys
-import os
-import time
+import logging, sys, os, time
 from pathlib import Path
 
 # === إعداد المسارات ===
@@ -22,13 +18,11 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 logger = logging.getLogger("mytwin.api")
-logger.info("🚀 MyTwin API v14.0.0 starting...")
-logger.info(f"   BASE_DIR: {BASE_DIR}")
+logger.info("🚀 MyTwin API v15.0.0 starting...")
 
 # === تحميل البيئة ===
 from dotenv import load_dotenv
 load_dotenv(BASE_DIR / '.env')
-load_dotenv(BASE_DIR / '.env.example.txt')
 
 # === FastAPI ===
 from fastapi import FastAPI, Request
@@ -48,14 +42,14 @@ except Exception as e:
 
 app = FastAPI(
     title="MyTwin API",
-    version="14.0.0",
-    description="Living Digital Twin – Cognitive Memory & Adaptive Tutoring",
-    docs_url="/docs" if config.DEBUG else None,
-    redoc_url="/redoc" if config.DEBUG else None,
+    version="15.0.0",
+    description="Living Digital Twin – Cognitive Memory & Adaptive Systems",
+    docs_url="/docs" if getattr(config, 'DEBUG', False) else None,
+    redoc_url="/redoc" if getattr(config, 'DEBUG', False) else None,
 )
 
 # === CORS محسّن ===
-allowed = config.ALLOWED_ORIGINS if hasattr(config, 'ALLOWED_ORIGINS') else ["*"]
+allowed = getattr(config, 'ALLOWED_ORIGINS', ["*"])
 if isinstance(allowed, str):
     allowed = [o.strip() for o in allowed.split(",")]
 
@@ -77,7 +71,9 @@ async def log_requests(request: Request, call_next):
         logger.warning(f"⏳ Slow request: {request.method} {request.url.path} ({duration:.2f}s)")
     return response
 
-# === نظام تحميل المسارات الذكي ===
+# ============================================================
+# نظام تحميل المسارات الذكي (جميع مسارات MyTwin)
+# ============================================================
 ROUTES_REGISTRY = {
     # الأساسية
     "chat":        "app.api.routes.chat",
@@ -90,36 +86,31 @@ ROUTES_REGISTRY = {
     "onboarding":  "app.api.routes.onboarding",
     "account":     "app.api.routes.account",
     "push":        "app.api.routes.push",
+    "tasks":       "app.api.routes.tasks",
+    "calendar":    "app.api.routes.calendar",
     "ads":         "app.api.routes.ads",
     "features":    "app.api.routes.features",
     "stats":       "app.api.routes.stats",
     "dev":         "app.api.routes.dev",
     "voice":       "app.api.routes.voice",
-    "relationship":"app.api.routes.relationship",
     # الميزات الجديدة
     "study":       "app.api.routes.study_routes",          # ATHENA
-    "business":    "app.api.routes.business_routes",   # G.R.O.W.T.H-H.I.V.E
-    "creator":     "app.api.routes.creator_routes",   # C.R.E.A.T.O.R v2.0
-    "recommendations": "app.api.routes.recommendations",  # Unified Recommendations
-    "meta":        "app.api.routes.meta_routes",          # Meta-Reflection & Proactive
-    "code_lab":    "app.api.routes.code_lab_routes",   # C.O.D.E. Lab
-    "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
-    "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
-    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
-    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
-    "code_lab":    "app.api.routes.code_lab_routes",   # C.O.D.E. Lab
-    "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
-    "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
-    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
-    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
-    "ai_trainer":  "app.api.routes.ai_trainer_routes",  # AI Trainer
-    "dreams":      "app.api.routes.dreams",
-    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
-    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
-    "smart_home":  "app.api.routes.smart_home",
-    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S. Task Manager
-    "reports":     "app.api.routes.reports",               # تقارير أسبوعية
-    "graph":       "app.api.routes.graph_routes",           # تنقيب الرسم البياني
+    "business":    "app.api.routes.business_routes",       # GROWTH-HIVE
+    "creator":     "app.api.routes.creator_routes",        # C.R.E.A.T.O.R.
+    "code_lab":    "app.api.routes.code_lab_routes",       # C.O.D.E. Lab
+    "life_coach":  "app.api.routes.life_coach_routes",     # L.I.F.E. C.O.A.C.H.
+    "dreams":      "app.api.routes.dream_routes",          # Dream Analysis
+    "smart_home":  "app.api.routes.smart_home_routes",     # S.M.A.R.T. Home
+    "pass":        "app.api.routes.task_manager_routes",   # P.A.S.S.
+    # المحركات المتقدمة
+    "reports":     "app.api.routes.reports",               # Weekly Reports
+    "graph":       "app.api.routes.graph_routes",          # Graph Mining
+    "recommendations": "app.api.routes.recommendations",   # Unified Recommendations
+    "meta":        "app.api.routes.meta_routes",           # Meta-Reflection
+    "relationship":"app.api.routes.relationship",          # Relationship State
+    "ai_trainer":  "app.api.routes.ai_trainer_routes",     # AI Trainer
+    # تكاملات خارجية
+    "telegram":    "app.infrastructure.integrations.telegram_webhook",
 }
 
 loaded_routes = []
@@ -150,7 +141,7 @@ if failed_routes:
 async def root():
     return {
         "name": "MyTwin API",
-        "version": "14.0.0",
+        "version": "15.0.0",
         "environment": os.getenv("ENV", "production"),
         "loaded_routes": len(loaded_routes),
         "total_registered": len(ROUTES_REGISTRY),
@@ -167,23 +158,27 @@ async def health():
     try:
         from app.memory.emotional.emotional_memory import TABLE_NAME
         health_status["memory_emotional"] = "available"
-    except:
-        health_status["memory_emotional"] = "unavailable"
+    except: health_status["memory_emotional"] = "unavailable"
+    
     try:
         from app.memory.graph.memory_graph import TABLE_EDGES
         health_status["memory_graph"] = "available"
-    except:
-        health_status["memory_graph"] = "unavailable"
+    except: health_status["memory_graph"] = "unavailable"
+    
     try:
         from app.features.study.athena_orchestrator import athena
         health_status["athena_study"] = "available"
-    except:
-        health_status["athena_study"] = "unavailable"
+    except: health_status["athena_study"] = "unavailable"
+    
     try:
         from app.infrastructure.ai.provider_router import provider_router
         health_status["ai_provider"] = "available"
-    except:
-        health_status["ai_provider"] = "unavailable"
+    except: health_status["ai_provider"] = "unavailable"
+    
+    try:
+        from app.infrastructure.ai.internal_model_provider import internal_model
+        health_status["internal_model"] = "loaded" if internal_model._loaded else "available"
+    except: health_status["internal_model"] = "unavailable"
     
     return JSONResponse(content=health_status)
 
@@ -193,39 +188,41 @@ async def ready():
 
 @app.get("/live", tags=["status"])
 async def live():
-    return {"status": "live", "uptime": time.time() - start_time if 'start_time' in globals() else 0}
+    return {"status": "live"}
 
 @app.on_event("startup")
 async def startup_event():
-    global start_time
-    start_time = time.time()
-    logger.info(f"🌟 MyTwin API v14.0.0 fully started in {time.strftime('%H:%M:%S')}")
+    logger.info(f"🌟 MyTwin API v15.0.0 fully started")
+    
     # مهام خلفية اختيارية
     try:
         import asyncio
-        async def periodic_maintenance():
+        async def periodic_tasks():
             while True:
                 await asyncio.sleep(86400)  # كل 24 ساعة
                 try:
-                    from app.memory.graph.graph_pattern_miner import compress_graph
-                    # افتراضي لجميع المستخدمين - يمكن تطويره لاحقاً
-                    logger.info("🔄 Running periodic graph compression...")
-                except:
-                    pass
-        asyncio.create_task(periodic_maintenance())
+                    from app.infrastructure.cache.memory_cleanup_service import run_memory_cleanup
+                    await run_memory_cleanup(dry=False)
+                    logger.info("🔄 Memory cleanup completed")
+                except: pass
+        asyncio.create_task(periodic_tasks())
+        
+        # بدء وضع الظل (Shadow Mode)
         try:
             from app.features.shadow_mode import ShadowScheduler
             shadow = ShadowScheduler()
             asyncio.create_task(shadow.start())
             logger.info("🌑 Shadow Mode started")
-        except Exception as e:
-            logger.warning(f"Shadow Mode unavailable: {e}")
-    except:
-        pass
+        except: pass
+    except: pass
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("🛑 MyTwin API shutting down")
+    try:
+        from app.background.queue import shutdown as queue_shutdown
+        await queue_shutdown()
+    except: pass
 
 # === نقطة دخول للتشغيل المباشر ===
 if __name__ == "__main__":
@@ -235,6 +232,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=port,
-        reload=config.DEBUG if hasattr(config, 'DEBUG') else False,
+        reload=getattr(config, 'DEBUG', False),
         log_level="info"
     )
