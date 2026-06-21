@@ -1,67 +1,65 @@
-"""Ads Routes – Rewarded Ads to earn extra messages."""
+"""
+Ads Routes v3.0 – متوافقة مع Ad Service الجديدة
+====================================================
+- تستخدم AdService v3 (طاقة + رسائل + Supabase + TCMA)
+- تدعم جميع الباقات
+- تسجيل الأحداث
+"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from datetime import datetime, timezone, date
-from app.api.dependencies.auth import get_current_user_id
-from app.infrastructure.database.supabase_client import get_db
-from app.infrastructure.cache.cache_service import get, set as cache_set
+from app.api.dependencies.auth import get_current_user_id, get_user_tier
 
+logger = logging.getLogger("ads_routes")
 router = APIRouter(prefix="/api/ads", tags=["ads"])
-
-REWARD_MESSAGES = 3
-MAX_DAILY_ADS = 5
 
 class ClaimAdBody(BaseModel):
     ad_type: str = Field("rewarded")
     ad_platform: str = Field("admob")
 
 @router.post("/reward")
-async def claim_reward(body: ClaimAdBody, user_id: str = Depends(get_current_user_id)):
-    db = get_db()
-    today = date.today().isoformat()
-    
-    # Premium users don't need ads
+async def claim_reward(
+    body: ClaimAdBody,
+    user_id: str = Depends(get_current_user_id),
+    tier: str = Depends(get_user_tier),
+):
+    """
+    مطالبة بمكافأة مشاهدة إعلان.
+    يمنح: رسائل إضافية + تجديد طاقة 20%
+    """
     try:
-        profile = db.table("profiles").select("tier").eq("id", user_id).single().execute()
-        tier = profile.data.get("tier", "free") if profile.data else "free"
-        if tier not in ["free", "free_trial_14d"]:
-            return {"success": True, "message": "Premium user – no ads needed"}
-    except:
-        tier = "free"
-
-    # Daily limit check
-    ad_key = f"ads:{user_id}:{today}"
-    watched = get(ad_key) or 0
-    if watched >= MAX_DAILY_ADS:
-        raise HTTPException(429, "Daily ad limit reached")
-
-    # Reward the user by reducing their message count
-    msg_key = f"msg:{user_id}:{today}"
-    current = get(msg_key) or 0
-    cache_set(msg_key, max(0, current - REWARD_MESSAGES), 86400)
-    cache_set(ad_key, watched + 1, 86400)
-
-    # Log to database
-    try:
-        db.table("ad_rewards").insert({
-            "user_id": user_id, "ad_type": body.ad_type,
-            "reward_messages": REWARD_MESSAGES,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
-    except: pass
-
-    return {
-        "success": True,
-        "reward": REWARD_MESSAGES,
-        "remaining_ads_today": MAX_DAILY_ADS - (watched + 1)
-    }
+        from app.domain.billing.ad_service import claim_ad_reward
+        
+        result = await claim_ad_reward(user_id)
+        
+        if not result.get("success"):
+            raise HTTPException(429, result.get("message", "Daily ad limit reached"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ad reward failed: {e}")
+        raise HTTPException(500, "فشل معالجة المكافأة")
 
 @router.get("/status")
-async def ad_status(user_id: str = Depends(get_current_user_id)):
-    today = date.today().isoformat()
-    watched = get(f"ads:{user_id}:{today}") or 0
-    return {
-        "watched_today": watched,
-        "remaining_today": max(0, MAX_DAILY_ADS - watched),
-        "reward_per_ad": REWARD_MESSAGES
-    }
+async def ad_status(
+    user_id: str = Depends(get_current_user_id),
+):
+    """حالة الإعلانات اليومية للمستخدم"""
+    try:
+        from app.domain.billing.ad_service import get_ad_status
+        
+        return await get_ad_status(user_id)
+        
+    except Exception as e:
+        logger.error(f"Ad status failed: {e}")
+        return {
+            "watched_today": 0,
+            "remaining_today": 3,
+            "max_daily_ads": 3,
+            "can_watch": True,
+        }
+
+logger.info("✅ Ads Routes v3.0 initialized")

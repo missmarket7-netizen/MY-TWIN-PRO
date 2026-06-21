@@ -1,30 +1,19 @@
-"""Feature Routes – with fixed tier detection."""
+"""
+Feature Routes v3.0 – متوافقة مع الأنظمة المستقلة
+=====================================================
+- تستخدم TierRateLimit للتحقق من الباقة
+- تستخدم Provider Router الموحّد
+- تحافظ على التوافق مع القديم
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
-from app.api.dependencies.auth import get_current_user_id
-from app.infrastructure.ai.provider_router import provider_router, AIUnavailable
-from app.infrastructure.database.supabase_client import get_db
+from app.api.dependencies.auth import get_current_user_id, get_user_tier
+from app.api.dependencies.rate_limiter import TierRateLimit
 import logging
 
 logger = logging.getLogger("features")
 router = APIRouter(prefix="/api/features", tags=["features"])
-
-async def get_user_tier(user_id: str) -> str:
-    """قراءة الباقة مباشرة من Supabase."""
-    db = get_db()
-    try:
-        r = db.table("profiles").select("tier").eq("id", user_id).single().execute()
-        logger.info(f"Supabase response: {r}")
-        if r.data and r.data.get("tier"):
-            tier = r.data["tier"]
-            logger.info(f"User {user_id} tier: {tier}")
-            return tier
-    except Exception as e:
-        logger.error(f"Failed to read tier from Supabase: {e}")
-    
-    logger.warning(f"User {user_id} not found in profiles, defaulting to premium for testing")
-    return "premium"  # السماح مؤقتًا للاختبار
 
 # نماذج البيانات
 class StudyBody(BaseModel):
@@ -60,63 +49,64 @@ class DreamBody(BaseModel):
     lang: str = "ar"
 
 # نقاط النهاية
-@router.post("/study")
-async def study_mode(body: StudyBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
-    logger.info(f"Study request - user: {user_id}, tier: {tier}")
+@router.post("/study", dependencies=[Depends(TierRateLimit(feature="study"))])
+async def study_mode(body: StudyBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"اشرح: {body.topic}. المستوى: {body.level}. اللغة: {body.lang}"
     try:
-        reply, _ = await provider_router.route(prompt, task="coaching", tier=tier)
+        from app.infrastructure.ai.provider_router import provider_router
+        reply, _ = await provider_router.route(prompt, task="study", tier=tier)
         return {"reply": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
 
-@router.post("/code")
-async def code_lab(body: CodeBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
+@router.post("/code", dependencies=[Depends(TierRateLimit(feature="code_lab"))])
+async def code_lab(body: CodeBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"{body.action} كود {body.language}: {body.task}. اللغة: {body.lang}"
     try:
+        from app.infrastructure.ai.provider_router import provider_router
         reply, _ = await provider_router.route(prompt, task="coding", tier=tier)
         return {"reply": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
 
-@router.post("/business")
-async def business_analysis(body: BusinessBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
+@router.post("/business", dependencies=[Depends(TierRateLimit(feature="business"))])
+async def business_analysis(body: BusinessBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"تحليل أعمال ({body.analysis_type}): {body.text}. اللغة: {body.lang}"
     try:
-        reply, _ = await provider_router.route(prompt, task="deep_reasoning", tier=tier)
+        from app.infrastructure.ai.provider_router import provider_router
+        reply, _ = await provider_router.route(prompt, task="business", tier=tier)
         return {"reply": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
 
-@router.post("/coach")
-async def life_coach(body: CoachBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
+@router.post("/coach", dependencies=[Depends(TierRateLimit(feature="life_coach"))])
+async def life_coach(body: CoachBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"مدرب حياة ({body.domain}): {body.topic}. اللغة: {body.lang}"
     try:
+        from app.infrastructure.ai.provider_router import provider_router
         reply, _ = await provider_router.route(prompt, task="coaching", tier=tier)
         return {"reply": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
 
-@router.post("/content")
-async def content_creation(body: ContentBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
+@router.post("/content", dependencies=[Depends(TierRateLimit(feature="content"))])
+async def content_creation(body: ContentBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"كتابة محتوى لمنصة {body.platform} بنبرة {body.tone}: {body.topic}. اللغة: {body.lang}"
     try:
-        reply, _ = await provider_router.route(prompt, task="general", tier=tier)
+        from app.infrastructure.ai.provider_router import provider_router
+        reply, _ = await provider_router.route(prompt, task="content", tier=tier)
         return {"reply": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
 
-@router.post("/dream")
-async def analyze_dream(body: DreamBody, user_id: str = Depends(get_current_user_id)):
-    tier = await get_user_tier(user_id)
+@router.post("/dream", dependencies=[Depends(TierRateLimit(feature="dreams"))])
+async def analyze_dream(body: DreamBody, user_id: str = Depends(get_current_user_id), tier: str = Depends(get_user_tier)):
     prompt = f"تفسير حلم: {body.dream}. اللغة: {body.lang}"
     try:
-        reply, _ = await provider_router.route(prompt, task="deep_reasoning", tier=tier)
+        from app.infrastructure.ai.provider_router import provider_router
+        reply, _ = await provider_router.route(prompt, task="dream", tier=tier)
         return {"interpretation": reply}
-    except AIUnavailable:
+    except Exception:
         raise HTTPException(503, "AI unavailable")
+
+logger.info("✅ Feature Routes v3.0 initialized")

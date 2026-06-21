@@ -1,6 +1,9 @@
 """
-Development routes – only for testing.
-Creates a test user and returns a valid JWT token.
+Development Routes v2.0 – اختبار متقدم
+=========================================
+- إنشاء مستخدم اختبار
+- جلب إحصائيات الذاكرة (TCMA)
+- فحص حالة النظام الداخلية
 """
 import os, logging
 from fastapi import APIRouter, HTTPException
@@ -19,13 +22,12 @@ class DevTokenRequest(BaseModel):
 
 @router.post("/token")
 async def get_dev_token(body: DevTokenRequest):
-    """Create or login a test user and return a valid JWT."""
+    """إنشاء أو تسجيل دخول مستخدم اختبار"""
     if body.secret != DEV_SECRET:
         raise HTTPException(403, "Wrong dev secret")
     
     db = get_db()
     try:
-        # Try to sign in first
         result = db.auth.sign_in_with_password({
             "email": body.email,
             "password": body.password,
@@ -35,14 +37,12 @@ async def get_dev_token(body: DevTokenRequest):
     except:
         pass
     
-    # Sign up if not exists
     try:
         result = db.auth.sign_up({
             "email": body.email,
             "password": body.password,
         })
         if result.user and result.session:
-            # Create profile
             db.table("profiles").insert({
                 "id": result.user.id,
                 "email": body.email,
@@ -57,3 +57,30 @@ async def get_dev_token(body: DevTokenRequest):
         raise HTTPException(500, f"Failed: {e}")
     
     raise HTTPException(500, "Could not create or login user")
+
+@router.get("/memory-stats")
+async def get_memory_stats(user_id: str):
+    """جلب إحصائيات الذاكرة (للتطوير فقط)"""
+    from app.infrastructure.cache.memory_cleanup_service import get_storage_stats
+    stats = await get_storage_stats()
+    return {"user_id": user_id, "tcma_tables": stats}
+
+@router.get("/test-tcma")
+async def test_tcma(user_id: str):
+    """اختبار طبقات TCMA"""
+    results = {}
+    # Emotional memory
+    try:
+        from app.memory.emotional.emotional_memory import get_emotional_patterns
+        patterns = await get_emotional_patterns(user_id, days=7)
+        results["emotional"] = patterns
+    except Exception as e:
+        results["emotional"] = str(e)
+    # Identity
+    try:
+        from app.memory.identity.identity_model import get_identity
+        identity = await get_identity(user_id)
+        results["identity"] = identity
+    except Exception as e:
+        results["identity"] = str(e)
+    return results
