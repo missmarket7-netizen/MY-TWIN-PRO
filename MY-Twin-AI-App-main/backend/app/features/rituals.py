@@ -1,10 +1,19 @@
-"""Rituals – morning & evening rituals with the twin."""
-import logging, random
+"""
+Rituals v2.0 – طقوس صباحية ومسائية (متكاملة مع TCMA)
+=========================================================
+تستخدم ذاكرة العلاقات والحالة العاطفية لتخصيص الطقوس.
+"""
+import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-from app.twin_state.journey_service import get_phase, get_behavior
-from app.repositories.profile_repository import get_profile
-from app.twin_state.relationship_service import load as load_relationship
+
+try:
+    from app.memory.relationship.relationship_memory import get_relationship_insights
+    from app.memory.emotional.emotional_memory import get_emotional_state_for_response
+    from app.memory.identity.identity_model import get_identity
+    TCMA_AVAILABLE = True
+except ImportError:
+    TCMA_AVAILABLE = False
 
 logger = logging.getLogger("rituals")
 
@@ -25,10 +34,6 @@ MORNING_RITUALS = {
         {"ar": "صباح العزيمة! تذكر هدفك وابدأ يومك بقوة", "en": "Good morning! Remember your goal and start strong"},
         {"ar": "صباح التحدي! خطوة واحدة تقربك من حلمك اليوم", "en": "Good morning! One step closer to your dream today"},
     ],
-    "mature": [
-        {"ar": "صباح الحكمة! يوم جديد مليء بالفرص", "en": "Good morning! A new day full of opportunities"},
-        {"ar": "صباح الامتنان! ما أكثر شيء ممتن له اليوم؟", "en": "Good morning! What are you most grateful for today?"},
-    ],
 }
 
 EVENING_RITUALS = {
@@ -48,38 +53,34 @@ EVENING_RITUALS = {
         {"ar": "أحسنت اليوم! هل اقتربت من هدفك؟", "en": "Well done today! Did you get closer to your goal?"},
         {"ar": "فخور بك! كيف كان تقدمك اليوم؟", "en": "Proud of you! How was your progress today?"},
     ],
-    "mature": [
-        {"ar": "مساء الخير. تأمل في يومك بهدوء", "en": "Good evening. Reflect on your day calmly"},
-        {"ar": "وقت التأمل. ما الدرس الذي خرجت به اليوم؟", "en": "Reflection time. What lesson did you take away today?"},
-    ],
 }
 
+async def get_relationship_phase(user_id: str) -> str:
+    """تحديد مرحلة العلاقة من TCMA"""
+    if not TCMA_AVAILABLE:
+        return "introduction"
+    try:
+        rel = await get_relationship_insights(user_id)
+        trust = rel.get("trust_level", 0) if rel else 0
+        if trust > 60: return "growth"
+        elif trust > 35: return "deepening"
+        elif trust > 15: return "trust_building"
+        return "introduction"
+    except:
+        return "introduction"
 
 async def get_morning_ritual(user_id: str, lang: str = "ar") -> Optional[str]:
-    profile, relationship = await _gather(get_profile(user_id), load_relationship(user_id))
-    if not profile or not relationship:
-        return None
-
-    phase = await get_phase(relationship.bond_level)
+    phase = await get_relationship_phase(user_id)
     pool = MORNING_RITUALS.get(phase, MORNING_RITUALS["introduction"])
     today = datetime.now(timezone.utc).date().isoformat()
     seed = hash(f"morning:{user_id}:{today}") % len(pool)
     return pool[seed].get(lang, pool[seed].get("ar", ""))
 
-
 async def get_evening_ritual(user_id: str, lang: str = "ar") -> Optional[str]:
-    profile, relationship = await _gather(get_profile(user_id), load_relationship(user_id))
-    if not profile or not relationship:
-        return None
-
-    phase = await get_phase(relationship.bond_level)
+    phase = await get_relationship_phase(user_id)
     pool = EVENING_RITUALS.get(phase, EVENING_RITUALS["introduction"])
     today = datetime.now(timezone.utc).date().isoformat()
     seed = hash(f"evening:{user_id}:{today}") % len(pool)
     return pool[seed].get(lang, pool[seed].get("ar", ""))
 
-
-async def _gather(*coros):
-    import asyncio
-    results = await asyncio.gather(*coros, return_exceptions=True)
-    return [r if not isinstance(r, Exception) else None for r in results]
+logger.info("✅ Rituals v2.0 initialized")

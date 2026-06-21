@@ -1,87 +1,67 @@
 """
-MyTwin – Referral System v2.0
-- إنشاء كود إحالة فريد لكل مستخدم
-- تفعيل كود الإحالة ومنح مكافأة للطرفين
-- منع تكرار استخدام نفس الكود
-- إنشاء رابط إحالة للمشاركة
+MyTwin – Referral System v3.0 (متوافق مع TCMA)
 """
-import os
-import hashlib
+import os, hashlib, logging
 from datetime import datetime, timezone
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+try:
+    from app.infrastructure.database.supabase_client import get_db
+    DB_AVAILABLE = True
+except ImportError:
+    DB_AVAILABLE = False
+
+logger = logging.getLogger("referral_service")
 BASE_URL = os.getenv("EXPO_PUBLIC_API_URL", "https://mytwin.app")
 
-db: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    db = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 def generate_referral_code(uid: str) -> str:
-    """
-    إنشاء كود إحالة فريد للمستخدم.
-    مثال: MT-A3F2X1
-    """
     return "MT" + hashlib.sha256(uid.encode()).hexdigest()[:6].upper()
 
 def get_referral_link(uid: str) -> str:
-    """
-    إنشاء رابط إحالة كامل للمشاركة.
-    مثال: https://mytwin.app/join?ref=MT-A3F2X1
-    """
     code = generate_referral_code(uid)
-    # تخزين الكود في الملف الشخصي إذا لم يكن موجودًا
-    if db:
-        existing = db.table("profiles").select("referral_code").eq("id", uid).single().execute()
-        if not existing.data or not existing.data.get("referral_code"):
-            db.table("profiles").update({"referral_code": code}).eq("id", uid).execute()
+    if DB_AVAILABLE:
+        try:
+            db = get_db()
+            existing = db.table("profiles").select("referral_code").eq("id", uid).single().execute()
+            if not existing.data or not existing.data.get("referral_code"):
+                db.table("profiles").update({"referral_code": code}).eq("id", uid).execute()
+        except Exception as e:
+            logger.warning(f"Failed to store referral code: {e}")
     return f"{BASE_URL}/join?ref={code}"
 
 def activate_referral(uid: str, code: str) -> dict:
-    """
-    تفعيل كود إحالة:
-    - يمنح المستخدم الجديد 500 توكن.
-    - يمنح الداعي (صاحب الكود) 500 توكن.
-    - يمنع استخدام نفس الكود أكثر من مرة.
-    """
-    if not db:
+    if not DB_AVAILABLE:
         return {"error": "no_db"}
     
+    db = get_db()
     code = code.upper().strip()
     
     # البحث عن صاحب الكود
-    owner = db.table("profiles").select("user_id").eq("referral_code", code).single().execute()
+    owner = db.table("profiles").select("id").eq("referral_code", code).single().execute()
     if not owner.data:
         return {"error": "invalid_code"}
     
-    inviter_id = owner.data["user_id"]
-    
-    # منع استخدام كودك الخاص
+    inviter_id = owner.data["id"]
     if inviter_id == uid:
         return {"error": "own_code"}
     
-    # التحقق من عدم استخدام هذا الكود مسبقًا من قبل هذا المستخدم
-    existing = db.table("referral_usage").select("*").eq("id", uid).eq("code", code).single().execute()
+    # منع التكرار
+    existing = db.table("referral_usage").select("*").eq("user_id", uid).eq("code", code).execute()
     if existing.data:
         return {"error": "already_used"}
     
-    # تسجيل استخدام الكود
+    # تسجيل الاستخدام
     db.table("referral_usage").insert({
-        "user_id": uid,
-        "code": code,
-        "inviter_id": inviter_id,
+        "user_id": uid, "code": code, "inviter_id": inviter_id,
         "activated_at": datetime.now(timezone.utc).isoformat(),
     }).execute()
     
-    # منح المكافأة للمستخدم الجديد
-    from token_limits import add_referral_bonus
-    add_referral_bonus(uid, 500)
+    # منح المكافأة (500 توكن للطرفين)
+    bonus = 500
+    try:
+        from app.domain.billing.token_limits import add_referral_bonus
+        add_referral_bonus(uid, bonus)
+        add_referral_bonus(inviter_id, bonus)
+    except ImportError:
+        logger.warning("Token system not available, skipping bonus")
     
-    # منح المكافأة للداعي
-    add_referral_bonus(inviter_id, 500)
-    
-    return {
-        "success": True,
-        "bonus": 500,
-        "inviter_id": inviter_id,
-    }
+    return {"success": True, "bonus": bonus, "inviter_id": inviter_id}

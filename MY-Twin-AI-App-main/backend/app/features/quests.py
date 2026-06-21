@@ -1,9 +1,20 @@
-"""Quests – long-term growth missions."""
+"""
+Quests v2.0 – مهام النمو طويلة المدى (متكاملة مع TCMA)
+===========================================================
+تستخدم الذاكرة العاطفية ونموذج الهوية لتوليد مهام مخصصة.
+"""
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
-from app.repositories.goals_repository import get_active, get_completed, create
-from app.models.goal import Goal
+
+try:
+    from app.memory.emotional.emotional_memory import get_emotional_state_for_response
+    from app.memory.identity.identity_model import get_identity
+    from app.memory.relationship.relationship_memory import get_relationship_insights
+    from app.infrastructure.database.supabase_client import get_db
+    TCMA_AVAILABLE = True
+except ImportError:
+    TCMA_AVAILABLE = False
 
 logger = logging.getLogger("quests")
 
@@ -24,58 +35,78 @@ QUEST_TEMPLATES = {
         {"ar": "حدد هدفاً كبيراً واعمل عليه 30 يوماً", "en": "Set a big goal and work on it for 30 days", "days": 30},
         {"ar": "تعلم مهارة جديدة وشارك تقدمك", "en": "Learn a new skill and share your progress", "days": 21},
     ],
-    "mature": [
-        {"ar": "كن مرشداً لنفسك ولمن حولك", "en": "Be a mentor to yourself and others", "days": 60},
-        {"ar": "ابنِ إرثاً شخصياً وشاركه مع توأمك", "en": "Build a personal legacy and share it with your twin", "days": 90},
-    ],
 }
 
+async def get_relationship_phase(user_id: str) -> str:
+    """تحديد مرحلة العلاقة من TCMA"""
+    phase = "introduction"
+    if not TCMA_AVAILABLE:
+        return phase
+    
+    try:
+        emotional = await get_emotional_state_for_response(user_id, "")
+        emotion = emotional.get("current_emotion", "neutral") if emotional else "neutral"
+        
+        identity = await get_identity(user_id)
+        traits = identity.get("traits", []) if identity else []
+        
+        rel = await get_relationship_insights(user_id)
+        trust = rel.get("trust_level", 0) if rel else 0
+        
+        if trust > 70:
+            phase = "growth"
+        elif trust > 40:
+            phase = "deepening"
+        elif trust > 20:
+            phase = "trust_building"
+    except Exception as e:
+        logger.error(f"Phase detection failed: {e}")
+    
+    return phase
 
 async def suggest_quests(user_id: str, lang: str = "ar", max_quests: int = 3) -> List[Dict[str, str]]:
-    from app.twin_state.relationship_service import load as load_relationship
-    from app.twin_state.journey_service import get_phase
-    from app.repositories.profile_repository import get_profile
-
-    profile, relationship = await _gather(get_profile(user_id), load_relationship(user_id))
-    if not profile or not relationship:
+    """اقتراح مهام نمو طويلة المدى"""
+    if not TCMA_AVAILABLE:
         return []
 
-    active_goals = await get_active(user_id)
-    completed_goals = await get_completed(user_id)
+    try:
+        db = get_db()
+        active_goals = db.table("goals").select("*").eq("user_id", user_id).eq("status", "active").execute()
+        if active_goals.data and len(active_goals.data) >= 5:
+            return []
 
-    # Don't suggest if user already has many active goals
-    if len(active_goals) >= 5:
+        phase = await get_relationship_phase(user_id)
+        pool = QUEST_TEMPLATES.get(phase, QUEST_TEMPLATES["introduction"])
+        
+        suggestions = []
+        for template in pool[:max_quests]:
+            title = template.get(lang, template.get("ar", ""))
+            suggestions.append({
+                "title": title,
+                "phase": phase,
+                "estimated_days": template["days"],
+            })
+
+        return suggestions[:max_quests]
+    except Exception as e:
+        logger.error(f"Quest suggestion failed: {e}")
         return []
 
-    phase = await get_phase(relationship.bond_level)
-    pool = QUEST_TEMPLATES.get(phase, QUEST_TEMPLATES["introduction"])
-    suggestions = []
-    today = datetime.now(timezone.utc).date().isoformat()
+async def start_quest(user_id: str, title: str, days: int = 7) -> Optional[str]:
+    """بدء مهمة نمو جديدة"""
+    try:
+        db = get_db()
+        due = (datetime.now(timezone.utc) + __import__('datetime').timedelta(days=days)).isoformat()
+        result = db.table("goals").insert({
+            "user_id": user_id, "title": title, "progress": 0.0,
+            "priority": 2, "status": "active", "due_date": due,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        if result.data:
+            logger.info(f"🏁 Quest started: {title}")
+            return result.data[0]["id"]
+    except Exception as e:
+        logger.error(f"Quest creation failed: {e}")
+    return None
 
-    for template in pool[:max_quests]:
-        # Check if similar quest already exists
-        title = template.get(lang, template.get("ar", ""))
-        if any(g.title == title for g in active_goals + completed_goals):
-            continue
-
-        suggestions.append({
-            "title": title,
-            "phase": phase,
-            "estimated_days": template["days"],
-        })
-
-    return suggestions[:max_quests]
-
-
-async def start_quest(user_id: str, title: str) -> Optional[str]:
-    goal = Goal(user_id=user_id, title=title, progress=0.0, priority=2, status="active")
-    goal_id = await create(goal)
-    if goal_id:
-        logger.info(f"🏁 Quest started: {title} ({goal_id})")
-    return goal_id
-
-
-async def _gather(*coros):
-    import asyncio
-    results = await asyncio.gather(*coros, return_exceptions=True)
-    return [r if not isinstance(r, Exception) else None for r in results]
+logger.info("✅ Quests v2.0 initialized")

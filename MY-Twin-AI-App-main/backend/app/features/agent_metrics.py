@@ -1,29 +1,25 @@
 """
-MyTwin – Agent Metrics v1.0 (Performance Tracking)
-- يسجل أداء الأدوات والـ Agent Loop
-- يخزن في Supabase للتحليل المستقبلي
+Agent Metrics v2.0 – متوافق مع Unified Tool Registry & TCMA
 """
-import os, logging, time
+import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+
+try:
+    from app.infrastructure.database.supabase_client import get_db
+    DB_AVAILABLE = True
+except ImportError:
+    DB_AVAILABLE = False
+
+try:
+    from app.memory.emotional.emotional_memory import store_emotional_memory
+    TCMA_AVAILABLE = True
+except ImportError:
+    TCMA_AVAILABLE = False
 
 logger = logging.getLogger("agent_metrics")
 
 class AgentMetrics:
-    def __init__(self):
-        self._db = None
-
-    def _get_db(self):
-        if not self._db:
-            try:
-                self._db = create_client(
-                    os.getenv("SUPABASE_URL", ""),
-                    os.getenv("SUPABASE_SERVICE_KEY", "")
-                )
-            except:
-                pass
-        return self._db
-
     async def log_tool_execution(
         self,
         user_id: str,
@@ -34,10 +30,8 @@ class AgentMetrics:
         output_summary: str = "",
         error_message: str = ""
     ):
-        """تسجيل تنفيذ أداة"""
-        db = self._get_db()
-        if not db:
-            return
+        if not DB_AVAILABLE: return
+        db = get_db()
         try:
             db.table("agent_metrics").insert({
                 "user_id": user_id,
@@ -49,18 +43,20 @@ class AgentMetrics:
                 "error_message": error_message[:200],
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }).execute()
+
+            # تكامل اختياري مع TCMA: تسجيل مشاعر عند فشل متكرر
+            if not success and TCMA_AVAILABLE:
+                # يمكن توسيعه لاحقاً لتحليل عدد مرات الفشل
+                pass
         except Exception as e:
-            logger.warning(f"Failed to log metric: {e}")
+            logger.warning(f"Metric log failed: {e}")
 
     async def get_tool_stats(self, user_id: str) -> Dict[str, Any]:
-        """إحصائيات استخدام الأدوات لمستخدم"""
-        db = self._get_db()
-        if not db:
-            return {}
+        if not DB_AVAILABLE: return {}
+        db = get_db()
         try:
             res = db.table("agent_metrics").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(100).execute()
-            if not res.data:
-                return {"total": 0, "tools": {}}
+            if not res.data: return {"total": 0, "tools": {}}
             
             stats = {"total": len(res.data), "tools": {}}
             for row in res.data:
@@ -72,9 +68,7 @@ class AgentMetrics:
                     stats["tools"][tool]["success"] += 1
             return stats
         except Exception as e:
-            logger.warning(f"Failed to get stats: {e}")
+            logger.warning(f"Stats failed: {e}")
             return {}
 
-
 agent_metrics = AgentMetrics()
-print("✅ Agent Metrics v1.0 initialized")
