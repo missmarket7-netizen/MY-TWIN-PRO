@@ -6,125 +6,26 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
-import * as Location from 'expo-location';
 import { useTwinStore } from '../../store/useTwinStore';
 import { apiPost, apiGet } from '../../lib/httpClient';
 import { speakResponse, stopSpeaking } from '../../utils/voice_engine';
 import TypingIndicator from '../../components/TypingIndicator';
 import {
-  Menu, Volume2, VolumeX, Mic, MicOff, Sparkles, Brain, Cpu, Search, Cloud, Music,
-  Film, DollarSign, TrendingUp, Zap, BatteryCharging, Play, ExternalLink,
+  Menu, Volume2, VolumeX, Mic, Sparkles,
 } from 'lucide-react-native';
-import { COLORS, UserBubble, TwinBubble, ToolChip } from './ChatBubbles';
+import { COLORS, ThinkingBar, WelcomeState, EnergyModal } from './ChatComponents';
+import { UserBubble, TwinBubble, ToolChip } from './ChatBubbles';
 import { ChatInput } from './ChatInput';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const APP_ICON = require('../../assets/icon.png');
 
-const MAX_FREE_ADS_PER_DAY = 2;
-const ENERGY_PER_AD = 20;
-
-const ThinkingBar = memo(({ stage, isDark }: { stage: string; isDark: boolean }) => {
-  const stages: Record<string, { icon: any; text_ar: string; text_en: string; color: string }> = {
-    thinking: { icon: Brain, text_ar: 'يفكر...', text_en: 'Thinking...', color: '#8B5CF6' },
-    searching_memory: { icon: Search, text_ar: 'يبحث في الذكريات...', text_en: 'Searching memories...', color: '#3B82F6' },
-    using_tool: { icon: Cloud, text_ar: 'يستخدم الأدوات...', text_en: 'Using tools...', color: '#10B981' },
-    generating: { icon: Sparkles, text_ar: 'يصيغ الرد...', text_en: 'Crafting response...', color: '#F59E0B' },
-    completed: { icon: Sparkles, text_ar: 'تم!', text_en: 'Done!', color: '#10B981' },
-  };
-  const info = stages[stage] || stages.thinking;
-  const Icon = info.icon;
-  return (
-    <View style={[thinkStyles.container, { backgroundColor: info.color + '15' }]}>
-      <Icon size={16} stroke={info.color} />
-      <Text style={[thinkStyles.text, { color: info.color }]}>🧠 {info.text_ar}</Text>
-    </View>
-  );
-});
-const thinkStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignSelf: 'center', marginVertical: 8 },
-  text: { fontSize: 13, fontWeight: '600' },
-});
-
-const WelcomeState = memo(({ isDark, lang, twinName, onSuggestion }: any) => {
-  const c = isDark ? COLORS.dark : COLORS.light;
-  const suggestions = lang === 'ar' ? [
-    'صباح الخير! كيف حالك اليوم؟',
-    'حابب نتكلم عن إيه؟',
-    'عندك أي أخبار حلوة؟',
-  ] : [
-    'Good morning! How are you today?',
-    'What would you like to talk about?',
-    'Any good news to share?',
-  ];
-  return (
-    <View style={styles.welcomeContainer}>
-      <View style={[styles.welcomeIconWrap, { backgroundColor: c.accent + '15' }]}>
-        <Sparkles size={40} stroke={c.accent} />
-      </View>
-      <Text style={[styles.welcomeTitle, { color: c.text }]}>
-        {lang === 'ar' ? `أهلاً بيك، ${twinName || 'توأمك'} جاهز!` : `Welcome! ${twinName || 'Your Twin'} is ready!`}
-      </Text>
-      <Text style={[styles.welcomeSub, { color: c.subtext }]}>
-        {lang === 'ar' ? 'ابدأ محادثة أو اختر من الاقتراحات' : 'Start a conversation or pick a suggestion'}
-      </Text>
-      <View style={styles.suggestionsWrap}>
-        {suggestions.map((s, i) => (
-          <TouchableOpacity key={i} style={[styles.suggestionChip, { backgroundColor: c.inputBg, borderColor: c.border }]} onPress={() => onSuggestion(s)} activeOpacity={0.7}>
-            <Text style={[styles.suggestionText, { color: c.text }]}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-});
-
-const EnergyModal = memo(({ visible, onClose, onWatchAd, adStatus, lang }: any) => {
-  const isAr = lang === 'ar';
-  const t = (ar: string, en: string) => isAr ? ar : en;
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.energyCard}>
-          <BatteryCharging size={56} stroke="#7C3AED" style={{ alignSelf: 'center', marginBottom: 16 }} />
-          <Text style={styles.energyTitle}>{t('الطاقة منتهية', 'Out of Energy')}</Text>
-          <Text style={styles.energyBody}>
-            {t(
-              `شاهد إعلاناً واحصل على ${ENERGY_PER_AD}% طاقة إضافية (يمكنك المشاهدة حتى ${MAX_FREE_ADS_PER_DAY} مرات يومياً)`,
-              `Watch an ad and get ${ENERGY_PER_AD}% extra energy (you can watch up to ${MAX_FREE_ADS_PER_DAY} times a day)`
-            )}
-          </Text>
-          {adStatus?.remaining_today > 0 ? (
-            <TouchableOpacity style={styles.watchAdBtn} onPress={onWatchAd}>
-              <Play size={20} stroke="#FFF" />
-              <Text style={styles.watchAdText}>{t('مشاهدة إعلان', 'Watch Ad')}</Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={styles.energyNote}>
-              {t('استنفدت الإعلانات اليومية. انتظر 20 ساعة للتجديد.', 'Daily ads exhausted. Wait 20 hours for renewal.')}
-            </Text>
-          )}
-          <TouchableOpacity onPress={onClose} style={styles.energyClose}>
-            <Text style={styles.energyCloseText}>{t('إغلاق', 'Close')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-});
 export default function Chat() {
   const insets = useSafeAreaInsets();
   const {
     userId, twinName, twinGender, tier, chatHistory, addMessage,
-    lang, theme, setTwinName, setTwinGender,
+    lang, theme, twinEnergy, setTwinEnergy,
     openMenu, closeMenu, voiceEnabled, setVoiceEnabled,
-    bondLevel, sendMessage: storeSendMessage,
-    isThinking: storeIsThinking, setThinking: storeSetThinking,
-    thinkingStage: storeThinkingStage, setThinkingStage: storeSetThinkingStage,
-    twinEnergy, setTwinEnergy,
+    bondLevel,
   } = useTwinStore();
 
   const [input, setInput] = useState('');
@@ -135,6 +36,8 @@ export default function Chat() {
   const [voiceStatus, setVoiceStatus] = useState<'speaking' | 'listening' | null>(null);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [adStatus, setAdStatus] = useState<any>(null);
+  const [thinkingStage, setThinkingStage] = useState('idle');
+  const [isThinking, setIsThinking] = useState(false);
 
   const flatRef = useRef<FlatList>(null);
   const attachAnim = useRef(new Animated.Value(0)).current;
@@ -167,54 +70,48 @@ export default function Chat() {
 
     setInput('');
     setLoading(true);
-    storeSetThinking(true);
-    storeSetThinkingStage('thinking');
+    setIsThinking(true);
+    setThinkingStage('thinking');
 
     try {
-      if (activeToolsList.length > 0) {
-        storeSetThinkingStage('using_tool');
-        const toolPromises = activeToolsList.map(async (tool) => {
-          const data = await apiPost(`/api/features/${tool.type}`, { query: message || 'music', lang });
-          return { type: tool.type, result: data.reply || data.result, success: true };
-        });
-        const settledResults = await Promise.allSettled(toolPromises);
-        settledResults.forEach((res) => {
-          if (res.status === 'fulfilled' && res.value.success) {
-            addMessage({ id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36), role: 'twin', content: res.value.result, timestamp: Date.now(), provider: 'tool' });
-          }
-        });
-        setActiveToolsList([]);
-        storeSetThinkingStage('completed');
-        setLoading(false); storeSetThinking(false);
-        return;
-      }
+      setThinkingStage('generating');
+      const response = await apiPost('/api/chat', {
+        message,
+        history: chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content })),
+        lang,
+      });
 
-      storeSetThinkingStage('generating');
-      const response = await apiPost('/api/chat', { message, history: chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content })), lang });
-      
-      addMessage({ id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36), role: 'twin', content: response.reply, timestamp: Date.now(), emotion: response.emotion?.primary, provider: response.provider || 'gemini' });
+      addMessage({
+        id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+        role: 'twin', content: response.reply, timestamp: Date.now(),
+        emotion: response.emotion?.primary, provider: response.provider || 'orchestrator',
+      });
 
       if (voiceEnabled) {
         setVoiceStatus('speaking');
         try { await speakResponse(response.reply); } catch {}
         setVoiceStatus(null);
       }
-      storeSetThinkingStage('completed');
+      setThinkingStage('completed');
     } catch (error: any) {
       const isAr = lang === 'ar';
       let errMsg = isAr ? 'حدث خطأ ما. حاول مجدداً 💜' : 'Something went wrong. Try again 💜';
-      addMessage({ id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36), role: 'twin', content: errMsg, timestamp: Date.now(), failed: true, provider: 'error' });
+      addMessage({
+        id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+        role: 'twin', content: errMsg, timestamp: Date.now(), failed: true, provider: 'error',
+      });
     } finally {
-      setLoading(false); storeSetThinking(false);
+      setLoading(false); setIsThinking(false);
+      setTimeout(() => setThinkingStage('idle'), 2000);
     }
-  }, [input, loading, voiceEnabled, lang, addMessage, storeSetThinking, storeSetThinkingStage, activeToolsList, twinEnergy, chatHistory]);
+  }, [input, loading, voiceEnabled, lang, addMessage, activeToolsList, twinEnergy, chatHistory]);
 
   const handleWatchAd = async () => {
     setShowEnergyModal(false);
     try {
       const data = await apiPost('/api/ads/reward', { ad_type: 'rewarded' });
       if (data.success) {
-        setTwinEnergy(Math.min(100, twinEnergy + ENERGY_PER_AD));
+        setTwinEnergy(Math.min(100, twinEnergy + 20));
         const freshStatus = await apiGet('/api/ads/status');
         setAdStatus(freshStatus);
       }
@@ -262,14 +159,14 @@ export default function Chat() {
     if (!loading) return null;
     return (
       <View>
-        <ThinkingBar stage={storeThinkingStage} isDark={isDark} />
+        <ThinkingBar stage={thinkingStage} isDark={isDark} />
         <View style={styles.typingRow}>
           <Image source={APP_ICON} style={{ width: 28, height: 28, borderRadius: 14 }} />
           <TypingIndicator />
         </View>
       </View>
     );
-  }, [loading, storeThinkingStage, isDark]);
+  }, [loading, thinkingStage, isDark]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
@@ -336,20 +233,4 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 0, paddingVertical: 12, flexGrow: 1 },
   typingRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingVertical: 12, gap: 10 },
   toolsRow: { flexDirection: 'row', padding: 10, borderTopWidth: 1, borderTopColor: '#E5E5EA', gap: 8 },
-  welcomeContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 },
-  welcomeIconWrap: { width: 80, height: 80, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  welcomeTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  welcomeSub: { fontSize: 15, textAlign: 'center', marginBottom: 24 },
-  suggestionsWrap: { gap: 10, width: '100%' },
-  suggestionChip: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
-  suggestionText: { fontSize: 15, fontWeight: '500' },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 30 },
-  energyCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 30, alignItems: 'center', width: '100%', maxWidth: 350 },
-  energyTitle: { fontSize: 22, fontWeight: '800', color: '#1A1226', marginBottom: 12 },
-  energyBody: { fontSize: 15, color: '#7C6B99', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
-  watchAdBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#7C3AED', paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
-  watchAdText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  energyNote: { fontSize: 13, color: '#EF4444', textAlign: 'center', marginBottom: 16 },
-  energyClose: { marginTop: 16, padding: 10 },
-  energyCloseText: { fontSize: 14, color: '#6B7280' },
 });

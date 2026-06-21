@@ -7,7 +7,7 @@ import {
   Send, X, Camera, Image as ImageIcon, FileText,
   Search, Cloud, Music, Film, DollarSign, TrendingUp,
   Wand2, Mic, MicOff, GraduationCap, Code2, Heart,
-  Moon, PenLine, BarChart3, Sparkles,
+  Moon, PenLine, BarChart3, Home,
 } from 'lucide-react-native';
 import { ToolChip } from './ChatBubbles';
 
@@ -31,7 +31,7 @@ export const ChatInput = memo(({
 }: any) => {
   const inputRef = useRef<TextInput>(null);
 
-  // القائمة الموحدة الموسعة
+  // القائمة الموحدة الموسعة (مضافة Smart Home)
   const unifiedMenu: ToolItem[] = useMemo(() => [
     // === قسم الإرفاق ===
     { id: 'camera', icon: Camera, label_ar: 'كاميرا', label_en: 'Camera', color: '#8B5CF6', category: 'attach', onPress: onCamera },
@@ -52,6 +52,7 @@ export const ChatInput = memo(({
     { id: 'coach', icon: Heart, label_ar: 'مدرب حياة', label_en: 'Life Coach', color: '#EC4899', category: 'feature' },
     { id: 'dream', icon: Moon, label_ar: 'تفسير حلم', label_en: 'Dream', color: '#6366F1', category: 'feature' },
     { id: 'content', icon: PenLine, label_ar: 'كتابة محتوى', label_en: 'Content', color: '#D946EF', category: 'feature' },
+    { id: 'smart_home', icon: Home, label_ar: 'منزل ذكي', label_en: 'Smart Home', color: '#06B6D4', category: 'feature' },
   ], [onCamera, onGallery, onFile]);
 
   const handleToolSelect = (item: ToolItem) => {
