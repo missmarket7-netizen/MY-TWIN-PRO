@@ -1,9 +1,8 @@
 """
-G.R.O.W.T.H-H.I.V.E - نظام إدارة الأعمال المتكامل
-==================================================
-محرك تحليل المشاريع، التسويق، المبيعات، والتقارير.
-يتكامل مع TCMA لتقديم تجربة أعمال شخصية وعميقة.
+GROWTH-HIVE - نظام إدارة الأعمال المتكامل
+=============================================
+يدير المشاريع ودراسات الجدوى والتسويق.
 """
-from .growth_hive_orchestrator import GrowthHiveOrchestrator
+from .growth_hive_orchestrator import GrowthHiveOrchestrator, growth_hive
 
-__all__ = ["GrowthHiveOrchestrator"]
+__all__ = ["GrowthHiveOrchestrator", "growth_hive"]

@@ -226,3 +226,52 @@ logger.info("✅ ATHENA Orchestrator Part 1 loaded")
 
 athena = ATHENAOrchestrator()
 logger.info("✅ ATHENA Orchestrator deeply integrated with TCMA")
+
+    # ============================================================
+    # خدمة تلخيص الكتب والفيديوهات التعليمية
+    # ============================================================
+    async def summarize_educational_content(
+        self, user_id: str, content: str, content_type: str = "book",
+        language: str = "ar", style: str = "detailed"
+    ) -> Dict[str, Any]:
+        """يلخص كتاباً أو فيديو تعليمياً إلى نقاط تعلم"""
+        if not AI_AVAILABLE:
+            return {"error": "خدمة الذكاء الاصطناعي غير متاحة"}
+        
+        # تحضير الموجه حسب نوع المحتوى
+        if content_type == "book":
+            context = f"كتاب: {content[:500]}..."
+            prompt = f"""أنشئ تلخيصاً تعليمياً للكتاب التالي:
+{context}
+
+المطلوب:
+1. الفكرة الرئيسية (جملة واحدة)
+2. أهم 5 دروس مستفادة
+3. خريطة ذهنية للمفاهيم
+4. أسئلة للمراجعة الذاتية
+
+الأسلوب: {style}. اللغة: {language}."""
+        else:  # video
+            context = f"فيديو: {content[:500]}..."
+            prompt = f"""أنشئ تلخيصاً تعليمياً للفيديو التالي:
+{context}
+
+المطلوب:
+1. الموضوع الرئيسي
+2. النقاط الزمنية الرئيسية (Time stamps)
+3. أهم 5 نصائح/معلومات
+4. سؤال للمناقشة
+
+اللغة: {language}."""
+
+        summary = await provider_router.generate(prompt, language=language)
+        
+        # تخزين في الذاكرة
+        if TCMA_AVAILABLE:
+            await store_emotional_memory(
+                user_id=user_id, expressed_text=f"لخص {content_type}: {content[:50]}",
+                detected_emotion={"primary": "neutral", "intensity": 0.5, "valence": 0.0},
+                trigger="study", cultural_context=f"تلخيص {content_type}"
+            )
+        
+        return {"type": content_type, "summary": summary}

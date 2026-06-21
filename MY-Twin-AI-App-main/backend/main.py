@@ -101,8 +101,20 @@ ROUTES_REGISTRY = {
     # الميزات الجديدة
     "study":       "app.api.routes.study_routes",          # ATHENA
     "business":    "app.api.routes.business_routes",   # G.R.O.W.T.H-H.I.V.E
+    "creator":     "app.api.routes.creator_routes",   # C.R.E.A.T.O.R v2.0
+    "recommendations": "app.api.routes.recommendations",  # Unified Recommendations
+    "meta":        "app.api.routes.meta_routes",          # Meta-Reflection & Proactive
+    "code_lab":    "app.api.routes.code_lab_routes",   # C.O.D.E. Lab
+    "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
+    "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
+    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
+    "code_lab":    "app.api.routes.code_lab_routes",   # C.O.D.E. Lab
+    "life_coach":  "app.api.routes.life_coach_routes",   # L.I.F.E. C.O.A.C.H.
+    "dreams":      "app.api.routes.dream_routes",       # Dream Analysis v2.0
+    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
     "ai_trainer":  "app.api.routes.ai_trainer_routes",  # AI Trainer
     "dreams":      "app.api.routes.dreams",
+    "smart_home":  "app.api.routes.smart_home_routes",   # S.M.A.R.T. Home
     "smart_home":  "app.api.routes.smart_home",
     "reports":     "app.api.routes.reports",               # تقارير أسبوعية
     "graph":       "app.api.routes.graph_routes",           # تنقيب الرسم البياني
@@ -199,6 +211,13 @@ async def startup_event():
                 except:
                     pass
         asyncio.create_task(periodic_maintenance())
+        try:
+            from app.features.shadow_mode import ShadowScheduler
+            shadow = ShadowScheduler()
+            asyncio.create_task(shadow.start())
+            logger.info("🌑 Shadow Mode started")
+        except Exception as e:
+            logger.warning(f"Shadow Mode unavailable: {e}")
     except:
         pass
 

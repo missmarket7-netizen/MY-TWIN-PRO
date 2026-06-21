@@ -161,3 +161,19 @@ async def get_knowledge_path(concept_id: str = Query(...)) -> Dict[str, Any]:
         "steps": len(path),
     }
 
+
+class SummarizeRequest(BaseModel):
+    user_id: str
+    content: str
+    content_type: str = "book"  # book or video
+    language: str = "ar"
+    style: str = "detailed"
+
+@router.post("/summarize")
+async def summarize_educational(request: SummarizeRequest):
+    if not STUDY_READY:
+        raise HTTPException(status_code=503, detail="خدمة الدراسة غير متوفرة")
+    return await athena.summarize_educational_content(
+        request.user_id, request.content, request.content_type,
+        request.language, request.style
+    )

@@ -1,22 +1,22 @@
 """
-Model Trainer - مدير تدريب النموذج الخاص
-=========================================
-يوفر واجهة لبدء تدريب LoRA على نموذج أساسي مفتوح.
-يستخدم مكتبات transformers, peft, datasets.
+Model Trainer v2.0 - مدير تدريب النموذج الخاص (محدث)
+======================================================
+يقوم تلقائياً بتحويل البيانات إلى صيغة LLaMA 3 قبل بدء التدريب.
 """
 import logging
 import os
 import subprocess
+import json
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger("model_trainer")
 
 class ModelTrainer:
     def __init__(self):
-        self.default_base_model = "NousResearch/Meta-Llama-3-8B"  # يدعم العربية بشكل ممتاز
+        self.default_base_model = "NousResearch/Meta-Llama-3-8B"
         self.output_dir = "mytwin_model_output"
 
-    async def start_training(
+    async def prepare_and_train(
         self,
         training_file: str,
         base_model: Optional[str] = None,
@@ -25,47 +25,56 @@ class ModelTrainer:
         use_lora: bool = True,
     ) -> Dict[str, Any]:
         """
-        يبدأ عملية تدريب نموذج باستخدام LoRA.
-        يفترض وجود بيئة Python مع transformers و peft.
+        1. يحول البيانات إلى صيغة LLaMA 3
+        2. يبدأ التدريب
         """
         if not os.path.exists(training_file):
             return {"error": f"ملف التدريب غير موجود: {training_file}"}
 
+        # 1. التحويل التلقائي إلى صيغة LLaMA 3
+        converted_file = training_file.replace(".jsonl", "_llama3.jsonl")
+        try:
+            # استدعاء دالة التحويل مباشرة
+            from app.ai_trainer.convert_to_llama3 import convert_messages_to_llama3
+            with open(training_file, "r", encoding="utf-8") as fin, open(converted_file, "w", encoding="utf-8") as fout:
+                for line in fin:
+                    data = json.loads(line)
+                    messages = data.get("messages", [])
+                    if len(messages) >= 2:
+                        llama3_text = convert_messages_to_llama3(messages)
+                        fout.write(json.dumps({"text": llama3_text}, ensure_ascii=False) + "\n")
+            logger.info(f"✅ تم تحويل البيانات تلقائياً: {converted_file}")
+        except Exception as e:
+            logger.error(f"فشل التحويل التلقائي: {e}")
+            return {"error": f"فشل تحويل البيانات: {str(e)}"}
+
+        # 2. إعداد التدريب
         base = base_model or self.default_base_model
         output = os.path.join(self.output_dir, f"mytwin_lora_{os.path.basename(training_file).split('.')[0]}")
 
-        # إعداد سكريبت التدريب (يمكن استدعاء مكتبة transformers مباشرة)
         training_script = self._generate_training_script(
-            training_file, base, output, num_epochs, learning_rate, use_lora
+            converted_file, base, output, num_epochs, learning_rate, use_lora
         )
 
-        # تنفيذ التدريب (محاكاة - في الواقع سيكون عبر huggingface trainer)
-        try:
-            # هنا نكتب السكريبت إلى ملف وننفذه
-            script_path = "run_training.py"
-            with open(script_path, "w") as f:
-                f.write(training_script)
+        script_path = "run_training.py"
+        with open(script_path, "w") as f:
+            f.write(training_script)
 
-            # تنفيذ (اختياري، قد نكتفي بإعادة التوجيهات)
-            logger.info(f"سكريبت التدريب جاهز: {script_path}")
-            logger.info(f"النموذج الأساسي: {base}")
-            logger.info(f"المخرجات: {output}")
+        logger.info(f"سكريبت التدريب جاهز: {script_path}")
+        logger.info(f"النموذج الأساسي: {base}")
+        logger.info(f"المخرجات: {output}")
 
-            return {
-                "status": "ready",
-                "script_path": script_path,
-                "command": f"python {script_path}",
-                "base_model": base,
-                "output_dir": output,
-                "num_epochs": num_epochs,
-                "learning_rate": learning_rate,
-            }
-        except Exception as e:
-            logger.error(f"فشل إعداد التدريب: {e}")
-            return {"error": str(e)}
+        return {
+            "status": "ready",
+            "script_path": script_path,
+            "command": f"python {script_path}",
+            "base_model": base,
+            "output_dir": output,
+            "num_epochs": num_epochs,
+            "learning_rate": learning_rate,
+        }
 
     def _generate_training_script(self, data_file, base_model, output, epochs, lr, use_lora):
-        """يولد سكريبت تدريب كامل باستخدام Hugging Face"""
         lora_config = ""
         if use_lora:
             lora_config = """
@@ -80,7 +89,6 @@ class ModelTrainer:
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
 """
-
         script = f"""
 import torch
 from transformers import (
@@ -94,7 +102,6 @@ from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
 import os
 
-# تحميل النموذج والمُجزئ
 base_model = "{base_model}"
 model = AutoModelForCausalLM.from_pretrained(
     base_model,
@@ -107,26 +114,8 @@ tokenizer.pad_token = tokenizer.eos_token
 
 {lora_config}
 
-# تحميل البيانات
 data_files = {{"train": "{data_file}"}}
 dataset = load_dataset("json", data_files=data_files, split="train")
-
-def format_chat(examples):
-    texts = []
-    for msgs in examples["messages"]:
-        text = ""
-        for m in msgs:
-            role = m["role"]
-            content = m["content"]
-            if role == "user":
-                text += f"<|user|>\\n{{content}}\\n"
-            else:
-                text += f"<|assistant|>\\n{{content}}\\n"
-        text += tokenizer.eos_token
-        texts.append(text)
-    return {{"text": texts}}
-
-dataset = dataset.map(format_chat, batched=True, remove_columns=dataset.column_names)
 
 def tokenize_function(examples):
     return tokenizer(examples["text"], truncation=True, max_length=512, padding="max_length")
@@ -161,4 +150,4 @@ print("✅ Training complete!")
 """
         return script
 
-logger.info("✅ Model Trainer initialized")
+logger.info("✅ Model Trainer v2.0 initialized")
