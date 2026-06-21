@@ -1,18 +1,33 @@
 """
-Reasoning Service – Intent-driven execution planning.
-Migrated from reasoning_engine.py with full logic preserved.
+Reasoning Service v3.0 – مخطط تنفيذ النوايا (متكامل مع TCMA والأدوات الجديدة)
+================================================================================
+- يخطط للخطوات بناءً على نية المستخدم
+- يتكامل مع Unified Tool Registry (الأدوات الجديدة)
+- يستخدم TCMA لتحديد الحاجة إلى التعاطف
 """
 import os, logging, json, re
 from typing import Dict, Any, Optional, List, Tuple
-from app.features.tool_registry import ToolRegistry
 
 logger = logging.getLogger("reasoning_service")
+
+try:
+    from app.features.tools.tool_registry import ToolRegistry
+    TOOLS_AVAILABLE = True
+except ImportError:
+    TOOLS_AVAILABLE = False
+
+try:
+    from app.memory.emotional.emotional_memory import get_emotional_state_for_response
+    TCMA_AVAILABLE = True
+except ImportError:
+    TCMA_AVAILABLE = False
 
 VALID_INTENTS = {
     "general", "emotional", "coaching", "decision",
     "memory", "search", "weather", "music", "goal",
     "greeting", "gratitude", "goodbye", "news", "coding",
-    "business", "career", "planning"
+    "business", "career", "planning", "study", "dream",
+    "life_coach", "smart_home", "task", "code_lab"
 }
 
 class ReasoningService:
@@ -55,18 +70,22 @@ class ReasoningService:
         intent = "general"
         msg_lower = message.lower()
         
+        # خريطة محدثة للنوايا والأدوات الجديدة
         patterns = {
-            "weather": r"\b(طقس|الجو|الرياح|مطر|حرارة|شمس|سحاب|عاصفة|weather|rain|sunny|temperature)\b",
-            "music": r"\b(أغنية|موسيقى|اسمع|شغل|باند|مطرب|song|music|playlist|spotify)\b",
-            "news": r"\b(أخبار|حدث|حصل|عاجل|news|headlines|latest)\b",
-            "currency": r"\b(عملة|دولار|ريال|سعر|صرف|currency|exchange|usd|sar)\b",
-            "search": r"\b(بحث|search|google|معلومات عن|اعرف)\b",
+            "weather": r"\b(طقس|الجو|الرياح|مطر|حرارة|شمس|weather|rain|temperature)\b",
+            "news": r"\b(أخبار|حدث|عاجل|news|headlines)\b",
+            "search": r"\b(بحث|search|معلومات عن|اعرف)\b",
             "goal": r"\b(هدف|أهداف|تقدم|خطة|plan|goal)\b",
             "memory": r"\b(ذكرت|قلت|اتذكر|remember|memory|سابق)\b",
             "emotional": r"\b(حزين|خايف|قلق|sad|worried|anxious|خوف|مكتئب)\b",
-            "greeting": r"\b(مرحبا|اهلا|صباح الخير|مساء الخير|هاي|hello|hi)\b",
+            "greeting": r"\b(مرحبا|اهلا|صباح الخير|hello|hi)\b",
             "goodbye": r"\b(مع السلامة|باي|bye|goodbye)\b",
             "gratitude": r"\b(شكرا|تسلم|thanks|thank you)\b",
+            "study": r"\b(ادرس|تعلم|مفهوم|درس|study|learn|concept)\b",
+            "code_lab": r"\b(كود|برمجة|تطبيق|code|programming|python|react)\b",
+            "dream": r"\b(حلم|حلمت|dream|nightmare)\b",
+            "smart_home": r"\b(شغل النور|اطفئ|منزل|home|light)\b",
+            "task": r"\b(مهمة|موعد|تذكير|task|reminder|schedule)\b",
         }
         
         for intent_type, pattern in patterns.items():
@@ -74,11 +93,22 @@ class ReasoningService:
                 intent = intent_type
                 break
 
+        # خريطة محدثة للأدوات (من Unified Tool Registry)
         tool_map = {
-            "weather": "get_weather", "music": "search_spotify", "news": "get_news",
-            "currency": "get_currency", "search": "search_google",
+            "weather": "weather",
+            "news": "news",
+            "search": "search",
+            "study": "study",
+            "code_lab": "code",
+            "dream": "dream",
+            "smart_home": "smart_home_command",
+            "task": "create_task",
+            "memory": "reflections",
+            "emotional": "emotional_state",
         }
-        primary_tool = tool_map.get(intent) if intent in tool_map and tool_map[intent] in ToolRegistry.list_tools() else None
+        
+        available_tools = ToolRegistry.list_tools() if TOOLS_AVAILABLE else []
+        primary_tool = tool_map.get(intent) if intent in tool_map and tool_map[intent] in available_tools else None
         
         return {
             "intent": intent,
@@ -103,68 +133,17 @@ class ReasoningService:
         user_id: Optional[str] = None, lang: str = "ar",
         context_summary: str = "", tier: str = "free"
     ) -> Dict[str, Any]:
-        if not self._should_use_llm_planner(message, emotion):
-            return self._fast_plan(message, emotion)
-
-        # Try LLM planner if available
-        if self.client:
+        # 1. محاولة تحسين التعاطف من TCMA
+        if TCMA_AVAILABLE and user_id:
             try:
-                tools_desc = ToolRegistry.get_tool_descriptions(tier)
-                tools_json = json.dumps(tools_desc, ensure_ascii=False)
+                tcma_emotion = await get_emotional_state_for_response(user_id, message)
+                if tcma_emotion and tcma_emotion.get("current_emotion") in ["sadness", "fear", "frustration"]:
+                    emotion["requires_empathy"] = True
+            except: pass
 
-                prompt = f"""أنت مخطط ذكي. حلل الموقف وخطط للخطوات.
-                
-السياق: {context_summary}
-المشاعر: {emotion.get('primary', 'neutral')}
-الأدوات: {tools_json}
-
-أعد ONLY JSON:
-{{
-  "intent": "من {VALID_INTENTS}",
-  "goal": "الهدف",
-  "needs_tool": true/false,
-  "primary_tool": "اسم الأداة أو null",
-  "tool_confidence": 0.0-1.0,
-  "needs_memory": true/false,
-  "response_style": "conversational/informative/supportive/coaching",
-  "complexity": "simple/medium/complex",
-  "urgency": "low/medium/high",
-  "risk_level": "low/medium/high",
-  "requires_empathy": true/false
-}}
-
-الرسالة: "{message}"
-JSON:"""
-
-                raw_reply = await self.client.get_best_reply(prompt, task="deep_reasoning")
-                plan = self._extract_json(raw_reply)
-                if plan:
-                    plan = self._validate_plan(plan)
-                    primary_tool = plan.get("primary_tool")
-                    available = ToolRegistry.list_tools()
-                    
-                    if primary_tool and primary_tool not in available:
-                        plan["primary_tool"] = None
-                        plan["needs_tool"] = False
-
-                    return {
-                        "intent": plan.get("intent", "general"),
-                        "goal": plan.get("goal", "general_chat"),
-                        "needs_tool": plan.get("needs_tool", False),
-                        "primary_tool": plan.get("primary_tool"),
-                        "tool_confidence": float(plan.get("tool_confidence", 0.5)),
-                        "needs_memory": plan.get("needs_memory", False),
-                        "response_style": plan.get("response_style", "conversational"),
-                        "complexity": plan.get("complexity", "medium"),
-                        "urgency": plan.get("urgency", "low"),
-                        "risk_level": plan.get("risk_level", "low"),
-                        "requires_empathy": plan.get("requires_empathy", False),
-                    }
-            except Exception as e:
-                logger.warning(f"Planner LLM failed: {e}")
-
+        # 2. استخدام المخطط المحلي (Fast Plan) افتراضياً
         return self._fast_plan(message, emotion)
 
 
 reasoning_service = ReasoningService()
-print("✅ Reasoning Service migrated")
+logger.info("✅ Reasoning Service v3.0 initialized")

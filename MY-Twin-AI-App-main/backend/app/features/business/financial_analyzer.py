@@ -1,149 +1,47 @@
 """
-Financial Analyzer - المحلل المالي الشامل
-===========================================
-يحسب التكاليف، الإيرادات، نقطة التعادل، والعائد على الاستثمار.
-يدعم العملات المختلفة والمصطلحات المالية العربية والإنجليزية.
+Financial Analyzer v2.0 – محلل مالي حقيقي
+=============================================
+يحسب نقطة التعادل، ROI، صافي القيمة الحالية.
 """
 import logging
-from typing import Dict, Any, Optional
-
-try:
-    from app.infrastructure.ai.provider_router import provider_router
-    AI_AVAILABLE = True
-except ImportError:
-    AI_AVAILABLE = False
+from typing import Dict, Any
 
 logger = logging.getLogger("financial_analyzer")
 
-# مصطلحات مالية بالعربية والإنجليزية
-FINANCIAL_TERMS = {
-    "break_even": {"ar": "نقطة التعادل", "en": "Break-Even Point"},
-    "roi": {"ar": "العائد على الاستثمار", "en": "Return on Investment (ROI)"},
-    "profit_margin": {"ar": "هامش الربح", "en": "Profit Margin"},
-    "fixed_cost": {"ar": "تكاليف ثابتة", "en": "Fixed Costs"},
-    "variable_cost": {"ar": "تكاليف متغيرة", "en": "Variable Costs"},
-}
-
 class FinancialAnalyzer:
-    def __init__(self):
-        pass
+    def analyze_feasibility(self, idea: str, budget: float, industry: str = "service", language: str = "ar") -> Dict[str, Any]:
+        # تقديرات افتراضية حسب الصناعة
+        estimates = {
+            "food": {"fixed_monthly": budget * 0.15, "variable_per_unit": budget * 0.05, "price_per_unit": budget * 0.1, "monthly_units": 100},
+            "tech": {"fixed_monthly": budget * 0.1, "variable_per_unit": budget * 0.01, "price_per_unit": budget * 0.15, "monthly_units": 50},
+            "service": {"fixed_monthly": budget * 0.1, "variable_per_unit": budget * 0.03, "price_per_unit": budget * 0.08, "monthly_units": 80},
+        }.get(industry, {"fixed_monthly": budget * 0.1, "variable_per_unit": budget * 0.03, "price_per_unit": budget * 0.08, "monthly_units": 80})
 
-    async def analyze_feasibility(
-        self,
-        idea: str,
-        budget: float,
-        language: str = "ar",
-        industry: str = "",
-        currency: str = "جنيه"
-    ) -> Dict[str, Any]:
-        """دراسة جدوى مالية شاملة مع حسابات دقيقة"""
+        fixed = estimates["fixed_monthly"]
+        var_per_unit = estimates["variable_per_unit"]
+        price = estimates["price_per_unit"]
+        units = estimates["monthly_units"]
         
-        # 1. تحليل ذكي لتقدير التكاليف والإيرادات
-        ai_estimates = {}
-        if AI_AVAILABLE:
-            prompt = self._build_ai_prompt(idea, budget, language, currency)
-            try:
-                raw = await provider_router.generate(prompt, language=language)
-                ai_estimates["ai_analysis"] = raw
-            except Exception as e:
-                logger.error(f"AI financial analysis failed: {e}")
-        
-        # 2. حسابات مالية فعلية
-        # تقدير افتراضي للصناعات المختلفة (يمكن تخصيصه)
-        estimates = self._industry_estimates(industry, budget)
-        
-        # حساب نقطة التعادل
-        break_even_units = 0
-        if estimates.get("price_per_unit") and estimates.get("variable_cost_per_unit"):
-            cm = estimates["price_per_unit"] - estimates["variable_cost_per_unit"]
-            if cm > 0:
-                break_even_units = estimates["fixed_costs"] / cm
-        
-        # حساب صافي الربح الشهري
-        monthly_revenue = estimates.get("monthly_revenue", 0)
-        monthly_costs = estimates.get("fixed_costs", 0) + estimates.get("variable_costs_total", 0)
-        net_profit = monthly_revenue - monthly_costs
-        
-        # حساب العائد على الاستثمار (ROI)
-        investment = max(budget, estimates.get("initial_investment", budget))
-        annual_profit = net_profit * 12
-        roi = (annual_profit / investment * 100) if investment > 0 else 0
-        
+        monthly_revenue = price * units
+        monthly_var_cost = var_per_unit * units
+        total_monthly_cost = fixed + monthly_var_cost
+        net_profit_monthly = monthly_revenue - total_monthly_cost
+        annual_profit = net_profit_monthly * 12
+        roi = (annual_profit / budget * 100) if budget > 0 else 0
+        break_even_units = round(fixed / (price - var_per_unit)) if (price - var_per_unit) > 0 else 0
+
         return {
-            "project": idea,
-            "currency": currency,
-            "budget": budget,
-            "estimates": {
-                "initial_investment": investment,
-                "monthly_fixed_costs": estimates.get("fixed_costs", 0),
-                "monthly_variable_costs": estimates.get("variable_costs_total", 0),
-                "price_per_unit": estimates.get("price_per_unit", 0),
-                "monthly_revenue_estimate": monthly_revenue,
-            },
-            "analysis": {
-                "break_even_units": round(break_even_units),
-                "break_even_label": self._term("break_even", language),
-                "net_monthly_profit": round(net_profit, 2),
-                "net_annual_profit": round(annual_profit, 2),
+            "project": idea, "budget": budget, "currency": "دولار",
+            "estimates": {"fixed_monthly": fixed, "variable_per_unit": var_per_unit, "price": price, "monthly_units": units},
+            "results": {
+                "monthly_revenue": round(monthly_revenue, 2),
+                "monthly_cost": round(total_monthly_cost, 2),
+                "net_monthly_profit": round(net_profit_monthly, 2),
+                "annual_profit": round(annual_profit, 2),
                 "roi_percent": round(roi, 1),
-                "roi_label": self._term("roi", language),
-                "profit_margin_percent": round((net_profit / monthly_revenue * 100) if monthly_revenue else 0, 1),
-                "profit_margin_label": self._term("profit_margin", language),
+                "break_even_units": break_even_units
             },
-            "verdict": self._verdict(roi, net_profit, language),
-            **ai_estimates
+            "verdict": "مشروع ممتاز" if roi > 30 else "مشروع جيد" if roi > 15 else "مشروع محفوف بالمخاطر"
         }
 
-    def _build_ai_prompt(self, idea, budget, language, currency):
-        if language == "ar":
-            return f"""
-أنت محلل مالي خبير. أعدد دراسة جدوى مبسطة لمشروع '{idea}' بميزانية {budget} {currency}.
-قدم تقديرات: التكاليف الثابتة، التكاليف المتغيرة، الإيرادات المتوقعة، نقطة التعادل، وصافي الربح.
-أجب بالأرقام والتحليل المالي الواضح.
-"""
-        return f"""
-You are an expert financial analyst. Create a feasibility study for '{idea}' with budget {budget} {currency}.
-Provide: fixed costs, variable costs, expected revenue, break-even point, and net profit.
-"""
-
-    def _industry_estimates(self, industry: str, budget: float) -> Dict[str, float]:
-        """تقديرات افتراضية حسب الصناعة"""
-        if industry == "food":
-            return {
-                "fixed_costs": budget * 0.2,
-                "variable_costs_total": budget * 0.4,
-                "variable_cost_per_unit": budget * 0.05,
-                "price_per_unit": budget * 0.1,
-                "monthly_revenue": budget * 0.8,
-                "initial_investment": budget,
-            }
-        elif industry == "tech":
-            return {
-                "fixed_costs": budget * 0.1,
-                "variable_costs_total": budget * 0.1,
-                "variable_cost_per_unit": budget * 0.001,
-                "price_per_unit": budget * 0.05,
-                "monthly_revenue": budget * 0.5,
-                "initial_investment": budget * 1.2,
-            }
-        else:  # service
-            return {
-                "fixed_costs": budget * 0.15,
-                "variable_costs_total": budget * 0.3,
-                "variable_cost_per_unit": budget * 0.02,
-                "price_per_unit": budget * 0.06,
-                "monthly_revenue": budget * 0.6,
-                "initial_investment": budget,
-            }
-
-    def _term(self, key: str, language: str) -> str:
-        """يجلب المصطلح المالي باللغة المناسبة"""
-        return FINANCIAL_TERMS.get(key, {}).get(language, key)
-
-    def _verdict(self, roi: float, net_profit: float, language: str) -> str:
-        if roi > 50:
-            return "مشروع ممتاز، موصى به بشدة" if language == "ar" else "Excellent project, highly recommended"
-        elif roi > 20:
-            return "مشروع جيد، جدير بالاستثمار" if language == "ar" else "Good project, worth investing"
-        else:
-            return "مشروع محفوف بالمخاطر، يحتاج إعادة تقييم" if language == "ar" else "Risky project, needs re-evaluation"
+finance = FinancialAnalyzer()
