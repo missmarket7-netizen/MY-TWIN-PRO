@@ -98,6 +98,7 @@ ROUTES_REGISTRY = {
     "business":    "app.api.routes.business_routes",       # GROWTH-HIVE
     "creator":     "app.api.routes.creator_routes",        # C.R.E.A.T.O.R.
     "code_lab":    "app.api.routes.code_lab_routes",       # C.O.D.E. Lab
+    "image_lab":   "app.api.routes.image_routes",        # I.M.A.G.E.
     "life_coach":  "app.api.routes.life_coach_routes",     # L.I.F.E. C.O.A.C.H.
     "dreams":      "app.api.routes.dream_routes",          # Dream Analysis
     "smart_home":  "app.api.routes.smart_home_routes",     # S.M.A.R.T. Home
