@@ -1,3 +1,8 @@
+"""
+Unified Tool Registry – سجل الأدوات الموحّد
+=============================================
+يربط جميع ميزات MyTwin الجديدة كأدوات قابلة للاستدعاء.
+"""
 import logging
 from typing import Dict, Any, Optional, Callable
 
@@ -26,57 +31,120 @@ class ToolRegistry:
         return list(cls._tools.keys())
 
     @classmethod
-    def get_tool_descriptions(cls, tier: str = "free") -> Dict[str, str]:
-        descriptions = {}
-        for name, info in cls._tools.items():
-            if tier in ["free", "plus"] and info.get("cost", 1) > 2:
-                continue
-            descriptions[name] = info.get("description", "")
-        return descriptions
+    def get_all(cls) -> Dict[str, Dict[str, Any]]:
+        return cls._tools
 
-# تسجيل الأدوات الداخلية (التي لا تعتمد على خدمات خارجية)
-async def _tool_remind_goal(user_id: str, query: str = "") -> Optional[str]:
+# ============================================================
+# تسجيل أدوات الذاكرة (TCMA)
+# ============================================================
+async def tool_emotional_state(user_id: str, query: str = "") -> str:
+    """أداة: استرجاع الحالة العاطفية الحالية"""
     try:
-        import os
-        url = os.getenv("SUPABASE_URL", ""); key = os.getenv("SUPABASE_SERVICE_KEY", "")
-        if not url or not key: return None
-        db = create_client(url, key)
-        res = db.table("goals").select("*").eq("user_id", user_id).eq("status", "active").order("created_at", desc=True).limit(3).execute()
-        if res.data: return "أهدافك النشطة: " + "، ".join(g.get("title", "") for g in res.data)
-        return "لا توجد أهداف نشطة حالياً."
+        from app.memory.emotional.emotional_memory import get_emotional_state_for_response
+        state = await get_emotional_state_for_response(user_id, "")
+        return f"الحالة العاطفية: {state.get('current_emotion', 'محايد')}"
     except Exception as e:
-        logger.warning(f"Tool remind_goal failed: {e}")
-        return None
+        return f"تعذر استرجاع الحالة: {e}"
 
-async def _tool_fetch_memory(user_id: str, query: str = "") -> Optional[str]:
+async def tool_user_identity(user_id: str, query: str = "") -> str:
+    """أداة: استرجاع هوية المستخدم"""
     try:
-        from app.memory.memory_service import get_memory_context
-        context = await get_memory_context(user_id)
-        if context and query.lower() in str(context).lower(): return str(context)
-        return "لا توجد ذكريات تطابق البحث."
+        from app.memory.identity.identity_model import get_identity
+        identity = await get_identity(user_id)
+        return f"هوية المستخدم: {identity.get('self_view', 'غير معروف')}"
     except Exception as e:
-        logger.warning(f"Tool fetch_memory failed: {e}")
-        return None
+        return f"تعذر استرجاع الهوية: {e}"
 
-ToolRegistry.register("remind_goal", _tool_remind_goal, 9, 1, "memory", "استرجاع أهداف المستخدم النشطة")
-ToolRegistry.register("fetch_memory", _tool_fetch_memory, 8, 1, "memory", "استرجاع ذكريات محددة من الماضي")
+async def tool_reflections(user_id: str, query: str = "") -> str:
+    """أداة: استرجاع الاستنتاجات المتراكمة"""
+    try:
+        from app.memory.reflection.reflection_engine import get_user_insights
+        insights = await get_user_insights(user_id, min_confidence=0.6)
+        return f"استنتاجات: {insights.get('summary', 'لا يوجد')}"
+    except Exception as e:
+        return f"تعذر استرجاع الاستنتاجات: {e}"
 
-# تسجيل الأدوات الخارجية (مع استيراد آمن)
-try:
-    from app.features.external_services import (
-        search_google, search_youtube, search_spotify,
-        get_weather, get_news, get_currency,
-        home_assistant_control
-    )
-    ToolRegistry.register("search_google", search_google, 8, 2, "search", "البحث في الإنترنت عن معلومات عامة")
-    ToolRegistry.register("search_youtube", search_youtube, 7, 2, "search", "البحث عن فيديوهات في يوتيوب")
-    ToolRegistry.register("search_spotify", search_spotify, 6, 2, "search", "البحث عن أغاني أو موسيقى في سبوتيفاي")
-    ToolRegistry.register("get_weather", get_weather, 9, 1, "utility", "معرفة حالة الطقس في مدينة معينة")
-    ToolRegistry.register("get_news", get_news, 7, 1, "utility", "جلب آخر الأخبار والمستجدات")
-    ToolRegistry.register("get_currency", get_currency, 6, 1, "utility", "معرفة أسعار صرف العملات")
-    ToolRegistry.register("home_assistant_control", home_assistant_control, 5, 3, "smart_home", "التحكم في أجهزة المنزل الذكي مثل الإضاءة")
-    logger.info("✅ External tools registered in ToolRegistry")
-except ImportError as e:
-    logger.warning(f"External services not available: {e}")
+async def tool_people_network(user_id: str, query: str = "") -> str:
+    """أداة: استرجاع شبكة الأشخاص المهمين"""
+    try:
+        from app.memory.relationship.person_node import get_person_network
+        network = await get_person_network(user_id, min_importance=30)
+        names = [p["name"] for p in network[:5]]
+        return f"أشخاص مهمون: {', '.join(names)}" if names else "لا توجد شبكة معارف كافية"
+    except Exception as e:
+        return f"تعذر استرجاع الشبكة: {e}"
 
-print("✅ Tool Registry initialized")
+# ============================================================
+# تسجيل أدوات الميزات الجديدة
+# ============================================================
+async def tool_study_session(user_id: str, query: str = "") -> str:
+    """أداة: بدء جلسة دراسة سريعة"""
+    try:
+        from app.features.study.athena_orchestrator import athena
+        result = await athena.start_study_session(user_id, query or "عام", "teen", "ar")
+        return result.get("explanation", {}).get("simplified", "جاري الدراسة...")
+    except Exception as e:
+        return f"تعذر بدء الدراسة: {e}"
+
+async def tool_business_idea(user_id: str, query: str = "") -> str:
+    """أداة: توليد فكرة مشروع"""
+    try:
+        from app.features.business.growth_hive_orchestrator import growth_hive
+        result = await growth_hive.generate_business_idea(user_id, 1000, query, "عام", "ar")
+        ideas = result.get("ideas", [])
+        return f"أفكار: {ideas[0].get('title', '')}" if ideas else "لا توجد أفكار"
+    except Exception as e:
+        return f"تعذر توليد الفكرة: {e}"
+
+async def tool_code_generation(user_id: str, query: str = "") -> str:
+    """أداة: توليد كود برمجي"""
+    try:
+        from app.features.code_lab.sdlc_orchestrator import code_lab
+        result = await code_lab.generate_code(user_id, query, "Python")
+        return result.get("code", "تعذر التوليد")[:500]
+    except Exception as e:
+        return f"تعذر توليد الكود: {e}"
+
+async def tool_life_coach(user_id: str, query: str = "") -> str:
+    """أداة: جلسة تدريب حياة سريعة"""
+    try:
+        from app.features.life_coach.life_coach_orchestrator import life_coach
+        result = await life_coach.start_session(user_id, query, "ar")
+        return result.get("psychological_analysis", {}).get("cbt_intervention", "أنا هنا لدعمك.")
+    except Exception as e:
+        return f"تعذر بدء الجلسة: {e}"
+
+async def tool_dream_interpret(user_id: str, query: str = "") -> str:
+    """أداة: تفسير حلم"""
+    try:
+        from app.features.dreams.dream_orchestrator import dream_orchestrator
+        result = await dream_orchestrator.interpret(user_id, query, "ar")
+        return result.get("interpretation", "تعذر التفسير")
+    except Exception as e:
+        return f"تعذر تفسير الحلم: {e}"
+
+async def tool_proactive_recommendation(user_id: str, query: str = "") -> str:
+    """أداة: توصية استباقية"""
+    try:
+        from app.core.unified_recommendation_engine import engine
+        recs = await engine.get_daily_recommendation(user_id)
+        return recs.get("recommendations", [{}])[0].get("message", "لا توجد توصيات")
+    except Exception as e:
+        return f"تعذر التوصية: {e}"
+
+# ============================================================
+# تسجيل الكل
+# ============================================================
+ToolRegistry.register("emotional_state", tool_emotional_state, 10, 1, "memory", "استرجاع الحالة العاطفية الحالية")
+ToolRegistry.register("user_identity", tool_user_identity, 9, 1, "memory", "استرجاع هوية المستخدم")
+ToolRegistry.register("reflections", tool_reflections, 8, 1, "memory", "استرجاع الاستنتاجات المتراكمة")
+ToolRegistry.register("people_network", tool_people_network, 7, 1, "memory", "استرجاع شبكة الأشخاص المهمين")
+ToolRegistry.register("study", tool_study_session, 8, 2, "study", "بدء جلسة دراسة سريعة")
+ToolRegistry.register("business", tool_business_idea, 7, 2, "business", "توليد فكرة مشروع")
+ToolRegistry.register("code", tool_code_generation, 6, 3, "code_lab", "توليد كود برمجي")
+ToolRegistry.register("life_coach", tool_life_coach, 5, 2, "life_coach", "جلسة تدريب حياة")
+ToolRegistry.register("dream", tool_dream_interpret, 4, 2, "dreams", "تفسير حلم")
+ToolRegistry.register("recommendation", tool_proactive_recommendation, 10, 1, "proactive", "توصية يومية مخصصة")
+
+logger.info(f"✅ Unified Tool Registry initialized with {len(ToolRegistry._tools)} tools")
+print(f"✅ Tool Registry: {len(ToolRegistry._tools)} tools registered")
