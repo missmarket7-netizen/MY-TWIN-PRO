@@ -1,8 +1,20 @@
-"""Attachment Service – detect user attachment style."""
+"""
+Attachment Service v3.0 – كشف نمط التعلق (متكامل مع TCMA)
+=============================================================
+- يفضل TCMA Attachment Model إذا كان متاحاً
+- يعود للمنطق المحلي (الكلمات المفتاحية) كاحتياط
+- يستخدم في Twin State و Life Coach
+"""
 import logging
 from typing import Dict, List, Optional
 
 logger = logging.getLogger("attachment_service")
+
+try:
+    from app.memory.relationship.attachment_model import detect_attachment_style as tcma_detect
+    TCMA_ATTACHMENT_AVAILABLE = True
+except ImportError:
+    TCMA_ATTACHMENT_AVAILABLE = False
 
 INDICATORS = {
     "secure":       {"words": ["أثق بك","أشعر بالراحة","شكراً لوجودك"], "emotions": ["joy","love","calm"]},
@@ -19,7 +31,16 @@ RESPONSE_ADJUSTMENTS = {
     "unknown":      {"warmth":0.6,"challenge":0.4,"support":"exploratory","humor":0.5,"tone":"neutral"},
 }
 
-async def detect_style(messages: List[str], emotion_history: Optional[List[Dict]] = None) -> Dict:
+async def detect_style(messages: List[str] = None, user_id: str = None, emotion_history: Optional[List[Dict]] = None) -> Dict:
+    """يكتشف نمط التعلق. يفضل TCMA إذا كان user_id متاحاً."""
+    if TCMA_ATTACHMENT_AVAILABLE and user_id:
+        try:
+            result = await tcma_detect(user_id)
+            if result and result.get("style") and result["style"] != "unknown":
+                return result
+        except Exception as e:
+            logger.warning(f"TCMA attachment failed: {e}")
+
     if not messages:
         return {"style":"unknown","confidence":0.0}
     recent = messages[-20:]
@@ -50,3 +71,5 @@ def _has_anxiety(msg): return any(w in msg for w in ["خائف","قلق","متو
 def _has_avoidance(msg): return any(w in msg for w in ["لا أريد التحدث","لست بحاجة","أفضل وحدي","خليني","ما لي خلق"])
 def _has_contradiction(msg): return any(w in msg for w in ["أحتاجك","تعال"]) and any(w in msg for w in ["لكن لا","ابتعد","ما أقدر"])
 def _has_secure(msg): return any(w in msg for w in ["شكراً","فهمتني","أنت الأفضل","أنا مرتاح"])
+
+logger.info("✅ Attachment Service v3.0 initialized (TCMA Integrated)")
