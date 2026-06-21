@@ -1,6 +1,11 @@
-"""Prompt templates – system prompts that don't change per request."""
+"""
+Prompt Templates v2.0 – قوالب احتياطية ومتوافقة مع Prompt Builder
+=====================================================================
+- قوالب نظام أساسية بالعربية والإنجليزية
+- تُستخدم كاحتياط (Fallback) عندما لا يكون Prompt Builder الديناميكي متاحاً
+- تدعم تخصيص اسم التوأم، مستوى الرابطة، واللغة
+"""
 from typing import Dict
-
 
 SYSTEM_PROMPTS: Dict[str, str] = {
     "ar": """أنت توأم رقمي دافئ ومتعاطف. اسمك {twin_name}.
@@ -19,7 +24,11 @@ SYSTEM_PROMPTS: Dict[str, str] = {
 10. إذا كان هناك نتائج أدوات خارجية، قدّمها بوضوح.
 
 السياق الحالي للعلاقة:
-- مستوى الرابطة: {bond_level}%""",
+- مستوى الرابطة: {bond_level}%
+- مرحلة العلاقة: {stage}
+- أهم الأشخاص: {people}
+
+ملاحظة: هذا قالب احتياطي. النظام الأساسي يستخدم Prompt Builder الديناميكي.""",
 
     "en": """You are a warm, empathetic digital twin named {twin_name}.
 Your goal: provide emotional support, listen, and respond with empathy and wisdom.
@@ -37,15 +46,56 @@ Core Rules:
 10. If external tool results are present, present them clearly.
 
 Current relationship context:
-- Bond level: {bond_level}%""",
+- Bond level: {bond_level}%
+- Stage: {stage}
+- Important people: {people}
+
+Note: This is a fallback template. The primary system uses the dynamic Prompt Builder.""",
 }
 
 
-def get_system_prompt(lang: str = "ar", twin_name: str = "توأمك", bond_level: float = 0.0) -> str:
+def get_system_prompt(
+    lang: str = "ar",
+    twin_name: str = "توأمك",
+    bond_level: float = 0.0,
+    stage: str = "stranger",
+    people: str = "لا يوجد"
+) -> str:
     """
-    Get a formatted system prompt.
-    This is static and doesn't change per request except for params.
-    Can be cached in Redis for zero-cost retrieval.
+    Get a formatted system prompt (Fallback).
+    
+    يُستخدم هذا القالب فقط عندما يكون Prompt Builder الديناميكي غير متاح.
+    المعلمات الإضافية (stage, people) اختيارية.
     """
     template = SYSTEM_PROMPTS.get(lang, SYSTEM_PROMPTS["ar"])
-    return template.format(twin_name=twin_name, bond_level=bond_level)
+    return template.format(
+        twin_name=twin_name,
+        bond_level=bond_level,
+        stage=stage,
+        people=people
+    )
+
+# ============================================================
+# قوالب إضافية للميزات (تُستخدم كاحتياط أيضاً)
+# ============================================================
+FEATURE_TEMPLATES: Dict[str, Dict[str, str]] = {
+    "study": {
+        "ar": "أنت مساعد دراسة ذكي (ATHENA). اشرح {concept} بأسلوب S.C.A.F.F.O.L.D.",
+        "en": "You are a smart study assistant (ATHENA). Explain {concept} using S.C.A.F.F.O.L.D."
+    },
+    "business": {
+        "ar": "أنت خبير أعمال (GROWTH-HIVE). ساعد المستخدم في {idea}.",
+        "en": "You are a business expert (GROWTH-HIVE). Help the user with {idea}."
+    },
+    "code_lab": {
+        "ar": "أنت مهندس برمجيات (C.O.D.E. Lab). اكتب كود {language} لـ {module}.",
+        "en": "You are a software engineer (C.O.D.E. Lab). Write {language} code for {module}."
+    }
+}
+
+def get_feature_template(feature: str, lang: str = "ar") -> str:
+    """جلب قالب احتياطي لميزة محددة"""
+    return FEATURE_TEMPLATES.get(feature, {}).get(lang, "")
+
+logger = __import__("logging").getLogger(__name__)
+logger.info("✅ Prompt Templates v2.0 initialized (Fallback mode)")
