@@ -1,66 +1,57 @@
 """
-MyTwin – Emotional Timeline v2.0 (متوافق مع Emotional Engine v8.0)
-- يسجل المشاعر في Supabase
-- يحلل الاتجاهات ويُنتج ملخصات
+Emotional Timeline v3.0 – متكامل مع TCMA Emotional Memory
+=============================================================
+يسجل المشاعر في TCMA (التي تخزّنها في Supabase تلقائياً).
+يحلل الاتجاهات من الذاكرة العاطفية مباشرة.
 """
-import os, logging, asyncio
-from typing import Dict, Any, Optional, List
+import logging
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
-from app.twin_state.emotional_service import EmotionalStateTracker
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
-db: Optional[Client] = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+try:
+    from app.memory.emotional.emotional_memory import store_emotional_memory, get_emotional_patterns
+    TCMA_AVAILABLE = True
+except ImportError:
+    TCMA_AVAILABLE = False
 
 class EmotionalTimeline:
-    def __init__(self):
-        # ✅ لا نمرر أي معاملات، EmotionalStateTracker يقرأ المفتاح من البيئة داخلياً
-        self.emotion_tracker = EmotionalStateTracker()
-
     async def record_emotion(self, user_id: str, text: str) -> Optional[Dict[str, Any]]:
-        """تحليل النص وتسجيل المشاعر في Supabase"""
-        if not db:
+        """تحليل النص وتسجيل المشاعر في TCMA"""
+        if not TCMA_AVAILABLE:
             return None
         try:
-            result = await self.emotion_tracker.analyze(text)
+            from app.twin_state.emotional_service import emotional_service
+            result = await emotional_service.analyze(text, user_id)
             if result:
-                db.table("emotional_timeline").insert({
-                    "user_id": user_id,
-                    "primary_emotion": result.get("primary", "neutral"),
-                    "intensity": result.get("intensity", 0.5),
-                    "valence": result.get("valence", 0.0),
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }).execute()
+                # TCMA تخزّن في Supabase داخلياً
+                await store_emotional_memory(
+                    user_id=user_id,
+                    expressed_text=text,
+                    detected_emotion=result,
+                    trigger="chat"
+                )
                 return result
         except Exception as e:
             logger.error(f"Failed to record emotion: {e}")
         return None
 
     async def get_emotion_summary(self, user_id: str, days: int = 7) -> Dict[str, Any]:
-        """ملخص المشاعر لآخر أيام"""
-        if not db:
+        """ملخص المشاعر من TCMA"""
+        if not TCMA_AVAILABLE:
             return {"dominant": "neutral", "average_intensity": 0.5}
         try:
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-            res = db.table("emotional_timeline").select("*").eq("user_id", user_id).gte("created_at", cutoff).execute()
-            if not res.data:
-                return {"dominant": "neutral", "average_intensity": 0.5}
-            
-            emotions = [r["primary_emotion"] for r in res.data]
-            intensities = [r.get("intensity", 0.5) for r in res.data]
-            
-            freq: Dict[str, int] = {}
-            for e in emotions:
-                freq[e] = freq.get(e, 0) + 1
-            dominant = max(freq, key=freq.get)
-            avg_intensity = sum(intensities) / len(intensities)
-            
-            return {"dominant": dominant, "average_intensity": avg_intensity}
+            patterns = await get_emotional_patterns(user_id, days)
+            return {
+                "dominant": patterns.get("dominant_emotion", "neutral"),
+                "distribution": patterns.get("emotion_distribution", {}),
+                "patterns": patterns.get("patterns", []),
+                "recommendation": patterns.get("recommendation", ""),
+                "source": "tcma"
+            }
         except Exception as e:
-            logger.error(f"Failed to get emotion summary: {e}")
+            logger.error(f"Failed to get summary: {e}")
             return {"dominant": "neutral", "average_intensity": 0.5}
 
 emotional_timeline = EmotionalTimeline()
-print("✅ Emotional Timeline v2.0 جاهز")
