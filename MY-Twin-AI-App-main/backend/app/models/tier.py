@@ -1,4 +1,4 @@
-"""Tier model – subscription tiers, limits, features."""
+"""Tier model v2.0 – جميع ميزات MyTwin الجديدة"""
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -16,31 +16,70 @@ class TierConfig(BaseModel):
     coaching_enabled: bool = Field(default=False)
     dreams_enabled: bool = Field(default=False)
     proactive_enabled: bool = Field(default=False)
+    # ميزات جديدة
+    study_enabled: bool = Field(default=False)
+    business_enabled: bool = Field(default=False)
+    creator_enabled: bool = Field(default=False)
+    code_lab_enabled: bool = Field(default=False)
+    smart_home_enabled: bool = Field(default=False)
+    deep_search_enabled: bool = Field(default=False)
+    translate_enabled: bool = Field(default=False)
+    summarize_enabled: bool = Field(default=False)
+    shadow_mode_enabled: bool = Field(default=False)
 
 
 TIER_CONFIGS: dict = {
-    "free": TierConfig(tier="free", daily_messages=15, daily_tokens=500, bond_ceiling=28,
-                       features=["chat","weather","search"], models=["groq","gemini"],
-                       voice_provider="edge_tts"),
-    "plus": TierConfig(tier="plus", daily_messages=50, daily_tokens=1500, bond_ceiling=70,
-                       features=["chat","weather","search","spotify","news","proactive"],
-                       models=["groq","gemini","openrouter"], voice_provider="edge_tts",
-                       long_memory_enabled=True, proactive_enabled=True),
-    "premium": TierConfig(tier="premium", daily_messages=150, daily_tokens=4000, bond_ceiling=90,
-                          features=["chat","weather","search","spotify","news","calendar","coaching","dreams","proactive"],
-                          models=["groq","gemini","openrouter"], voice_provider="elevenlabs",
-                          elevenlabs_enabled=True, long_memory_enabled=True,
-                          coaching_enabled=True, dreams_enabled=True, proactive_enabled=True),
-    "pro": TierConfig(tier="pro", daily_messages=500, daily_tokens=7000, bond_ceiling=100,
-                      features=["chat","weather","search","spotify","news","calendar","coaching","dreams","proactive","smart_home"],
-                      models=["groq","gemini","openrouter"], voice_provider="elevenlabs",
-                      elevenlabs_enabled=True, long_memory_enabled=True,
-                      coaching_enabled=True, dreams_enabled=True, proactive_enabled=True),
-    "yearly": TierConfig(tier="yearly", daily_messages=9999, daily_tokens=15000, bond_ceiling=100,
-                         features=["all"], models=["groq","gemini","openrouter"],
-                         voice_provider="elevenlabs", elevenlabs_enabled=True,
-                         long_memory_enabled=True, coaching_enabled=True,
-                         dreams_enabled=True, proactive_enabled=True),
+    "free": TierConfig(
+        tier="free", daily_messages=15, daily_tokens=500, bond_ceiling=28,
+        features=["chat", "weather", "search"],
+        models=["groq", "gemini"],
+        voice_provider="edge_tts",
+        translate_enabled=True, summarize_enabled=True,
+    ),
+    "plus": TierConfig(
+        tier="plus", daily_messages=50, daily_tokens=1500, bond_ceiling=70,
+        features=["chat", "weather", "search", "news", "proactive"],
+        models=["groq", "gemini", "openrouter"],
+        voice_provider="edge_tts",
+        long_memory_enabled=True, proactive_enabled=True,
+        study_enabled=True, creator_enabled=True,
+        translate_enabled=True, summarize_enabled=True,
+    ),
+    "premium": TierConfig(
+        tier="premium", daily_messages=150, daily_tokens=4000, bond_ceiling=90,
+        features=["chat", "weather", "search", "news", "calendar", "coaching", "dreams", "proactive"],
+        models=["groq", "gemini", "openrouter"],
+        voice_provider="elevenlabs", elevenlabs_enabled=True,
+        long_memory_enabled=True, coaching_enabled=True,
+        dreams_enabled=True, proactive_enabled=True,
+        study_enabled=True, business_enabled=True, creator_enabled=True,
+        code_lab_enabled=True, translate_enabled=True, summarize_enabled=True,
+        deep_search_enabled=True, shadow_mode_enabled=True,
+    ),
+    "pro": TierConfig(
+        tier="pro", daily_messages=500, daily_tokens=7000, bond_ceiling=100,
+        features=["chat", "weather", "search", "news", "calendar", "coaching", "dreams", "proactive", "smart_home"],
+        models=["groq", "gemini", "openrouter"],
+        voice_provider="elevenlabs", elevenlabs_enabled=True,
+        long_memory_enabled=True, coaching_enabled=True,
+        dreams_enabled=True, proactive_enabled=True,
+        study_enabled=True, business_enabled=True, creator_enabled=True,
+        code_lab_enabled=True, smart_home_enabled=True,
+        translate_enabled=True, summarize_enabled=True,
+        deep_search_enabled=True, shadow_mode_enabled=True,
+    ),
+    "yearly": TierConfig(
+        tier="yearly", daily_messages=9999, daily_tokens=15000, bond_ceiling=100,
+        features=["all"],
+        models=["groq", "gemini", "openrouter"],
+        voice_provider="elevenlabs", elevenlabs_enabled=True,
+        long_memory_enabled=True, coaching_enabled=True,
+        dreams_enabled=True, proactive_enabled=True,
+        study_enabled=True, business_enabled=True, creator_enabled=True,
+        code_lab_enabled=True, smart_home_enabled=True,
+        translate_enabled=True, summarize_enabled=True,
+        deep_search_enabled=True, shadow_mode_enabled=True,
+    ),
 }
 
 

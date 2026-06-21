@@ -1,4 +1,9 @@
-"""Voice model – voice configuration and personalities."""
+"""
+Voice Model v2.0 – يدعم الصوت الذكوري والأنثوي
+==================================================
+- أصوات افتراضية للغة العربية والإنجليزية (ذكور وإناث)
+- قواعد مخصصة للشخصية والجنس
+"""
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -27,6 +32,18 @@ GENDER_BASE = {
     "female": {"pitch": 1.1,  "rate": 1.0},
 }
 
+# الأصوات الافتراضية حسب اللغة والجنس (Edge TTS)
+DEFAULT_VOICES = {
+    "ar": {
+        "female": "ar-EG-SalmaNeural",
+        "male": "ar-SA-HamedNeural",
+    },
+    "en": {
+        "female": "en-US-JennyNeural",
+        "male": "en-US-GuyNeural",
+    },
+}
+
 
 def get_voice_personality(personality: str = "friend", gender: str = "female") -> dict:
     config = VOICE_PERSONALITIES.get(personality, VOICE_PERSONALITIES["friend"]).copy()
@@ -35,3 +52,17 @@ def get_voice_personality(personality: str = "friend", gender: str = "female") -
     config["rate"] = config["rate"] * base["rate"]
     config["gender"] = gender
     return config
+
+
+def get_default_voice_id(lang: str = "ar", gender: str = "female") -> str:
+    """إرجاع معرف الصوت الافتراضي حسب اللغة والجنس"""
+    lang_voices = DEFAULT_VOICES.get(lang, DEFAULT_VOICES["ar"])
+    return lang_voices.get(gender, lang_voices["female"])
+
+
+def get_gender_voice_options(gender: str = "female") -> dict:
+    """إرجاع خيارات الصوت لكل اللغات حسب الجنس"""
+    options = {}
+    for lang, voices in DEFAULT_VOICES.items():
+        options[lang] = voices.get(gender, list(voices.values())[0])
+    return options

@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 
 
 class VoiceConfig(BaseModel):
-    provider: str = Field(default="edge_tts")  # edge_tts | expo_speech | elevenlabs
+    provider: str = Field(default="edge_tts")
     voice_id: str = Field(default="ar-EG-SalmaNeural")
     language: str = Field(default="ar")
     pitch: float = Field(default=1.0, ge=0.5, le=2.0)
     rate: float = Field(default=1.0, ge=0.5, le=2.0)
     gender: str = Field(default="female")
+    personality: str = Field(default="friend")
+    emotion: str = Field(default="neutral")
 
 
 class TierConfig(BaseModel):
